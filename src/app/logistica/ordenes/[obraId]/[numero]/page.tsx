@@ -80,7 +80,19 @@ export default async function OrdenPage({ params }: PageProps<"/logistica/ordene
   const manoObra = cot?.valorizacion_id != null || cot?.es_retencion === true;
   const conEntregas = (orden.estado === "EN_ENTREGA" || orden.estado === "RECIBIDA") && !manoObra;
   const esOC = orden.tipo === "OC";
-  const [{ data: prov }, rechazos, pagos, entregas, { data: guia }, { data: transportistas }, { data: comps }, { data: historial }] = await Promise.all([
+  // Una sola ola más: lo que depende de otra consulta (la URL de la guía, las de los comprobantes, los nombres del
+  // historial) se encadena a su propia promesa en vez de esperar a toda la ola.
+  const [
+    { data: prov },
+    rechazos,
+    pagos,
+    entregas,
+    { guia, urlGuia },
+    { data: transportistas },
+    { comps, urlsComp },
+    { historial, nombreEditor },
+    representante,
+  ] = await Promise.all([
     supabase
       .from("proveedores")
       .select("comprobante_habitual, retencion_4ta_pct, suspension_4ta_fecha, contactos:proveedor_contactos(nombre, telefono, whatsapp, telegram)")
@@ -99,7 +111,16 @@ export default async function OrdenPage({ params }: PageProps<"/logistica/ordene
       .eq("numero_oc", numero)
       .order("solicitado_at", { ascending: false })
       .limit(1)
-      .maybeSingle(),
+      .maybeSingle()
+      .then(async ({ data: guia }) => ({
+        guia,
+        urlGuia: guia?.archivo_path
+          ? await supabase.storage
+              .from("documentos")
+              .createSignedUrl(guia.archivo_path, 3600)
+              .then((r) => (r.data?.signedUrl ? urlPublica(r.data.signedUrl) : null))
+          : null,
+      })),
     esOC
       ? supabase.from("transportistas").select("id, ruc, razon_social, placa, licencia").order("razon_social")
       : Promise.resolve({ data: [] }),
@@ -107,26 +128,23 @@ export default async function OrdenPage({ params }: PageProps<"/logistica/ordene
       .from("v_comprobantes")
       .select("id, tipo, serie, numero, fecha_emision, total, retencion, detraccion, archivo_path, asiento_id, pagado")
       .in("id", comprobanteIds.length ? comprobanteIds : [-1])
-      .order("id"),
+      .order("id")
+      .then(async ({ data: comps }) => ({
+        comps,
+        urlsComp: await urlsComprobantes((comps ?? []).map((c) => c.archivo_path).filter((p): p is string => !!p)),
+      })),
     supabase
       .from("comprobantes_historial")
       .select("id, comprobante_id, anterior, nuevo, motivo, editado_at, editado_by")
       .in("comprobante_id", comprobanteIds.length ? comprobanteIds : [-1])
-      .order("editado_at", { ascending: false }),
-  ]);
-  const { data: editores } = await supabase
-    .from("perfiles")
-    .select("user_id, nombre")
-    .in("user_id", [...new Set((historial ?? []).map((h) => h.editado_by).filter((u): u is string => !!u))].concat(["00000000-0000-0000-0000-000000000000"]));
-  const nombreEditor = new Map((editores ?? []).map((e) => [e.user_id, e.nombre]));
-  const [urlGuia, urlsComp] = await Promise.all([
-    guia?.archivo_path
-      ? supabase.storage
-          .from("documentos")
-          .createSignedUrl(guia.archivo_path, 3600)
-          .then((r) => (r.data?.signedUrl ? urlPublica(r.data.signedUrl) : null))
-      : null,
-    urlsComprobantes((comps ?? []).map((c) => c.archivo_path).filter((p): p is string => !!p)),
+      .order("editado_at", { ascending: false })
+      .then(async ({ data: historial }) => {
+        const ids = [...new Set((historial ?? []).map((h) => h.editado_by).filter((u): u is string => !!u))];
+        const { data: editores } = ids.length ? await supabase.from("perfiles").select("user_id, nombre").in("user_id", ids) : { data: [] };
+        return { historial, nombreEditor: new Map((editores ?? []).map((e) => [e.user_id, e.nombre])) };
+      }),
+    // El firmante del contrato (solo OS), a la vez que lo demás.
+    orden.tipo === "OS" ? representanteContratos(orden.empresa_id ?? null, { conFirma: false }) : Promise.resolve(null),
   ]);
 
   return (
@@ -145,7 +163,7 @@ export default async function OrdenPage({ params }: PageProps<"/logistica/ordene
           ? {
               comprobante: (cot?.comprobante_tipo as "RXH" | "FACTURA" | null) ?? null,
               fechaInicio: cot?.fecha_inicio ?? null,
-              ...(await representanteContratos(orden.empresa_id ?? null)),
+              ...representante!,
             }
           : undefined
       }

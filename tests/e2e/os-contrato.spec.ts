@@ -86,7 +86,7 @@ test.describe("@prod1 @logistica facturar: guía y retención", () => {
       await hoja.getByLabel("Número").fill(num);
       // Orden normal: sin el archivo de la factura no se registra.
       await expect(hoja.getByRole("button", { name: /^Registrar/ })).toBeDisabled();
-      await hoja.locator('input[type="file"]').setInputFiles(path.resolve("public/empresas/ariant.png"));
+      await hoja.locator('input[type="file"]').setInputFiles(path.resolve("tests/e2e/archivos/ariant.png"));
       // Marcar la guía cambia el botón: ya no se envía solo.
       await hoja.getByLabel("Requiere guía de remisión").check();
       await expect(hoja.getByRole("button", { name: "Registrar", exact: true })).toBeVisible();
@@ -114,7 +114,7 @@ test.describe("@prod1 @logistica facturar: guía y retención", () => {
     const [obra, numero] = fila;
     try {
       const page = await abrir("logistica", `/logistica/ordenes/${obra}/${numero}?tipo=OS`);
-      await page.locator('#contrato input[type="file"]').setInputFiles(path.resolve("public/empresas/ariant.png"));
+      await page.locator('#contrato input[type="file"]').setInputFiles(path.resolve("tests/e2e/archivos/ariant.png"));
       await expect.poll(() => sql1(`select estado from ordenes_compra where obra_id = ${obra} and numero = '${numero}'`), { timeout: 15_000 }).toBe("EN_TESORERIA");
     } finally {
       sql(`delete from adjuntos where tipo = 'CONTRATO' and obra_id = ${obra} and numero_oc = '${numero}';
@@ -178,7 +178,7 @@ test.describe("@prod1 @logistica facturar: guía y retención", () => {
       await expect(hoja.getByRole("alert")).toHaveText(/constancia/);
       await seccion.getByLabel("Fecha de la constancia").fill(hoyLima());
       await expect(seccion).toContainText(`Vigente hasta el 31/12/${hoyLima().slice(0, 4)}`);
-      await seccion.locator('input[type="file"]').setInputFiles(path.resolve("public/empresas/ariant.png"));
+      await seccion.locator('input[type="file"]').setInputFiles(path.resolve("tests/e2e/archivos/ariant.png"));
       await hoja.getByRole("button", { name: "Guardar" }).click();
       await expect(hoja).toBeHidden();
       expect(sql1(`select suspension_4ta_fecha || ' ' || (suspension_4ta_path like 'proveedores/${ruc}/suspension-4ta-%') from proveedores where id = ${id}`)).toBe(`${hoyLima()} true`);
@@ -199,7 +199,7 @@ test.describe("@prod1 @gerencia firma y DNI", () => {
       await page.getByRole("button", { name: "Mi firma" }).click();
       const hoja = page.getByRole("dialog", { name: "Mi firma" });
       await expect(hoja.getByText("Sin firma").or(hoja.getByRole("img", { name: "Firma" }))).toBeVisible();
-      await hoja.locator('input[type="file"]').setInputFiles(path.resolve("public/empresas/ariant.png"));
+      await hoja.locator('input[type="file"]').setInputFiles(path.resolve("tests/e2e/archivos/ariant.png"));
       await expect(hoja.getByRole("img", { name: "Firma" })).toBeVisible();
       await hoja.getByRole("button", { name: "Guardar firma" }).click();
       await expect(hoja).toBeHidden();

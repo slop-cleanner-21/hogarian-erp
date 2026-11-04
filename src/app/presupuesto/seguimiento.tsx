@@ -1,7 +1,8 @@
 import { FiltroOrden } from "@/components/filtro-orden";
 import { SearchBox, Tabs } from "@/components/list-controls";
 import { RecordarFiltros } from "@/components/recordar-filtros";
-import { SeguimientoPresupuesto, tramosDe, type FilaSeguimiento } from "@/components/seguimiento-presupuesto";
+import { SeguimientoPresupuesto } from "@/components/seguimiento-filas";
+import { tramosDe, type FilaSeguimiento } from "@/components/seguimiento-presupuesto";
 import { TopBar, UserMenu } from "@/components/shell";
 import { UrlSelect } from "@/components/url-select";
 import { TODOS, filtro } from "@/lib/filtros";

@@ -27,7 +27,7 @@ test.describe("@prod1 @logistica guía de remisión", () => {
       const enviar = hoja.getByRole("button", { name: "Registrar guía" });
       await expect(enviar, "sin N° ni archivo no se puede registrar").toBeDisabled();
       await hoja.getByLabel("N° de guía").fill(numeroGuia);
-      await hoja.getByLabel("Guía (PDF o foto)").setInputFiles(path.resolve("public/empresas/ariant.png"));
+      await hoja.getByLabel("Guía (PDF o foto)").setInputFiles(path.resolve("tests/e2e/archivos/ariant.png"));
       await expect(hoja.getByText("ariant.png")).toBeVisible();
       await enviar.click();
       await expect(hoja).toBeHidden();

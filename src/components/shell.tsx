@@ -18,6 +18,7 @@ import { CambiarContrasena } from "./cambiar-contrasena";
 import { MiFirma } from "./mi-firma";
 import { Campana } from "./campana";
 import { CLAVE_ANTERIOR } from "./recordar-ruta";
+import { destinoDe } from "@/lib/vistas";
 import Link from "next/link";
 import { usePathname, useRouter, useSearchParams } from "next/navigation";
 import { useState, type ReactNode } from "react";
@@ -91,6 +92,7 @@ function moduloActual(path: string): Modulo {
 }
 
 export function BottomNav() {
+  const router = useRouter();
   const path = usePathname();
   const params = new URLSearchParams(useSearchParams().toString());
   const nav = MODULOS[moduloActual(path)].nav;
@@ -121,6 +123,11 @@ export function BottomNav() {
                     return;
                   }
                   setTocado({ href, desde: actual });
+                  const destino = destinoDe(href);
+                  if (destino !== href) {
+                    e.preventDefault();
+                    router.push(destino);
+                  }
                 }}
                 aria-current={active ? "page" : undefined}
                 className={cn(
@@ -189,6 +196,7 @@ export function UserMenu({ id, nombre, rol }: { id: string; nombre: string; rol:
   const [contrasena, setContrasena] = useState(false);
   const [firma, setFirma] = useState(false);
   const [huella, setHuella] = useState(false);
+  const router = useRouter();
   const path = usePathname();
   const actual = moduloActual(path);
   const disponibles = (Object.keys(MODULOS) as Modulo[]).filter(
@@ -217,8 +225,14 @@ export function UserMenu({ id, nombre, rol }: { id: string; nombre: string; rol:
                 // Ya en su pantalla principal: abriría la misma vista guardada (la URL no cambia), solo se cierra.
                 data-aqui={path === `/${m}` || undefined}
                 onClick={(e) => {
-                  if (path === `/${m}`) e.preventDefault();
                   setOpen(false);
+                  if (path === `/${m}`) return e.preventDefault();
+                  // Directo a su vista guardada (sin la redirección del proxy).
+                  const destino = destinoDe(`/${m}`);
+                  if (destino !== `/${m}`) {
+                    e.preventDefault();
+                    router.push(destino);
+                  }
                 }}
                 className={cn(
                   "flex h-12 items-center rounded-control px-3",

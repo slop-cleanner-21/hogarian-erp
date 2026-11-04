@@ -133,7 +133,7 @@ test.describe("@roles @tesoreria", () => {
         }),
       ),
     );
-    const conLogo = (n: string) => ["png", "svg"].some((x) => fs.existsSync(path.resolve(`public/empresas/${n.toLowerCase()}.${x}`)));
+    const conLogo = (n: string) => ["png", "svg", "webp"].some((x) => fs.existsSync(path.resolve(`public/empresas/${n.toLowerCase()}.${x}`)));
     expect(fichas.length, "empresas en la entrada").toBeGreaterThan(1);
     for (const f of fichas) {
       if (conLogo(f.nombre)) expect(f.carga, `${f.nombre}: <img> que carga`).toBe(true);

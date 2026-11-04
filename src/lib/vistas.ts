@@ -75,3 +75,17 @@ export function guardarVista(path: string, base: string[], completa: URLSearchPa
     // Sin cookies: se restaura en el navegador como antes.
   }
 }
+
+/**
+ * En el navegador: la URL final de un enlace del menú (su vista guardada, si la hay). Así se navega directo,
+ * sin la redirección del proxy, que costaba un viaje entero en datos móviles (el proxy queda de respaldo).
+ */
+export function destinoDe(href: string): string {
+  try {
+    const m = document.cookie.match(new RegExp(`(?:^|; )${COOKIE_VISTAS}=([^;]*)`));
+    const [ruta, query = ""] = href.split("?");
+    return vistaGuardada(m?.[1], ruta, new URLSearchParams(query)) ?? href;
+  } catch {
+    return href;
+  }
+}

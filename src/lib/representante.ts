@@ -7,10 +7,13 @@ export type EmpresaContrato = { razonSocial: string | null; direccion: string | 
 
 /**
  * Quien firma los contratos de la empresa: el firmante que el Admin eligió (Admin › Empresas) o, si no hay, el
- * gerente con la firma más reciente. Con la firma como data URL: el PDF del contrato se arma en el navegador y
- * no depende de otra petición.
+ * gerente con la firma más reciente. La firma (data URL) solo con `conFirma`: la vista de la orden no la manda;
+ * el PDF la pide al armarse (firmaContrato).
  */
-export async function representanteContratos(empresaId: number | null): Promise<{ representante: Representante | null; empresa: EmpresaContrato }> {
+export async function representanteContratos(
+  empresaId: number | null,
+  { conFirma = true }: { conFirma?: boolean } = {},
+): Promise<{ representante: Representante | null; empresa: EmpresaContrato }> {
   const db = createAdminClient();
   const { data: emp } = empresaId
     ? await db.from("empresas").select("razon_social, direccion, firmante_id").eq("id", empresaId).maybeSingle()
@@ -37,7 +40,7 @@ export async function representanteContratos(empresaId: number | null): Promise<
     db.from("perfiles").select("nombre").eq("user_id", elegido).maybeSingle(),
     db.from("perfil_privado").select("dni, firma_path").eq("user_id", elegido).maybeSingle(),
   ]);
-  const { data: archivo } = p?.firma_path ? await db.storage.from("documentos").download(p.firma_path) : { data: null };
+  const { data: archivo } = conFirma && p?.firma_path ? await db.storage.from("documentos").download(p.firma_path) : { data: null };
   const firma = archivo ? `data:${archivo.type || "image/png"};base64,${Buffer.from(await archivo.arrayBuffer()).toString("base64")}` : null;
   return { representante: { nombre: perfil?.nombre ?? "", dni: p?.dni ?? null, firma }, empresa };
 }

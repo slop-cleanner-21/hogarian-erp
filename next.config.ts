@@ -52,6 +52,8 @@ const nextConfig: NextConfig = {
           { key: "Cache-Control", value: "private, no-store" },
         ],
       },
+      // Logos de las empresas (public/ se servía con max-age=0: se revalidaban en cada vista).
+      { source: "/empresas/:archivo*", headers: [{ key: "Cache-Control", value: "public, max-age=86400, stale-while-revalidate=604800" }] },
     ];
   },
   // Sin conexión directa (local, túnel), el navegador habla con Supabase a través de la app (ver

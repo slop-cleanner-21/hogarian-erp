@@ -15,9 +15,23 @@ export default async function NuevaOrdenPage({ searchParams }: PageProps<"/logis
   const obraId = Number(sp.obra) || null;
   const supabase = await createClient();
 
+  // Partidas de la obra: por páginas (la API corta cada respuesta en 1000 filas), solo las columnas que usa la
+  // pantalla. Prod 1 (sin valorizaciones): la mano de obra se ordena en OS, como los subcontratos.
+  const pagina = (a: number, b: number) => {
+    const q = supabase
+      .from("v_partidas")
+      .select("id, codigo, etapa, requerimiento, item_id, descripcion, unidad, cantidad, cant_comprometida, saldo_cant, tipo_material, cantidad_efectiva")
+      .eq("obra_id", obraId!)
+      .order("etapa")
+      .order("codigo")
+      .order("id");
+    return (tipo === "OC" ? q.eq("rubro", "MATERIAL") : q.neq("rubro", "MATERIAL")).range(a, b);
+  };
+
   // Obras y proveedores por páginas: pasadas las 1000 filas, los que quedaran fuera no se podrían elegir
-  // ni saldrían sugeridos aunque hayan vendido el ítem.
-  const [obras, proveedores, { data: tiposMaterial }] = await Promise.all([
+  // ni saldrían sugeridos aunque hayan vendido el ítem. Con la obra (viene en la URL), sus partidas y el
+  // siguiente número van en la misma ola.
+  const [obras, proveedores, { data: tiposMaterial }, data, { data: num }] = await Promise.all([
     todas((a, b) => supabase.from("obras").select("id, nombre, empresas(nombre)").order("nombre").order("id").range(a, b)),
     todas((a, b) =>
       supabase
@@ -28,6 +42,8 @@ export default async function NuevaOrdenPage({ searchParams }: PageProps<"/logis
         .range(a, b),
     ),
     supabase.from("tipos_material").select("codigo").order("orden"),
+    obraId ? todas(pagina) : Promise.resolve([]),
+    obraId ? supabase.rpc("siguiente_numero_oc", { p_obra_id: obraId }) : Promise.resolve({ data: null }),
   ]);
 
   let partidas: VPartida[] = [];
@@ -36,16 +52,6 @@ export default async function NuevaOrdenPage({ searchParams }: PageProps<"/logis
   let atender: { numero: string; lineas: Record<number, number> } | null = null;
   const requeridos: Record<number, number> = {};
   if (obraId) {
-    // Por páginas (la API corta cada respuesta en 1000 filas). Prod 1 (sin valorizaciones): la mano de
-    // obra se ordena en OS, como los subcontratos.
-    const pagina = (a: number, b: number) => {
-      const q = supabase.from("v_partidas").select("*").eq("obra_id", obraId).order("etapa").order("codigo").order("id");
-      return (tipo === "OC" ? q.eq("rubro", "MATERIAL") : q.neq("rubro", "MATERIAL")).range(a, b);
-    };
-    const [data, { data: num }] = await Promise.all([
-      todas(pagina),
-      supabase.rpc("siguiente_numero_oc", { p_obra_id: obraId }),
-    ]);
     partidas = data as VPartida[];
     siguiente = String(num ?? "");
     // Quién ya vendió estos ítems (en cualquier obra): se sugieren primero al elegir proveedor.
@@ -53,18 +59,23 @@ export default async function NuevaOrdenPage({ searchParams }: PageProps<"/logis
     const ventas = new Map<string, Venta>();
     // El P.U. es el de la última orden con precio (la más reciente puede no tenerlo aún).
     const fechaPu = new Map<string, string>();
-    for (let i = 0; i < itemIds.length; i += 300) {
-      // Por páginas: la API corta cada respuesta en 1000 filas y un bloque de ítems puede tener más
-      // ventas (con `.limit` se perdían en silencio y el ítem quedaba como si nadie lo hubiera vendido).
-      const lineas = await todas((a, b) =>
-        supabase
-          .from("v_oc_items_calc")
-          .select("item_id, proveedor_id, fecha, pu_efectivo")
-          .in("item_id", itemIds.slice(i, i + 300))
-          .neq("estado", "ANULADA")
-          .order("id")
-          .range(a, b),
-      );
+    // Por páginas: la API corta cada respuesta en 1000 filas y un bloque de ítems puede tener más ventas (con
+    // `.limit` se perdían en silencio y el ítem quedaba como si nadie lo hubiera vendido). Los bloques (de 300
+    // ítems, por el largo de la URL) van a la vez: cada uno tiene ítems distintos, el orden entre ellos no importa.
+    const bloques = await Promise.all(
+      Array.from({ length: Math.ceil(itemIds.length / 300) }, (_, k) =>
+        todas((a, b) =>
+          supabase
+            .from("v_oc_items_calc")
+            .select("item_id, proveedor_id, fecha, pu_efectivo")
+            .in("item_id", itemIds.slice(k * 300, k * 300 + 300))
+            .neq("estado", "ANULADA")
+            .order("id")
+            .range(a, b),
+        ),
+      ),
+    );
+    for (const lineas of bloques) {
       for (const l of lineas) {
         const k = `${l.item_id}-${l.proveedor_id}`;
         const previa = ventas.get(k);
@@ -93,8 +104,7 @@ export default async function NuevaOrdenPage({ searchParams }: PageProps<"/logis
       }
       if (faltan?.length) atender = { numero: faltan[0].numero!, lineas };
     }
-    const { data: pendientes } = await supabase.from("v_requerimiento_items").select("partida_id, pendiente").eq("obra_id", obraId).gt("pendiente", 0);
-    for (const r of pendientes ?? []) requeridos[r.partida_id!] = (requeridos[r.partida_id!] ?? 0) + Number(r.pendiente);
+    // Prod 1: sin requerimientos (no hay pendientes que marcar).
   }
 
   return (

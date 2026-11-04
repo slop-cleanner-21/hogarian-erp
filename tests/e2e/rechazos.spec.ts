@@ -121,7 +121,7 @@ test.describe("@prod1 @rechazos rechazo y reenvío", () => {
       const hoja = log.getByRole("dialog", { name: "Comprobante" });
       await hoja.getByLabel("Serie").fill("F998");
       await hoja.getByLabel("Número").fill(String(Date.now() % 100000000));
-      await hoja.locator('input[type="file"]').setInputFiles(path.resolve("public/empresas/ariant.png"));
+      await hoja.locator('input[type="file"]').setInputFiles(path.resolve("tests/e2e/archivos/ariant.png"));
       await hoja.getByRole("button", { name: "Registrar y enviar a Tesorería" }).click();
       await expect(hoja).toBeHidden();
       await expect.poll(() => sql1(`select estado from ordenes_compra where obra_id = ${obra} and numero = '${numero}'`)).toBe("EN_TESORERIA");

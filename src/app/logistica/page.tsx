@@ -159,6 +159,18 @@ export default async function OrdenesPage({ searchParams }: PageProps<"/logistic
   // contrato firmado de una OS). Sin nada pendiente, «Por enviar».
   const falta = new Map<string, "Subir guía" | "Firmar contrato">();
   const facturadas = (ordenes ?? []).filter((o) => o.estado === "FACTURADA");
+  // Rechazadas por Tesorería y aún sin reenviar (en cualquier pestaña): se dicen así. Se piden a la vez que lo
+  // que les falta a las facturadas (no dependen de eso).
+  const conRechazo = new Set<string>();
+  const activas = (ordenes ?? []).filter((o) => ["EMITIDA", "PRECIOS_CONFIRMADOS", "FACTURADA"].includes(o.estado ?? ""));
+  const rechazosP = activas.length
+    ? supabase
+        .from("rechazos")
+        .select("obra_id, numero")
+        .is("reenviado_at", null)
+        .in("obra_id", [...new Set(activas.map((o) => o.obra_id))])
+        .in("numero", [...new Set(activas.map((o) => o.numero))])
+    : Promise.resolve({ data: [] as { obra_id: number; numero: string }[] });
   if (facturadas.length) {
     const obrasF = [...new Set(facturadas.map((o) => o.obra_id))];
     const numerosF = [...new Set(facturadas.map((o) => o.numero))];
@@ -177,18 +189,7 @@ export default async function OrdenesPage({ searchParams }: PageProps<"/logistic
       else if (o.tipo === "OC" && o.requiere_guia && !conGuia.has(k)) falta.set(k, "Subir guía");
     }
   }
-  // Rechazadas por Tesorería y aún sin reenviar (en cualquier pestaña): se dicen así.
-  const conRechazo = new Set<string>();
-  const activas = (ordenes ?? []).filter((o) => ["EMITIDA", "PRECIOS_CONFIRMADOS", "FACTURADA"].includes(o.estado ?? ""));
-  if (activas.length) {
-    const { data: abiertos } = await supabase
-      .from("rechazos")
-      .select("obra_id, numero")
-      .is("reenviado_at", null)
-      .in("obra_id", [...new Set(activas.map((o) => o.obra_id))])
-      .in("numero", [...new Set(activas.map((o) => o.numero))]);
-    for (const r of abiertos ?? []) conRechazo.add(`${r.obra_id}-${r.numero}`);
-  }
+  for (const r of (await rechazosP).data ?? []) conRechazo.add(`${r.obra_id}-${r.numero}`);
   const rechazada = (o: Orden) => conRechazo.has(`${o.obra_id}-${o.numero}`);
   const href = (o: Orden) => `/logistica/ordenes/${o.obra_id}/${encodeURIComponent(o.numero ?? "")}?tipo=${tipo}`;
   const anulada = (o: Orden) => o.estado === "ANULADA";
