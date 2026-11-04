@@ -1,0 +1,64 @@
+# See https://help.github.com/articles/ignoring-files/ for more about ignoring files.
+
+# dependencies
+/node_modules
+/.pnp
+.pnp.*
+.yarn/*
+!.yarn/patches
+!.yarn/plugins
+!.yarn/releases
+!.yarn/versions
+
+# testing
+/coverage
+
+# next.js
+/.next/
+/out/
+
+# production
+/build
+
+# misc
+.DS_Store
+*.pem
+
+# debug
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+.pnpm-debug.log*
+
+# env files (can opt-in for committing if needed)
+.env*
+
+# vercel
+.vercel
+
+# typescript
+*.tsbuildinfo
+next-env.d.ts
+
+# supabase local
+supabase/.branches
+supabase/.temp
+# datos reales del Excel (RUCs, cuentas bancarias)
+supabase/seed/excel.sql
+
+# auditorías de UI
+tests/audit/screens/
+test-results/
+playwright-report/
+
+# seed generado desde el Excel (RUCs y cuentas bancarias reales)
+supabase/seed/excel.sql
+tests/audit/dl/
+tests/audit/*.log
+tests/audit/state.json
+
+# pruebas e2e: sesiones guardadas
+tests/e2e/.auth/
+
+# Auditorías manuales (scripts y resultados con datos reales de la base): solo locales, nunca al repo.
+tests/audit/

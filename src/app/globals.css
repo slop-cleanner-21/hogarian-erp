@@ -1,0 +1,224 @@
+@import "tailwindcss";
+
+/* Señalética de obra: concreto, carbón, azul Hogarian (acción) y ámbar de señal (solo alertas). */
+:root {
+  --bg: #e7e9e4;
+  --surface: #f8f9f6;
+  --sunken: #dfe2dc;
+  --ink: #1a201d;
+  --ink-2: #4b534e;
+  --ink-3: #5f6762;
+  --line: #cdd2cb;
+  --primary: #0a3e68;
+  --primary-ink: #ffffff;
+  --warn: #7f5300;
+  --warn-bg: #fbe9b0;
+  --warn-line: #d99a00;
+  --danger: #a8241c;
+  --danger-bg: #f8dcd9;
+  --ok: #1e7047;
+  --ok-bg: #dcefe3;
+  --focus: #0a3e68;
+  /* Avance de la plata en tonos de azul (pagado › por pagar › en Logística › libre) y su texto. */
+  --avance-1: #0a3e68;
+  --avance-1-fg: #ffffff;
+  --avance-2: #3d78ad;
+  --avance-2-fg: #ffffff;
+  --avance-3: #b7d2ea;
+  --avance-3-fg: #10304d;
+  --avance-libre: #e2e5e0;
+  color-scheme: light;
+}
+
+:root[data-theme="dark"] {
+  --bg: #121614;
+  --surface: #1a1f1c;
+  --sunken: #0e1210;
+  --ink: #e5e9e3;
+  --ink-2: #a8b0aa;
+  --ink-3: #8f9892;
+  --line: #2b322e;
+  --primary: #8cb9e6;
+  --primary-ink: #06213a;
+  --warn: #f2bd3a;
+  --warn-bg: #352a08;
+  --warn-line: #b8860b;
+  --danger: #f08a80;
+  --danger-bg: #3a1613;
+  --ok: #6fcf94;
+  --ok-bg: #12301f;
+  --focus: #8cb9e6;
+  --avance-1: #a9d0f5;
+  --avance-1-fg: #06213a;
+  --avance-2: #4f86ba;
+  --avance-2-fg: #06213a;
+  --avance-3: #284a6a;
+  --avance-3-fg: #e5e9e3;
+  --avance-libre: #2b322e;
+  color-scheme: dark;
+}
+
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme]) {
+    --bg: #121614;
+    --surface: #1a1f1c;
+    --sunken: #0e1210;
+    --ink: #e5e9e3;
+    --ink-2: #a8b0aa;
+    --ink-3: #8f9892;
+    --line: #2b322e;
+    --primary: #8cb9e6;
+    --primary-ink: #06213a;
+    --warn: #f2bd3a;
+    --warn-bg: #352a08;
+    --warn-line: #b8860b;
+    --danger: #f08a80;
+    --danger-bg: #3a1613;
+    --ok: #6fcf94;
+  --ok-bg: #12301f;
+    --focus: #8cb9e6;
+    --avance-1: #a9d0f5;
+    --avance-1-fg: #06213a;
+    --avance-2: #4f86ba;
+    --avance-2-fg: #06213a;
+    --avance-3: #284a6a;
+    --avance-3-fg: #e5e9e3;
+    --avance-libre: #2b322e;
+    color-scheme: dark;
+  }
+}
+
+@theme inline {
+  --color-bg: var(--bg);
+  --color-surface: var(--surface);
+  --color-sunken: var(--sunken);
+  --color-ink: var(--ink);
+  --color-ink-2: var(--ink-2);
+  --color-ink-3: var(--ink-3);
+  --color-line: var(--line);
+  --color-primary: var(--primary);
+  --color-primary-ink: var(--primary-ink);
+  --color-warn: var(--warn);
+  --color-warn-bg: var(--warn-bg);
+  --color-warn-line: var(--warn-line);
+  --color-danger: var(--danger);
+  --color-danger-bg: var(--danger-bg);
+  --color-ok: var(--ok);
+  --color-ok-bg: var(--ok-bg);
+  --color-focus: var(--focus);
+  --color-avance-1: var(--avance-1);
+  --color-avance-1-fg: var(--avance-1-fg);
+  --color-avance-2: var(--avance-2);
+  --color-avance-2-fg: var(--avance-2-fg);
+  --color-avance-3: var(--avance-3);
+  --color-avance-3-fg: var(--avance-3-fg);
+  --color-avance-libre: var(--avance-libre);
+  --font-sans: var(--font-barlow), system-ui, sans-serif;
+  --font-display: var(--font-barlow-condensed), var(--font-barlow), sans-serif;
+  --radius-field: 8px;
+  --radius-control: 10px;
+  --radius-panel: 12px;
+}
+
+html {
+  -webkit-text-size-adjust: 100%;
+  -webkit-tap-highlight-color: transparent;
+}
+
+body {
+  background: var(--bg);
+  color: var(--ink);
+  font-family: var(--font-sans);
+  font-size: 16px;
+  line-height: 1.4;
+}
+
+:focus-visible {
+  outline: 2px solid var(--focus);
+  outline-offset: 2px;
+}
+
+input[type="checkbox"],
+input[type="radio"] {
+  accent-color: var(--primary);
+}
+
+/* Cifras: siempre tabulares para que columnas de montos alineen. */
+.num {
+  font-variant-numeric: tabular-nums lining-nums;
+}
+
+/* Rótulo condensado: N° de orden, totales, títulos. */
+.rotulo {
+  font-family: var(--font-display);
+  font-variant-numeric: tabular-nums lining-nums;
+  letter-spacing: 0.01em;
+}
+
+dialog::backdrop {
+  background: rgb(8 12 10 / 0.55);
+}
+
+dialog[open] {
+  animation: subir 160ms ease-out;
+}
+
+@keyframes subir {
+  from {
+    transform: translateY(12px);
+    opacity: 0;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  dialog[open] {
+    animation: none;
+  }
+}
+
+input[type="number"]::-webkit-inner-spin-button,
+input[type="number"]::-webkit-outer-spin-button {
+  -webkit-appearance: none;
+  margin: 0;
+}
+input[type="number"] {
+  -moz-appearance: textfield;
+}
+input[type="date"] {
+  color-scheme: inherit;
+}
+
+/* Solo el margen del iPhone: no combinar con un relleno inferior en el mismo elemento (lo reemplaza). */
+.pb-safe {
+  padding-bottom: env(safe-area-inset-bottom);
+}
+
+/* Navegación en curso (BarraCarga): barra indeterminada arriba y contenido atenuado. El atenuado
+   espera 120 ms para no parpadear en las cargas rápidas. */
+.barra-carga {
+  position: fixed;
+  inset: 0 0 auto 0;
+  z-index: 60;
+  height: 3px;
+  overflow: hidden;
+  background: color-mix(in oklab, var(--primary) 25%, transparent);
+}
+.barra-carga::after {
+  content: "";
+  position: absolute;
+  inset: 0 auto 0 0;
+  width: 40%;
+  background: var(--primary);
+  animation: barra-carga 1s ease-in-out infinite;
+}
+@keyframes barra-carga {
+  from { transform: translateX(-100%); }
+  to { transform: translateX(250%); }
+}
+@media (prefers-reduced-motion: reduce) {
+  .barra-carga::after { animation: none; width: 100%; opacity: 0.6; }
+}
+html[data-cargando] main {
+  opacity: 0.55;
+  transition: opacity 0.15s 0.12s;
+}
