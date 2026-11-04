@@ -22,9 +22,12 @@ paso, local sigue igual: accesos rápidos, contraseña de la demo y túnel.
    ```sh
    npx supabase link --project-ref <ref>
    npx supabase db push
-   npx supabase config push   # auth: registro apagado, sin confirmación por correo, contraseña de 6+ (la app pide 8)
    ```
-   En Auth › URL Configuration: *Site URL* = el dominio de la app.
+   Auth (registro apagado: **en la nube arranca abierto**; sin confirmación por correo): `config push` desde una
+   copia de `config.toml` con `site_url` y `additional_redirect_urls` del dominio de la app (el del repo apunta a
+   local) y `max_frequency = "1m0s"`; revisar el diff antes (`yes n | npx supabase config push --workdir <copia>`).
+   La clave secreta se copia del panel (Project Settings › API Keys): `supabase projects api-keys` la muestra
+   enmascarada. Sirve también la `service_role` clásica.
 3. Crear el primer Admin (la contraseña temporal se muestra una vez):
    ```sh
    SUPABASE_URL=https://<ref>.supabase.co SUPABASE_SECRET_KEY=<secreta> \
@@ -45,7 +48,9 @@ Ensayado en local el 04/11/2026 con este mismo orden (base vacía → Admin → 
 
 ## 3. Vercel
 
-1. Importar el repo de GitHub (framework Next.js, `npm run build`).
+1. Importar el repo de GitHub: cada push a `main` despliega. El proyecto debe decir framework **Next.js** (si se
+   crea por la CLI queda sin framework y todo da 404). Las funciones corren en São Paulo (`vercel.json`,
+   `regions: ["gru1"]`), junto a la base.
 2. Variables de entorno (Production):
 
    | Variable | Valor |
@@ -60,6 +65,16 @@ Ensayado en local el 04/11/2026 con este mismo orden (base vacía → Admin → 
    **No** se definen: `NEXT_PUBLIC_USUARIOS_LOCALES` (botones de acceso rápido), `DEMO_ACCESO` (contraseña de
    la demo) ni `SERVER_ACTIONS_ORIGENES` (túnel).
 3. Dominio: agregarlo en Vercel y apuntar el DNS.
+
+## Entorno de pruebas (04/11/2026)
+
+En las cuentas personales, hasta tener permiso en los equipos de la empresa (luego se transfieren: Supabase
+› Project Settings › Transfer project; Vercel › Settings › Transfer; la URL de Supabase no cambia):
+
+| | |
+|---|---|
+| App | https://hogarian-erp.vercel.app (Vercel `josev-7139/hogarian-erp`, conectado a `main`) |
+| Supabase | proyecto `yqhdknwllnartyswbkoa` (organización personal, sa-east-1) |
 
 ## 4. Antes de abrirlo a todos
 
