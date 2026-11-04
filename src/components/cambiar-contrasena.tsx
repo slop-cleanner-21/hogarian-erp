@@ -4,7 +4,8 @@ import { useState, useTransition } from "react";
 import { cambiarMiContrasena } from "@/app/login/actions";
 import { MIN_CONTRASENA } from "@/lib/usuarios";
 import { Button } from "./ui/button";
-import { Field, Input } from "./ui/field";
+import { Field } from "./ui/field";
+import { PasswordInput } from "./ui/password-input";
 import { Sheet } from "./ui/sheet";
 
 /** Cambiar la propia contraseña (desde el menú del usuario). */
@@ -44,10 +45,10 @@ export function CambiarContrasena({ onClose }: { onClose: () => void }) {
       {!listo && (
         <div className="flex flex-col gap-4 p-4">
           <Field label={`Nueva contraseña (mín. ${MIN_CONTRASENA})`}>
-            <Input type="password" value={nueva} onChange={(e) => setNueva(e.target.value)} autoComplete="new-password" />
+            <PasswordInput value={nueva} onChange={(e) => setNueva(e.target.value)} autoComplete="new-password" />
           </Field>
           <Field label="Repetir la contraseña">
-            <Input type="password" value={repetida} onChange={(e) => setRepetida(e.target.value)} autoComplete="new-password" aria-invalid={distintas} />
+            <PasswordInput value={repetida} onChange={(e) => setRepetida(e.target.value)} autoComplete="new-password" aria-invalid={distintas} />
           </Field>
           {distintas && <p className="text-danger">No coinciden</p>}
           {error && <p role="alert" className="text-danger">{error}</p>}

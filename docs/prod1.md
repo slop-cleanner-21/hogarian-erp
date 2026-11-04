@@ -193,8 +193,8 @@ Contabilidad, Residente, Ingeniero de Operaciones y RRHH **no entran**. Sus role
   sus dispositivos). En la app instalada (PWA) se ofrece una vez si el teléfono tiene huella o rostro. Con ella:
   - **entra sin contraseña:** el login la pide solo al abrirse (no si cerró sesión a propósito) y tiene «Entrar
     con huella»; el servidor verifica la firma y abre la sesión con un enlace mágico de un solo uso;
-  - **la app se bloquea** al volver tras más de 5 minutos fuera (o al reabrirla) y se desbloquea con la huella;
-    «Usar contraseña» cierra la sesión.
+  - **la app se bloquea** cada vez que se abre (y al volver de otra app tras más de 1 minuto fuera) y se
+    desbloquea con la huella; «Usar contraseña» cierra la sesión.
 
   Si otra persona entra con contraseña en ese dispositivo, la huella deja de ofrecerse. Una huella quitada desde
   otro dispositivo deja de ofrecerse al fallar. Las credenciales (`huellas`, solo la clave pública) y los

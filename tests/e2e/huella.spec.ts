@@ -85,12 +85,12 @@ test.describe("@huella", () => {
     await page.waitForURL((u) => !u.pathname.startsWith("/login"));
     expect(sql1(`select count(*) from audit_log where tabla = 'sesion' and accion = 'LOGIN' and detalle->>'metodo' = 'huella' and user_id = '${uid()}' and id > ${desde}`)).toBe("1");
 
-    // Al volver tras más de 5 minutos, se bloquea y se desbloquea con la huella.
-    // (Al cerrar o recargar, la app anota cuándo dejó de verse: se simula después, antes de que cargue.)
+    // Al abrir la app de nuevo (aunque se haya cerrado hace un momento), se bloquea y se desbloquea con la huella.
+    // (Una app recién abierta no tiene la marca de esta sesión: se simula quitándola antes de que cargue.)
     await page.addInitScript(() => {
       if (sessionStorage.getItem("e2e_bloqueo")) return;
       sessionStorage.setItem("e2e_bloqueo", "1");
-      localStorage.setItem("prod1_huella_visto", String(Date.now() - 10 * 60_000));
+      localStorage.setItem("prod1_huella_visto", String(Date.now()));
       sessionStorage.removeItem("prod1_huella_abierta");
     });
     await page.reload();
@@ -168,6 +168,21 @@ test.describe("@login", () => {
     await page.reload();
     await expect(page.locator("html")).toHaveAttribute("data-theme", oscuro ? "light" : "dark");
     await expect(page.getByRole("button", { name: oscuro ? "Modo oscuro" : "Modo claro" })).toBeVisible();
+    await ctx.close();
+  });
+
+  test("el ojo muestra y oculta la contraseña", async ({ browser }, info) => {
+    const ctx = await browser.newContext({ ...info.project.use });
+    const page = await ctx.newPage();
+    await alLogin(page);
+    const campo = page.getByLabel("Contraseña", { exact: true });
+    await campo.fill("secreta-123");
+    await expect(campo).toHaveAttribute("type", "password");
+    await page.getByRole("button", { name: "Mostrar contraseña" }).click();
+    await expect(campo).toHaveAttribute("type", "text");
+    await expect(campo).toHaveValue("secreta-123");
+    await page.getByRole("button", { name: "Ocultar contraseña" }).click();
+    await expect(campo).toHaveAttribute("type", "password");
     await ctx.close();
   });
 });

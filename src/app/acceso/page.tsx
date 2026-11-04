@@ -3,7 +3,8 @@
 import { useActionState } from "react";
 import { Logo } from "@/components/logo";
 import { Button } from "@/components/ui/button";
-import { Field, Input } from "@/components/ui/field";
+import { Field } from "@/components/ui/field";
+import { PasswordInput } from "@/components/ui/password-input";
 import { entrarDemo } from "./actions";
 
 export default function AccesoPage() {
@@ -13,7 +14,7 @@ export default function AccesoPage() {
       <Logo />
       <form action={action} className="flex flex-col gap-4">
         <Field label="Contraseña de acceso">
-          <Input name="clave" type="password" autoComplete="current-password" autoFocus required />
+          <PasswordInput name="clave" autoComplete="current-password" autoFocus required />
         </Field>
         {error && <p role="alert" className="text-sm text-danger">{error}</p>}
         <Button type="submit" size="lg" disabled={pending}>

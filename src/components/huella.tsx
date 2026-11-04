@@ -31,7 +31,9 @@ const VISTO = "prod1_huella_visto"; // última vez que la app estuvo a la vista 
 const ABIERTA = "prod1_huella_abierta"; // esta pestaña ya entró o se desbloqueó (sessionStorage)
 const SALIO = "prod1_salio"; // cerró sesión a propósito: no pedir la huella sola al volver al login
 const NO_OFRECER = "prod1_huella_no";
-const ESPERA = 5 * 60_000;
+// Al abrir la app siempre pide la huella; al volver de otra app, si estuvo fuera más de esto (salir un momento a
+// WhatsApp a mandar un link no la pide).
+const ESPERA = 60_000;
 const RUTAS_LIBRES = ["/login", "/cotizar", "/acceso", "/sin-acceso", "/voucher-simulado"];
 
 type Marca = { u: string; e: string; c: string };
@@ -271,16 +273,17 @@ export function BloqueoHuella() {
         return 0;
       }
     };
-    const revisar = () => {
-      if (marcaDe(crudo()) && Date.now() - visto() > ESPERA) setBloqueada(true);
+    const revisar = (siempre: boolean) => {
+      if (marcaDe(crudo()) && (siempre || Date.now() - visto() > ESPERA)) setBloqueada(true);
     };
     let yaAbierta = false;
     try {
       yaAbierta = sessionStorage.getItem(ABIERTA) === "1";
     } catch {}
-    if (!yaAbierta) revisar();
+    // Recién abierta (esta pestaña o la app no había entrado ni se había desbloqueado): siempre.
+    if (!yaAbierta) revisar(true);
     const alCambiar = () => {
-      if (document.visibilityState === "visible") revisar();
+      if (document.visibilityState === "visible") revisar(false);
       else
         try {
           localStorage.setItem(VISTO, String(Date.now()));

@@ -6,6 +6,7 @@ import { Logo } from "@/components/logo";
 import { TemaBoton } from "@/components/theme-switch";
 import { Button } from "@/components/ui/button";
 import { Field, Input } from "@/components/ui/field";
+import { PasswordInput } from "@/components/ui/password-input";
 import { login } from "./actions";
 
 // Usuarios semilla del entorno local (supabase/seed/usuarios_locales.sql). La variable se fija al compilar: en
@@ -53,7 +54,7 @@ export default function LoginPage() {
           <Input name="email" type="email" autoComplete="username" required />
         </Field>
         <Field label="Contraseña">
-          <Input name="password" type="password" autoComplete="current-password" required />
+          <PasswordInput name="password" autoComplete="current-password" required />
         </Field>
         {error && <p role="alert" className="text-sm text-danger">{error}</p>}
         <Button type="submit" size="lg" disabled={pending}>
