@@ -2,7 +2,7 @@
 # Carga los datos reales en la base de producción (Supabase en la nube), en orden, sin demos ni usuarios de
 # prueba. Antes: migraciones (`npx supabase db push`) y el primer Admin (crear-admin.mjs).
 #
-#   PROD_DB_URL='postgresql://postgres.xxx:CLAVE@aws-0-sa-east-1.pooler.supabase.com:5432/postgres' \
+#   PROD_DB_URL='postgresql://postgres.xxx:CLAVE@aws-1-sa-east-1.pooler.supabase.com:5432/postgres' \
 #     bash scripts/produccion/cargar-datos.sh
 #
 # Usa el psql del contenedor local de Supabase (no hace falta instalarlo). Cada archivo va en una

@@ -32,7 +32,7 @@ paso, local sigue igual: accesos rápidos, contraseña de la demo y túnel.
    ```
 4. Cargar los datos reales, sin demos ni usuarios de prueba (usa el psql del contenedor local):
    ```sh
-   PROD_DB_URL='postgresql://postgres.<ref>:<clave>@aws-0-sa-east-1.pooler.supabase.com:5432/postgres' \
+   PROD_DB_URL='postgresql://postgres.<ref>:<clave>@aws-1-sa-east-1.pooler.supabase.com:5432/postgres' \
      bash scripts/produccion/cargar-datos.sh
    ```
    Carga, en orden: `base`, `excel`, `tipo_material`, `cuentas_items`, `historico` (a nombre del Admin),
