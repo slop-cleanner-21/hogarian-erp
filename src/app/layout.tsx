@@ -6,6 +6,7 @@ import { BarraCarga } from "@/components/barra-carga";
 import { BarrasSistema } from "@/components/barras-sistema";
 import { BloqueoHuella } from "@/components/huella";
 import { RecordarRuta } from "@/components/recordar-ruta";
+import { BLOQUEO_SCRIPT } from "@/lib/bloqueo";
 import { COLOR_BARRA, THEME_SCRIPT } from "@/lib/theme";
 import "./globals.css";
 
@@ -51,6 +52,8 @@ export default function RootLayout({ children }: LayoutProps<"/">) {
       <head>
         {/* Aplica el tema guardado antes del primer pintado (evita parpadeo). */}
         <script dangerouslySetInnerHTML={{ __html: THEME_SCRIPT }} />
+        {/* Con la huella activada y la app recién abierta, no muestra la pantalla hasta el bloqueo. */}
+        <script dangerouslySetInnerHTML={{ __html: BLOQUEO_SCRIPT }} />
       </head>
       <body className="min-h-full">
         {children}

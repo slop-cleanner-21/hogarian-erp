@@ -21,20 +21,20 @@ import {
   quitarHuella,
 } from "@/app/login/huella-actions";
 import { logout } from "@/app/login/actions";
+import { CLAVE_ABIERTA, CLAVE_HUELLA, RUTAS_LIBRES, quitarVelo } from "@/lib/bloqueo";
 import { Logo } from "./logo";
 import { Button } from "./ui/button";
 import { Sheet } from "./ui/sheet";
 
 // Huella en este dispositivo: qué usuario la activó (para ofrecerla al entrar y bloquear la app al volver).
-const CLAVE = "prod1_huella";
+const CLAVE = CLAVE_HUELLA;
 const VISTO = "prod1_huella_visto"; // última vez que la app estuvo a la vista (localStorage)
-const ABIERTA = "prod1_huella_abierta"; // esta pestaña ya entró o se desbloqueó (sessionStorage)
+const ABIERTA = CLAVE_ABIERTA; // esta pestaña ya entró o se desbloqueó (sessionStorage)
 const SALIO = "prod1_salio"; // cerró sesión a propósito: no pedir la huella sola al volver al login
 const NO_OFRECER = "prod1_huella_no";
 // Al abrir la app siempre pide la huella; al volver de otra app, si estuvo fuera más de esto (salir un momento a
 // WhatsApp a mandar un link no la pide).
 const ESPERA = 60_000;
-const RUTAS_LIBRES = ["/login", "/cotizar", "/acceso", "/sin-acceso", "/voucher-simulado"];
 
 type Marca = { u: string; e: string; c: string };
 
@@ -258,12 +258,14 @@ export function BloqueoHuella() {
   const libre = RUTAS_LIBRES.some((r) => path === r || path.startsWith(`${r}/`));
   const marca = useMarca();
   const [bloqueada, setBloqueada] = useState(false);
+  const [fallo, setFallo] = useState<string | null>(null);
   const [ofrecer, setOfrecer] = useState(false);
 
   useEffect(() => {
     // Desde el login se entra con contraseña o huella: lo que siga ya está desbloqueado.
     if (libre) {
       if (path === "/login") abierta();
+      quitarVelo();
       return;
     }
     const visto = () => {
@@ -282,6 +284,7 @@ export function BloqueoHuella() {
     } catch {}
     // Recién abierta (esta pestaña o la app no había entrado ni se había desbloqueado): siempre.
     if (!yaAbierta) revisar(true);
+    if (yaAbierta || !marcaDe(crudo())) quitarVelo();
     const alCambiar = () => {
       if (document.visibilityState === "visible") revisar(false);
       else
@@ -312,13 +315,31 @@ export function BloqueoHuella() {
   }, [libre, marca]);
 
   if (libre) return null;
-  if (bloqueada) return <Bloqueo onAbrir={() => setBloqueada(false)} />;
+  if (bloqueada)
+    return (
+      <Bloqueo
+        error={fallo}
+        onAbrir={() => {
+          setBloqueada(false);
+          quitarVelo();
+        }}
+        // La verificación del servidor llega después de abrir: si la rechaza, vuelve a bloquear.
+        onFallo={(e) => {
+          setFallo(e);
+          setBloqueada(true);
+        }}
+      />
+    );
   if (ofrecer) return <OfrecerHuella onClose={() => setOfrecer(false)} />;
   return null;
 }
 
-function Bloqueo({ onAbrir }: { onAbrir: () => void }) {
-  const [error, setError] = useState<string | null>(null);
+/**
+ * Pantalla de bloqueo. Abre apenas el teléfono acepta la huella (la firma ya la hizo el teléfono tras la huella) y
+ * el servidor la verifica después: si la rechaza, vuelve a bloquear (onFallo). Así se ahorra un viaje de espera.
+ */
+function Bloqueo({ error: inicial, onAbrir, onFallo }: { error: string | null; onAbrir: () => void; onFallo: (e: string) => void }) {
+  const [error, setError] = useState<string | null>(inicial);
   const [pending, startTransition] = useTransition();
   const sola = useRef(false);
   const abrir = () =>
@@ -328,22 +349,31 @@ function Bloqueo({ onAbrir }: { onAbrir: () => void }) {
         const opciones = await opcionesDesbloquear();
         // La sesión es de otra persona (sin huella aquí): no hay nada que pedir.
         if (!opciones) return (abierta(), onAbrir());
-        if (await desbloquear(await startAuthentication({ optionsJSON: opciones }))) {
-          abierta();
-          onAbrir();
-        } else setError("No se reconoció la huella");
+        const respuesta = await startAuthentication({ optionsJSON: opciones });
+        abierta();
+        onAbrir();
+        desbloquear(respuesta)
+          .then((ok) => {
+            if (ok) return;
+            try {
+              sessionStorage.removeItem(ABIERTA);
+            } catch {}
+            onFallo("No se reconoció la huella");
+          })
+          .catch(() => {});
       } catch (e) {
         if (!cancelada(e)) setError("No se pudo usar la huella");
       }
     });
   useEffect(() => {
-    if (sola.current) return;
+    // Tras un rechazo del servidor no la pide sola (se tocaría en bucle): se toca el botón.
+    if (sola.current || inicial) return;
     sola.current = true;
     abrir();
     // eslint-disable-next-line react-hooks/exhaustive-deps -- una sola vez al bloquearse
   }, []);
   return (
-    <div role="dialog" aria-modal="true" aria-label="App bloqueada" className="fixed inset-0 z-[100] flex flex-col items-center justify-center gap-10 bg-bg px-6 pb-[env(safe-area-inset-bottom)] pt-[env(safe-area-inset-top)]">
+    <div data-bloqueo-pantalla role="dialog" aria-modal="true" aria-label="App bloqueada" className="fixed inset-0 z-[100] flex flex-col items-center justify-center gap-10 bg-bg px-6 pb-[env(safe-area-inset-bottom)] pt-[env(safe-area-inset-top)]">
       <Logo />
       <button
         type="button"

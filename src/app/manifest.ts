@@ -1,5 +1,6 @@
 import type { MetadataRoute } from "next";
 import { APP_CORTO, APP_DESCRIPCION, APP_NOMBRE, COLOR_FONDO } from "@/lib/marca";
+import { COLOR_BARRA } from "@/lib/theme";
 
 export default function manifest(): MetadataRoute.Manifest {
   return {
@@ -12,7 +13,9 @@ export default function manifest(): MetadataRoute.Manifest {
     display: "standalone",
     orientation: "portrait",
     background_color: COLOR_FONDO,
-    theme_color: COLOR_FONDO,
+    // La barra de navegación de Android (atrás, inicio, tareas) en la app instalada toma este color y no sigue el
+    // tema de la página (la de arriba sí, con meta theme-color): oscura, con íconos blancos, en los dos temas.
+    theme_color: COLOR_BARRA.dark,
     icons: [
       { src: "/icon.svg", type: "image/svg+xml", sizes: "any", purpose: "any" },
       { src: "/icono/192", type: "image/png", sizes: "192x192", purpose: "any" },

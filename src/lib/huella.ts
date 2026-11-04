@@ -11,6 +11,7 @@ import {
 } from "@simplewebauthn/server";
 import { isoBase64URL, isoUint8Array } from "@simplewebauthn/server/helpers";
 import { cookies, headers } from "next/headers";
+import { after } from "next/server";
 import { APP_NOMBRE } from "@/lib/marca";
 import { createAdminClient } from "@/lib/supabase/admin";
 
@@ -32,7 +33,10 @@ async function sitio() {
 
 async function guardarDesafio(challenge: string, userId: string | null) {
   const db = createAdminClient(userId ?? undefined);
-  await db.from("huella_desafios").delete().lt("expira_at", new Date().toISOString());
+  // Los vencidos se borran después de responder (no alargan la espera de la huella).
+  after(async () => {
+    await db.from("huella_desafios").delete().lt("expira_at", new Date().toISOString());
+  });
   if (!userId) {
     const { count } = await db.from("huella_desafios").select("id", { count: "exact", head: true }).is("user_id", null);
     if ((count ?? 0) >= MAX_DESAFIOS_ANONIMOS) throw new Error("Demasiados intentos, espera unos minutos");
@@ -145,14 +149,17 @@ export type Firma = { ok: true; userId: string } | { ok: false; desconocida: boo
  */
 export async function verificarFirma(respuesta: AuthenticationResponseJSON, userId: string | null): Promise<Firma> {
   const fallo = { ok: false, desconocida: false } as const;
-  const challenge = await tomarDesafio(userId);
-  if (!challenge) return fallo;
   const db = createAdminClient(userId ?? undefined);
-  const { data: c } = await db
-    .from("huellas")
-    .select("id, user_id, credential_id, public_key, counter, transports, rp_id")
-    .eq("credential_id", String(respuesta.id ?? ""))
-    .maybeSingle();
+  // El desafío y la credencial, a la vez.
+  const [challenge, { data: c }] = await Promise.all([
+    tomarDesafio(userId),
+    db
+      .from("huellas")
+      .select("id, user_id, credential_id, public_key, counter, transports, rp_id")
+      .eq("credential_id", String(respuesta.id ?? ""))
+      .maybeSingle(),
+  ]);
+  if (!challenge) return fallo;
   if (!c) return { ok: false, desconocida: true };
   if (userId && c.user_id !== userId) return fallo;
   const { origin } = await sitio();
@@ -170,9 +177,10 @@ export async function verificarFirma(respuesta: AuthenticationResponseJSON, user
     requireUserVerification: true,
   }).catch(() => null);
   if (!v?.verified) return fallo;
-  await createAdminClient(c.user_id)
-    .from("huellas")
-    .update({ counter: v.authenticationInfo.newCounter, usada_at: new Date().toISOString() })
-    .eq("id", c.id);
+  // El contador y «usada» se guardan después de responder.
+  const usada = new Date().toISOString();
+  after(async () => {
+    await createAdminClient(c.user_id).from("huellas").update({ counter: v.authenticationInfo.newCounter, usada_at: usada }).eq("id", c.id);
+  });
   return { ok: true, userId: c.user_id };
 }

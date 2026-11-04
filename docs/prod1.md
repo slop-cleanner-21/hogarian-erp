@@ -194,7 +194,13 @@ Contabilidad, Residente, Ingeniero de Operaciones y RRHH **no entran**. Sus role
   - **entra sin contraseña:** el login la pide solo al abrirse (no si cerró sesión a propósito) y tiene «Entrar
     con huella»; el servidor verifica la firma y abre la sesión con un enlace mágico de un solo uso;
   - **la app se bloquea** cada vez que se abre (y al volver de otra app tras más de 1 minuto fuera) y se
-    desbloquea con la huella; «Usar contraseña» cierra la sesión.
+    desbloquea con la huella; «Usar contraseña» cierra la sesión. Se abre apenas el teléfono acepta la huella y
+    el servidor la verifica después (si la rechaza, vuelve a bloquear). Mientras carga la app recién abierta, la
+    pantalla no se muestra (`BLOQUEO_SCRIPT`, `src/lib/bloqueo.ts`).
+- **Barra de navegación de Android** (atrás, inicio, tareas) en la app instalada: la pinta Chrome con el
+  `theme_color` del manifiesto, que no puede seguir el tema; va oscura (con íconos blancos) en los dos temas. La
+  barra de arriba sí sigue el tema (`meta theme-color`, `BarrasSistema`). Las apps ya instaladas toman el color
+  cuando Chrome actualiza la app (o al reinstalarla).
 
   Si otra persona entra con contraseña en ese dispositivo, la huella deja de ofrecerse. Una huella quitada desde
   otro dispositivo deja de ofrecerse al fallar. Las credenciales (`huellas`, solo la clave pública) y los

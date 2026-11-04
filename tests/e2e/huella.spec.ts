@@ -96,6 +96,9 @@ test.describe("@huella", () => {
     await page.reload();
     await expect.poll(() => auditoria("DESBLOQUEO", desde), { timeout: 15_000 }).toBe(1);
     await expect(page.getByRole("dialog", { name: "App bloqueada" })).toHaveCount(0);
+    // La pantalla se ve (el velo previo al bloqueo se quitó).
+    await expect(page.locator("html")).not.toHaveAttribute("data-bloqueo", "1");
+    await expect(page.getByRole("button", { name: "Usuario" })).toBeVisible();
 
     // Quitarla: ya no se ofrece al entrar.
     await menu(page, "Huella");

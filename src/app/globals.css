@@ -222,3 +222,8 @@ html[data-cargando] main {
   opacity: 0.55;
   transition: opacity 0.15s 0.12s;
 }
+
+/* Huella: la app recién abierta no se muestra hasta que el bloqueo la tapa o se desbloquea (src/lib/bloqueo.ts). */
+html[data-bloqueo] body > :not([data-bloqueo-pantalla]) {
+  visibility: hidden;
+}

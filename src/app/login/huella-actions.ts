@@ -2,11 +2,12 @@
 
 import type { AuthenticationResponseJSON, RegistrationResponseJSON } from "@simplewebauthn/server";
 import { redirect } from "next/navigation";
+import { after } from "next/server";
 import { dispositivo } from "@/lib/auditoria-reporte";
 import { origen, registrarEvento } from "@/lib/auditoria";
 import { huellasDe, opcionesActivar, opcionesFirmar, verificarActivacion, verificarFirma, type Huella } from "@/lib/huella";
 import { createAdminClient } from "@/lib/supabase/admin";
-import { createClient, requireSesionVigente } from "@/lib/supabase/server";
+import { createClient, requireSesion, requireSesionVigente } from "@/lib/supabase/server";
 
 // Entrar y desbloquear con huella. Cada inicio de sesión, desbloqueo, intento fallido, activación y baja queda en la
 // auditoría (las altas y bajas también por el trigger de la tabla).
@@ -51,20 +52,24 @@ export async function entrarConHuella(respuesta: AuthenticationResponseJSON): Pr
 
 // ── Desbloquear (con sesión: la app se bloquea al volver tras un rato) ──
 
+// Desbloquear solo abre la pantalla de quien ya tiene sesión (la base sigue mirando su rol en cada consulta): con
+// la sesión del token basta, sin el viaje extra del rol vigente. La auditoría se escribe después de responder.
 export async function opcionesDesbloquear() {
-  const sesion = await requireSesionVigente();
+  const sesion = await requireSesion();
   return opcionesFirmar(sesion.userId);
 }
 
 export async function desbloquear(respuesta: AuthenticationResponseJSON): Promise<boolean> {
-  const sesion = await requireSesionVigente();
+  const sesion = await requireSesion();
   const ok = (await verificarFirma(respuesta, sesion.userId)).ok;
-  await registrarEvento({
-    tabla: "sesion",
-    accion: ok ? "DESBLOQUEO" : "DESBLOQUEO_FALLIDO",
-    registro: sesion.userId,
-    actor: sesion.userId,
-  });
+  after(() =>
+    registrarEvento({
+      tabla: "sesion",
+      accion: ok ? "DESBLOQUEO" : "DESBLOQUEO_FALLIDO",
+      registro: sesion.userId,
+      actor: sesion.userId,
+    }),
+  );
   return ok;
 }
 
