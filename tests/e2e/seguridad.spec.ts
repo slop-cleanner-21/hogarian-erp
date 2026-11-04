@@ -181,4 +181,58 @@ test.describe("@seguridad", () => {
       sql(`delete from audit_log where detalle->>'email' = $e$${email}$e$`);
     }
   });
+
+  // ── Re-auditoría (05/11/2026), migración prod1_seguridad_2 ──
+
+  test("un adjunto no puede apuntar fuera de su carpeta («..»)", async () => {
+    const jwt = await token(ROLES.logistica);
+    const [obra, numero] = sql(`select obra_id, numero from ordenes_compra where tipo = 'OS' and estado <> 'ANULADA' and created_by is null order by obra_id limit 1`)[0];
+    for (const path of [`${obra}/${numero}/../../../comprobantes/x.png`, `${obra}/${numero}//x.png`, `${obra}/${numero}/%2e%2e/x.png`]) {
+      const r = await rest(jwt, "adjuntos", {
+        method: "POST",
+        body: JSON.stringify({ tipo: "CONTRATO", obra_id: Number(obra), numero_oc: numero, path, nombre: "x.png", mime: "image/png" }),
+      });
+      expect(r.status, path).toBeGreaterThanOrEqual(400);
+    }
+    expect(sql1(`select count(*) from adjuntos where path like '%..%' or path like '%//%' or path like '%\\%%'`)).toBe("0");
+  });
+
+  test("la cotización no acepta NaN, infinito ni precios absurdos", async () => {
+    const [t, item] = sql(`select o.token_cotizacion, i.id from ordenes_compra o join oc_items i on i.obra_id = o.obra_id and i.numero_oc = o.numero
+                           where o.token_cotizacion is not null and o.estado = 'EMITIDA' and o.cotizacion_estado = 'ENVIADA' order by o.obra_id, o.numero limit 1`)[0] ?? [];
+    test.skip(!t, "sin links de cotización abiertos");
+    for (const pu of ["NaN", "Infinity", 1e30, -5]) {
+      const r = await rest(null, "rpc/enviar_cotizacion", { method: "POST", body: JSON.stringify({ p_token: t, p_precios: [{ item_id: Number(item), pu }] }) });
+      expect(r.status, String(pu)).toBeGreaterThanOrEqual(400);
+    }
+    expect(sql1(`select count(*) from oc_items where pu_cotizado = 'NaN' or pu_cotizado >= 1e8`)).toBe("0");
+  });
+
+  test("sin la contraseña de la demo no pasa ninguna server action (tampoco en /cotizar)", async ({ baseURL }) => {
+    test.skip(!env.DEMO_ACCESO, "sin contraseña de demo");
+    const r = await fetch(`${baseURL}/cotizar/${crypto.randomUUID()}`, {
+      method: "POST",
+      headers: { "Next-Action": "0".repeat(42), "Content-Type": "text/plain;charset=UTF-8", Origin: baseURL! },
+      body: "[]",
+    });
+    expect(r.status).toBe(403);
+  });
+
+  test("la huella y sus desafíos: nadie los lee con su sesión", async () => {
+    const jwt = await token(ROLES.gerencia);
+    for (const t of ["huellas?select=id", "huella_desafios?select=id"]) {
+      expect((await rest(null, t)).status, `anon ${t}`).toBeGreaterThanOrEqual(400);
+      expect((await rest(jwt, t)).status, `gerencia ${t}`).toBeGreaterThanOrEqual(400);
+    }
+  });
+
+  test("sin «X-Powered-By» y los archivos de /sb sin adivinar el tipo", async ({ baseURL }) => {
+    const r = await fetch(`${baseURL}/login`, { redirect: "manual" });
+    expect(r.headers.get("x-powered-by")).toBeNull();
+    if (env.NEXT_PUBLIC_SUPABASE_DIRECTO !== "1") {
+      const s = await fetch(`${baseURL}/sb/storage/v1/object/public/documentos/no-existe.xml`, { headers: { Cookie: "" } });
+      // Sin la cookie de la demo: 403 (si la hay, lo que pase lleva nosniff y sandbox).
+      expect([403, 400, 404]).toContain(s.status);
+    }
+  });
 });

@@ -12,6 +12,7 @@ import {
 import { isoBase64URL, isoUint8Array } from "@simplewebauthn/server/helpers";
 import { cookies, headers } from "next/headers";
 import { after } from "next/server";
+import { origen } from "@/lib/auditoria";
 import { APP_NOMBRE } from "@/lib/marca";
 import { createAdminClient } from "@/lib/supabase/admin";
 
@@ -20,8 +21,10 @@ import { createAdminClient } from "@/lib/supabase/admin";
 // base 5 minutos y la cookie solo lleva su id.
 
 const COOKIE_DESAFIO = "prod1_huella_desafio";
-/** Tope de desafíos sin sesión vigentes (pedir opciones para entrar es público): que no se pueda inflar la tabla. */
-const MAX_DESAFIOS_ANONIMOS = 300;
+/** Topes de desafíos sin sesión vigentes (pedir opciones para entrar es público): por IP, para que un script no
+ *  agote el tope de todos (con solo uno global, 300 llamadas dejaban a nadie entrar con huella), y uno total. */
+const MAX_DESAFIOS_POR_IP = 20;
+const MAX_DESAFIOS_ANONIMOS = 2000;
 
 /** Origen de la petición y su dominio (RP ID): Vercel, el túnel o localhost. Next ya validó el origen. */
 async function sitio() {
@@ -37,11 +40,16 @@ async function guardarDesafio(challenge: string, userId: string | null) {
   after(async () => {
     await db.from("huella_desafios").delete().lt("expira_at", new Date().toISOString());
   });
+  const { ip } = await origen();
   if (!userId) {
-    const { count } = await db.from("huella_desafios").select("id", { count: "exact", head: true }).is("user_id", null);
-    if ((count ?? 0) >= MAX_DESAFIOS_ANONIMOS) throw new Error("Demasiados intentos, espera unos minutos");
+    const anonimos = () => db.from("huella_desafios").select("id", { count: "exact", head: true }).is("user_id", null);
+    const [{ count: deLaIp }, { count: total }] = await Promise.all([
+      ip ? anonimos().eq("ip", ip) : Promise.resolve({ count: 0 }),
+      anonimos(),
+    ]);
+    if ((deLaIp ?? 0) >= MAX_DESAFIOS_POR_IP || (total ?? 0) >= MAX_DESAFIOS_ANONIMOS) throw new Error("Demasiados intentos, espera unos minutos");
   }
-  const { data, error } = await db.from("huella_desafios").insert({ challenge, user_id: userId }).select("id").single();
+  const { data, error } = await db.from("huella_desafios").insert({ challenge, user_id: userId, ip }).select("id").single();
   if (error) throw new Error(error.message);
   (await cookies()).set(COOKIE_DESAFIO, data.id, { httpOnly: true, secure: true, sameSite: "strict", maxAge: 300, path: "/" });
 }

@@ -27,7 +27,8 @@ const CORTOS = Object.keys(CORTO) as Corto[];
 const lista = (s: string) => CORTOS.filter((k) => s.split(/\s+/).includes(k));
 
 // ---------------------------------------------------------------------------------------------------------
-// Lectura: T = todas las filas · 0 = ninguna · P = parte (solo lo de sus obras) · M = las suyas (user_id).
+// Lectura: T = todas las filas · 0 = ninguna · P = parte (solo lo de sus obras) · M = las suyas (user_id) ·
+// X = sin permiso sobre la tabla (solo el servidor la usa).
 const LECTURA = tabla(`
   tabla                       LOG CON TES RES GER OPS JEF RRHH
   adelantos                    T   T   T   0   T   T   T   0
@@ -60,8 +61,8 @@ const LECTURA = tabla(`
   perfil_obras                 T   T   T   P   T   T   T   0
   perfiles                     T   T   T   T   T   T   T   T
   perfil_privado               0   0   0   0   0   0   0   0
-  huellas                      0   0   0   0   0   0   0   0
-  huella_desafios              0   0   0   0   0   0   0   0
+  huellas                      X   X   X   X   X   X   X   X
+  huella_desafios              X   X   X   X   X   X   X   X
   personas                     0   0   0   0   T   T   T   T
   proveedor_contactos          T   T   T   0   T   T   T   0
   proveedor_cuentas            T   T   T   0   T   0   0   0
@@ -190,7 +191,7 @@ const ARCHIVOS: [string, string, string, string][] = [
 // ni ve archivos salvo las fotos de las entregas.
 const FUERA = ["CON", "RES", "OPS", "RRHH"];
 const sin = (s: string, quitar: string[]) => s.split(/\s+/).filter((k) => k && !quitar.includes(k)).join(" ");
-for (const fila of Object.values(LECTURA)) for (const k of FUERA) fila[k as Corto] = "0";
+for (const fila of Object.values(LECTURA)) for (const k of FUERA) if (fila[k as Corto] !== "X") fila[k as Corto] = "0";
 for (const e of ESCRITURA) e[1] = sin(e[1], FUERA);
 // Ítems: Logística solo cambia tipo_material (el PATCH de la prueba va sobre la clave); lo prueba seguridad.spec.
 ESCRITURA.find(([t]) => t === "items")![1] = "";
@@ -378,6 +379,7 @@ test.describe("@permisos lectura por rol", () => {
           const total = B.tablas[t]?.n;
           const n = await contar(S[k].token, t);
           if (e === "P") return typeof n === "number" && n <= total ? null : `${t}: ${n} (esperado ≤ ${total})`;
+          if (e === "X") return typeof n === "string" && /error 40[13]/.test(n) ? null : `${t}: ${n} (esperado sin permiso)`;
           const esperado = e === "T" ? total : e === "M" ? (B.suyas[t]?.[ROLES[CORTO[k]]] ?? 0) : 0;
           if (n === esperado) return null;
           // Otras specs escriben y revierten en paralelo (p. ej. un asiento): con «todas», se vuelve a

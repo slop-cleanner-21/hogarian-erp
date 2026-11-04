@@ -38,10 +38,8 @@ async function demasiadosIntentos(email: string): Promise<boolean> {
 export async function login(_: string | null, formData: FormData): Promise<string | null> {
   const supabase = await createClient();
   const email = String(formData.get("email") ?? "").trim().toLowerCase().slice(0, 254);
-  if (await demasiadosIntentos(email)) {
-    await registrarEvento({ tabla: "sesion", accion: "LOGIN_FALLIDO", detalle: { email, motivo: "demasiados intentos" } });
-    return BLOQUEADO;
-  }
+  // Bloqueado: no se registra cada intento (serían escrituras anónimas sin tope); ya quedaron los que llevaron aquí.
+  if (await demasiadosIntentos(email)) return BLOQUEADO;
   const { data, error } = await supabase.auth.signInWithPassword({
     email,
     password: String(formData.get("password") ?? ""),

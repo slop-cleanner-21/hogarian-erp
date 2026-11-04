@@ -1124,6 +1124,7 @@ export type Database = {
           challenge: string;
           expira_at: string;
           id: string;
+          ip: string | null;
           user_id: string | null;
         };
         ComputedFields: never;
@@ -1131,12 +1132,14 @@ export type Database = {
           challenge: string;
           expira_at?: string;
           id?: string;
+          ip?: string | null;
           user_id?: string | null;
         };
         Update: {
           challenge?: string;
           expira_at?: string;
           id?: string;
+          ip?: string | null;
           user_id?: string | null;
         };
         Relationships: [];

@@ -21,8 +21,10 @@ export async function GET(req: Request, { params }: RouteContext<"/cotizar/[toke
 
   const db = createAdminClient();
   const { data, error } = await db.rpc("archivo_link", { p_token: token, p_tipo: tipo, p_id: id });
-  const r = data as { obra_id: number; numero: string; tipo: string; path: string | null } | null;
+  const r = data as { obra_id: number; numero: string; tipo: string; path: string | null; con_contrato?: boolean } | null;
   if (error || !r) return noDisponible();
+  // La base ya no admite rutas con «..» (path traversal); por si acaso, tampoco aquí.
+  if (r.path && /\.\.|\/\/|\\|%/.test(r.path)) return noDisponible();
 
   if (r.path) {
     // En producción, a una URL firmada corta (Vercel no entrega respuestas de más de 4,5 MB); en local, el archivo.
@@ -43,15 +45,16 @@ export async function GET(req: Request, { params }: RouteContext<"/cotizar/[toke
     });
   }
 
-  // OS sin el contrato firmado: el contrato para firmar, como el que genera Logística.
-  if (tipo !== "CONTRATO" || r.tipo !== "OS") return noDisponible();
+  // OS sin el contrato firmado: el contrato para firmar (solo las OS que llevan contrato).
+  if (tipo !== "CONTRATO" || !r.con_contrato) return noDisponible();
   const [{ data: orden }, { data: items }, { data: oc }] = await Promise.all([
     db.from("v_ordenes").select("*").eq("obra_id", r.obra_id).eq("numero", r.numero).maybeSingle(),
     db.from("v_oc_items").select("*").eq("obra_id", r.obra_id).eq("numero_oc", r.numero).order("id"),
     db.from("ordenes_compra").select("comprobante_tipo, fecha_inicio").eq("obra_id", r.obra_id).eq("numero", r.numero).maybeSingle(),
   ]);
   if (!orden) return noDisponible();
-  const firmante = await representanteContratos(orden.empresa_id ?? null);
+  // Sin la imagen de la firma de Gerencia: el link lo ve cualquiera que lo tenga, y la firma va al firmar.
+  const firmante = await representanteContratos(orden.empresa_id ?? null, { conFirma: false });
   const logo = logoPdfEmpresa(orden.empresa ?? "");
   const pdf = await contratoPdfBuffer(orden as VOrden, (items ?? []) as VOcItem[], {
     comprobante: (oc?.comprobante_tipo as "RXH" | "FACTURA" | null) ?? null,

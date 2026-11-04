@@ -8,7 +8,6 @@ import { NumberInput } from "@/components/ui/field";
 import { FileText, Receipt } from "lucide-react";
 import { fecha, qty, soles, solesPu } from "@/lib/format";
 import { guardar, leer } from "@/lib/recordar";
-import { enviarCotizacion } from "./actions";
 
 export type CotizacionData = {
   numero: string;
@@ -76,10 +75,14 @@ function Formulario({ token, data, conBorrador }: { token: string; data: Cotizac
   const enviar = () =>
     startTransition(async () => {
       setError(null);
-      const err = await enviarCotizacion({
-        token,
-        precios: data.items.map((i) => ({ item_id: i.id, pu: Number(pu[i.id]) })),
-      });
+      const err = await fetch(`/cotizar/${token}/enviar`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ precios: data.items.map((i) => ({ item_id: i.id, pu: Number(pu[i.id]) })) }),
+      })
+        .then((r) => r.json() as Promise<{ error: string | null }>)
+        .then((r) => r.error)
+        .catch(() => "No se pudo enviar la cotización: revisa tu conexión");
       if (err) return setError(err);
       guardar(claveBorrador(token), null);
       setEnviada(true);

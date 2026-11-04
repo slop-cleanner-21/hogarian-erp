@@ -33,12 +33,26 @@ async function guardarSb(request: NextRequest) {
   }
   const bearer = request.headers.get("authorization")?.replace(/^Bearer\s+/i, "");
   if (bearer && bearer !== anon && (bearer.startsWith("sb_secret_") || rolDelJwt(bearer) !== "authenticated")) return denegar();
-  return NextResponse.next();
+  const res = NextResponse.next();
+  // Archivos de Storage servidos con el origen de la app: sin adivinar el tipo y, salvo los PDF (el visor del
+  // navegador no los mostraría), en sandbox: un XML o HTML subido por un interno no corre con la sesión de la app.
+  // (headers() de next.config no llega a las respuestas reescritas.)
+  if (request.nextUrl.pathname.startsWith("/sb/storage/")) {
+    res.headers.set("X-Content-Type-Options", "nosniff");
+    if (!/\.pdf$/i.test(request.nextUrl.pathname)) res.headers.set("Content-Security-Policy", "sandbox; default-src 'none'; img-src 'self' data:; style-src 'unsafe-inline'");
+  }
+  return res;
 }
 
 export async function proxy(request: NextRequest) {
   const path = request.nextUrl.pathname;
   if (path.startsWith("/sb/")) return guardarSb(request);
+
+  // Sin la contraseña de la demo, ninguna server action (también en /cotizar, la única ruta pública: una server
+  // action se puede llamar desde cualquier ruta). El proveedor envía su cotización por una ruta propia.
+  if (accesoActivo() && request.headers.has("next-action") && request.cookies.get(COOKIE_ACCESO)?.value !== (await firmaAcceso())) {
+    return NextResponse.json({ message: "No permitido" }, { status: 403 });
+  }
 
   // Contraseña de la demo: antes que la sesión. Los links de cotización (proveedores) quedan libres.
   if (accesoActivo() && !path.startsWith("/cotizar")) {

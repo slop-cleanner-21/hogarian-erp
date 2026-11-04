@@ -3,6 +3,8 @@ import type { NextConfig } from "next";
 // ERP 100% dinámico por usuario: se usa el modelo de caché previo (sin Cache Components).
 const nextConfig: NextConfig = {
   cacheComponents: false,
+  // Sin «X-Powered-By: Next.js».
+  poweredByHeader: false,
   devIndicators: false,
   turbopack: {
     rules: {

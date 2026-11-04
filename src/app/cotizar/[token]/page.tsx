@@ -24,7 +24,8 @@ export default async function CotizarPage({ params }: PageProps<"/cotizar/[token
           <TemaProveedor />
         </div>
         <p className="mt-[30vh] text-center text-[19px] font-medium">
-          {error ? error.message : "Este link ya no está disponible"}
+          {/* El error de la base no se muestra tal cual: solo el de demasiados intentos. */}
+          {error?.code === "P0429" ? "Demasiados intentos. Vuelve a intentarlo en unos minutos." : "Este link ya no está disponible"}
         </p>
       </main>
     );
