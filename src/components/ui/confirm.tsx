@@ -2,6 +2,7 @@
 
 import { useEffect, useRef, type ReactNode } from "react";
 import { Button } from "./button";
+import { useCierreFuera } from "./cierre-fuera";
 
 export function Confirm({
   open,
@@ -24,6 +25,8 @@ export function Confirm({
   disabled?: boolean;
 }) {
   const ref = useRef<HTMLDialogElement>(null);
+  // Tocar el fondo (fuera del contenido, de principio a fin) equivale a «No».
+  const fuera = useCierreFuera(() => !pending && onNo());
   useEffect(() => {
     const d = ref.current;
     if (!d) return;
@@ -34,9 +37,9 @@ export function Confirm({
   return (
     <dialog
       ref={ref}
+      aria-label={title}
       onClose={(e) => e.target === e.currentTarget && onNo()}
-      // Tocar el fondo (fuera del contenido) equivale a «No».
-      onClick={(e) => e.target === e.currentTarget && !pending && onNo()}
+      {...fuera}
       className="m-auto w-[calc(100%-2rem)] max-w-sm rounded-panel bg-surface p-0"
     >
       <div className="flex flex-col gap-4 p-5">

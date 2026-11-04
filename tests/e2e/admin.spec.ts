@@ -79,7 +79,7 @@ test.describe("@prod1 @admin usuarios", () => {
 
       // El Admin la restablece: sirve la nueva, no la anterior.
       await admin.locator("main").getByRole("button", { name: new RegExp(email) }).click();
-      const ficha = admin.getByRole("dialog", { name: "Prueba E2E" });
+      const ficha = admin.getByRole("dialog", { name: "Prueba E2E", exact: true });
       await ficha.getByRole("button", { name: "Restablecer contraseña" }).click();
       await admin.getByRole("dialog").filter({ hasText: "¿Restablecer la contraseña?" }).getByRole("button", { name: /^Sí/ }).click();
       const credenciales = ficha.getByRole("region", { name: "Credenciales" });

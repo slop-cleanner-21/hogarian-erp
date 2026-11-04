@@ -3,6 +3,7 @@
 import { X } from "lucide-react";
 import { useEffect, useRef, type ReactNode } from "react";
 import { cn } from "@/lib/format";
+import { useCierreFuera } from "./cierre-fuera";
 
 /** Hoja inferior modal (pantalla completa en móvil si `full`). */
 export function Sheet({
@@ -21,6 +22,8 @@ export function Sheet({
   full?: boolean;
 }) {
   const ref = useRef<HTMLDialogElement>(null);
+  // Solo si el toque empieza y termina en el fondo (apretar dentro y soltar fuera no la cierra).
+  const fuera = useCierreFuera(onClose);
 
   useEffect(() => {
     const d = ref.current;
@@ -39,7 +42,7 @@ export function Sheet({
       aria-label={title}
       // "close" de un <dialog> hijo (selector anidado) se propaga por React: ignorarlo.
       onClose={(e) => e.target === e.currentTarget && onClose()}
-      onClick={(e) => e.target === ref.current && onClose()}
+      {...fuera}
       className={cn(
         "m-0 mt-auto w-full max-w-none bg-transparent p-0 sm:m-auto sm:max-w-lg",
         full ? "h-dvh max-h-dvh sm:h-[80dvh]" : "max-h-[90dvh]",
