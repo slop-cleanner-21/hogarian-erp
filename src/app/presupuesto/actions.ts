@@ -6,6 +6,7 @@ import { enviarAvisosPendientes } from "@/lib/push";
 import { createClient, requireSesion } from "@/lib/supabase/server";
 import type { Result } from "@/app/logistica/actions";
 import type { VOcItem } from "@/lib/types";
+import { todas } from "@/lib/paginar";
 
 // Historial de órdenes de una partida del presupuesto (lo consultan varias áreas).
 export type FilaHistorial = Pick<VOcItem, "id" | "obra_id" | "numero_oc" | "fecha" | "cantidad" | "pu_efectivo" | "parcial" | "estado"> & {
@@ -23,7 +24,7 @@ export async function historialPartida(
   await requireSesion(["TESORERIA", "LOGISTICA", "CONTABILIDAD", "GERENCIA", "OPERACIONES", "JEFE_OPERACIONES"]);
   const supabase = await createClient();
   let consulta = supabase
-    .from("v_oc_items")
+    .from("v_oc_items_calc")
     .select("id, obra_id, numero_oc, fecha, cantidad, pu_efectivo, parcial, estado")
     .eq("partida_id", partidaId)
     .neq("estado", "ANULADA")
@@ -131,6 +132,29 @@ export async function asignarPersonaObra(obraId: number, personaId: number, asig
   revalidatePath("/operaciones/obra");
   revalidatePath(`/gerencia/obras/${obraId}`);
   return { ok: true, data: undefined };
+}
+
+/**
+ * Lo que el cierre da de baja (partidas con saldo y su monto) y la retención por pagar. Se calcula al tocar «Cerrar
+ * obra»: el faltante de cada partida es una función por fila y costaba ~0,5 s en cada apertura del editor.
+ */
+export async function saldoCierre(obraId: number): Promise<Result<{ partidas: number; monto: number; retencion: number }>> {
+  await requireSesion(["GERENCIA"]);
+  const supabase = await createClient();
+  const [faltantes, { data: retenido, error }] = await Promise.all([
+    todas((a, b) => supabase.from("partidas").select("id, pu, faltante").eq("obra_id", obraId).order("id").range(a, b)),
+    supabase.from("valorizaciones").select("valorizacion_partidas(retencion)").eq("obra_id", obraId),
+  ]);
+  if (error) return { ok: false, error: error.message };
+  const conSaldo = faltantes.filter((f) => Number(f.faltante ?? 0) > 0.0001);
+  return {
+    ok: true,
+    data: {
+      partidas: conSaldo.length,
+      monto: conSaldo.reduce((s, f) => s + Number(f.faltante) * Number(f.pu ?? 0), 0),
+      retencion: (retenido ?? []).flatMap((v) => v.valorizacion_partidas).reduce((s, l) => s + Number(l.retencion), 0),
+    },
+  };
 }
 
 /** Cierra la obra: da de baja todo lo que falta y deja la retención lista para su OS final. */

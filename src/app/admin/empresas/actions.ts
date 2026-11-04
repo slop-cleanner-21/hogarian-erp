@@ -3,7 +3,7 @@
 import { revalidatePath } from "next/cache";
 import { z } from "zod";
 import { createAdminClient } from "@/lib/supabase/admin";
-import { requireSesion } from "@/lib/supabase/server";
+import { requireSesionVigente } from "@/lib/supabase/server";
 
 export type Result<T = undefined> = { ok: true; data: T } | { ok: false; error: string };
 
@@ -23,7 +23,7 @@ const Empresa = z.object({
 export async function guardarEmpresa(input: z.input<typeof Empresa>): Promise<Result> {
   const p = Empresa.safeParse(input);
   if (!p.success) return { ok: false, error: p.error.issues[0].message };
-  const sesion = await requireSesion(["ADMIN"]);
+  const sesion = await requireSesionVigente(["ADMIN"]);
   if (sesion.rol !== "ADMIN") return { ok: false, error: "Solo el Administrador edita las empresas" };
   const db = createAdminClient(sesion.userId);
   if (p.data.firmanteId) {

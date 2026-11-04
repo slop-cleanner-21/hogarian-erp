@@ -40,19 +40,15 @@ export async function PaginaSeguimiento({ sp, sesion, clave, titulo }: { sp: Par
   const empresa = filtro(sp, "empresa");
   const lista = empresa ? obras.filter((o) => String(o.empresa_id) === empresa) : obras;
   const obraId = lista.find((o) => String(o.id) === sp.obra)?.id ?? lista[0]?.id ?? null;
-  // Orden de etapas de la obra (lo define el Jefe de Operaciones) y adelantos vigentes.
-  const [{ data: ordenObra }, { marcas }, entregas] = obraId
+  // Orden de etapas de la obra (lo define el Jefe de Operaciones), adelantos vigentes, entregas y las partidas:
+  // todo en una sola ola (solo necesitan la obra).
+  const [{ data: ordenObra }, { marcas }, entregas, partidas] = obraId
     ? await Promise.all([
         supabase.from("obra_etapas").select("etapa").eq("obra_id", obraId).order("orden"),
         adelantosDeObra(obraId),
         // Lo que llegó con sus fotos, por partida.
         entregasPorPartida(obraId),
-      ])
-    : [{ data: [] }, { marcas: new Map<number, string[]>() }, {} as Record<number, EntregaPartida[]>];
-
-  const filas: FilaSeguimiento[] = obraId
-    ? (
-        await todas((a, b) =>
+        todas((a, b) =>
           supabase
             .from("v_seguimiento_partida")
             .select(
@@ -63,8 +59,12 @@ export async function PaginaSeguimiento({ sp, sesion, clave, titulo }: { sp: Par
             .order("orden_etapa")
             .order("partida_id")
             .range(a, b),
-        )
-      )
+        ),
+      ])
+    : [{ data: [] }, { marcas: new Map<number, string[]>() }, {} as Record<number, EntregaPartida[]>, []];
+
+  const filas: FilaSeguimiento[] = obraId
+    ? partidas
         .map((f): FilaSeguimiento => {
           const base = {
             id: f.partida_id,

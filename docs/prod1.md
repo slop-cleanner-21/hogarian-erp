@@ -174,6 +174,33 @@ Contabilidad, Residente, Ingeniero de Operaciones y RRHH **no entran**. Sus role
 - **Hora de Lima:** la base trabaja en `America/Lima` (migración `prod1_zona_lima`): «hoy» es el día de
   Lima también de noche.
 - **Cuenta sin perfil:** va a «Sin acceso» (antes la app la trataba como Logística).
+- **Seguridad (auditoría del 05/11/2026, migración `prod1_seguridad`):**
+  - Para la base solo existen los roles de prod 1: `rol_actual()` / `rol_en()` tratan a Contabilidad, Residente,
+    Ing. de Operaciones y RRHH como sin perfil (no leen nada ni pasan ningún RPC). El Jefe de Operaciones no pasa
+    ninguna función que escriba y de los archivos solo ve las fotos de las entregas.
+  - El token del link de cotización solo lo ve Logística (`token_cotizacion_de` en `v_ordenes` / `v_por_pagar`).
+    `ordenes_compra` se lee **por columnas**: una columna nueva necesita su `grant select (…)`.
+  - Logística solo cambia `tipo_material` de un ítem (no su tolerancia de sobreprecio).
+  - Lo que se hace con la clave secreta (Admin, Empresas, firma, huella) mira el rol vigente en la base
+    (`requireSesionVigente`): un Admin desactivado pierde el panel al instante. Nadie se reactiva a sí mismo.
+  - Login: 10 intentos fallidos por cuenta o 30 por IP en 15 minutos y espera.
+  - `/sb` (local y túnel) pide la contraseña de la demo y solo deja pasar la clave pública.
+  - Cabeceras: sin incrustar en otro sitio, `nosniff`, `Referrer-Policy`; los XML / SVG de `/sb` en sandbox.
+  - El precio de una cotización debe ser mayor que 0. Los tokens falsos ya no bloquean los links reales.
+  - El CSV de la auditoría no lleva fórmulas.
+- **Login:** sol / luna arriba a la derecha (claro u oscuro, el mismo tema del menú).
+- **Huella (passkey, WebAuthn):** cada usuario la activa por dispositivo desde su menú › Huella (ahí ve y quita
+  sus dispositivos). En la app instalada (PWA) se ofrece una vez si el teléfono tiene huella o rostro. Con ella:
+  - **entra sin contraseña:** el login la pide solo al abrirse (no si cerró sesión a propósito) y tiene «Entrar
+    con huella»; el servidor verifica la firma y abre la sesión con un enlace mágico de un solo uso;
+  - **la app se bloquea** al volver tras más de 5 minutos fuera (o al reabrirla) y se desbloquea con la huella;
+    «Usar contraseña» cierra la sesión.
+
+  Si otra persona entra con contraseña en ese dispositivo, la huella deja de ofrecerse. Una huella quitada desde
+  otro dispositivo deja de ofrecerse al fallar. Las credenciales (`huellas`, solo la clave pública) y los
+  desafíos de un solo uso (`huella_desafios`, 5 min) solo los lee el servidor. Valen solo en el dominio en que se
+  activaron: al cambiar de dominio, cada uno la activa de nuevo. Auditoría: «Inició sesión · con huella»,
+  «Desbloqueó con huella», intentos fallidos, y cada alta o baja de una huella (`src/lib/huella.ts`).
 
 ### Heredado del MVP (ya implementado)
 

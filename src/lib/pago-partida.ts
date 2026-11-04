@@ -9,7 +9,7 @@ export async function pagoPorPartida(obraId: number): Promise<Map<number, PagoPa
   const supabase = await createClient();
   const filas = await todas((a, b) =>
     supabase
-      .from("v_oc_items")
+      .from("v_oc_items_calc")
       .select("partida_id, cantidad, parcial, estado")
       .eq("obra_id", obraId)
       .in("estado", ["PAGADA", "EN_ENTREGA", "RECIBIDA", "EN_TESORERIA"])

@@ -3,34 +3,45 @@
 import { Bell } from "lucide-react";
 import Link from "next/link";
 import { useEffect, useState } from "react";
-import { abrirCanal } from "@/lib/realtime";
-import { createClient } from "@/lib/supabase/client";
 
-/** Campana de avisos con el número de no leídos; se actualiza en tiempo real. */
+/**
+ * Campana de avisos con el número de no leídos; se actualiza en tiempo real. Está en todas las pantallas: el
+ * cliente de Supabase (~67 KB gzip) se carga después, cuando el navegador queda libre, y no compite con lo que se
+ * ve al abrir.
+ */
 export function Campana({ userId }: { userId: string }) {
   const [pendientes, setPendientes] = useState(0);
 
   useEffect(() => {
-    const supabase = createClient();
     let vivo = true;
-    const contar = async () => {
-      const { count } = await supabase
-        .from("notificaciones")
-        .select("id", { count: "exact", head: true })
-        .eq("user_id", userId)
-        .is("leida_at", null);
-      if (vivo) setPendientes(count ?? 0);
+    let cerrar = () => {};
+    const iniciar = async () => {
+      const [{ createClient }, { abrirCanal }] = await Promise.all([import("@/lib/supabase/client"), import("@/lib/realtime")]);
+      if (!vivo) return;
+      const supabase = createClient();
+      const contar = async () => {
+        const { count } = await supabase
+          .from("notificaciones")
+          .select("id", { count: "exact", head: true })
+          .eq("user_id", userId)
+          .is("leida_at", null);
+        if (vivo) setPendientes(count ?? 0);
+      };
+      void contar();
+      cerrar = abrirCanal(supabase, () =>
+        supabase
+          .channel(`avisos-${userId}`)
+          .on("postgres_changes", { event: "*", schema: "public", table: "notificaciones", filter: `user_id=eq.${userId}` }, () => {
+            void contar();
+          }),
+      );
     };
-    void contar();
-    const cerrar = abrirCanal(supabase, () =>
-      supabase
-        .channel(`avisos-${userId}`)
-        .on("postgres_changes", { event: "*", schema: "public", table: "notificaciones", filter: `user_id=eq.${userId}` }, () => {
-          void contar();
-        }),
-    );
+    const ocioso = window.requestIdleCallback ?? ((f: () => void) => window.setTimeout(f, 300));
+    const cancelar = window.cancelIdleCallback ?? window.clearTimeout;
+    const id = ocioso(() => void iniciar(), { timeout: 2000 });
     return () => {
       vivo = false;
+      cancelar(id);
       cerrar();
     };
   }, [userId]);

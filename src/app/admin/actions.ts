@@ -5,7 +5,7 @@ import { z } from "zod";
 import { ROLES_PROD1 } from "@/lib/prod1";
 import { registrarEvento } from "@/lib/auditoria";
 import { createAdminClient } from "@/lib/supabase/admin";
-import { requireSesion } from "@/lib/supabase/server";
+import { requireSesionVigente } from "@/lib/supabase/server";
 import type { Rol } from "@/lib/types";
 import { contrasenaAlAzar, MIN_CONTRASENA } from "@/lib/usuarios";
 
@@ -15,7 +15,7 @@ const fail = (error: string): Result<never> => ({ ok: false, error });
 
 // Solo el Admin. requireSesion deja pasar al Admin con cualquier lista; con ["ADMIN"] nadie más entra.
 async function admin() {
-  const sesion = await requireSesion(["ADMIN"]);
+  const sesion = await requireSesionVigente(["ADMIN"]);
   if (sesion.rol !== "ADMIN") throw new Error("Solo el Administrador gestiona usuarios");
   // Los cambios en perfiles quedan en la auditoría a nombre del Admin (x-actor).
   return { sesion, db: createAdminClient(sesion.userId) };
@@ -140,7 +140,7 @@ export async function restablecerContrasena(id: string): Promise<Result<string>>
 export async function cambiarActivo(id: string, activo: boolean): Promise<Result> {
   if (!z.guid().safeParse(id).success) return fail("Usuario no válido");
   const { sesion, db } = await admin();
-  if (id === sesion.userId && !activo) return fail("No puedes desactivar tu propia cuenta");
+  if (id === sesion.userId) return fail("No puedes desactivar ni reactivar tu propia cuenta");
   const { error } = await db.auth.admin.updateUserById(id, { ban_duration: activo ? "none" : BANEO });
   if (error) return fail(mensaje(error));
   await registrarEvento({ tabla: "usuarios", accion: activo ? "REACTIVAR" : "DESACTIVAR", registro: id, actor: sesion.userId });

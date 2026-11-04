@@ -64,7 +64,8 @@ Ensayado en local el 04/11/2026 con este mismo orden (base vacía → Admin → 
 
    **No** se definen: `NEXT_PUBLIC_USUARIOS_LOCALES` (botones de acceso rápido), `DEMO_ACCESO` (contraseña de
    la demo) ni `SERVER_ACTIONS_ORIGENES` (túnel).
-3. Dominio: agregarlo en Vercel y apuntar el DNS.
+3. Dominio: agregarlo en Vercel y apuntar el DNS. Las huellas (passkeys) van atadas al dominio: las activadas en
+   `*.vercel.app` no sirven en el dominio propio, y cada usuario la activa de nuevo.
 
 ## Entorno de pruebas (04/11/2026)
 

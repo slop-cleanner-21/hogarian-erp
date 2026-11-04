@@ -1,7 +1,7 @@
 import type { Metadata } from "next";
 import { TopBar, UserMenu } from "@/components/shell";
 import { createAdminClient } from "@/lib/supabase/admin";
-import { requireSesion } from "@/lib/supabase/server";
+import { requireSesionVigente } from "@/lib/supabase/server";
 import type { Rol } from "@/lib/types";
 import { ROL_LABEL } from "@/lib/usuarios";
 import { UsuariosLista, type Usuario } from "./usuarios-lista";
@@ -10,7 +10,7 @@ export const metadata: Metadata = { title: "Usuarios" };
 
 /** Usuarios (solo el Admin): crear cuentas, cambiar nombre, correo y rol, restablecer contraseña y desactivar. */
 export default async function UsuariosPage() {
-  const sesion = await requireSesion(["ADMIN"]);
+  const sesion = await requireSesionVigente(["ADMIN"]);
   const db = createAdminClient();
   const [cuentas, { data: perfiles, error }, { data: privados }] = await Promise.all([
     todasLasCuentas(db),

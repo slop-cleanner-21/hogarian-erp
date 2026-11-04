@@ -8,7 +8,7 @@ import { Button } from "@/components/ui/button";
 import { Confirm } from "@/components/ui/confirm";
 import { SearchSelect } from "@/components/ui/search-select";
 import { money } from "@/lib/format";
-import { asignarPersonaObra, cerrarObra, publicarPresupuesto, reemplazarResidente } from "./actions";
+import { asignarPersonaObra, cerrarObra, publicarPresupuesto, reemplazarResidente, saldoCierre } from "./actions";
 
 const CARGO: Record<string, string> = {
   RESIDENTE: "Residente",
@@ -188,14 +188,25 @@ export function PersonasObra({
  * Cerrar la obra (Gerencia): se da de baja todo lo que falta de cada partida y ya no se requiere,
  * ordena ni avanza nada más. La retención acumulada se paga después en una sola OS.
  */
-export function CerrarObra({ obraId, partidas, monto, retencion }: { obraId: number; partidas: number; monto: number; retencion: number }) {
+export function CerrarObra({ obraId }: { obraId: number }) {
   const router = useRouter();
   const [abierto, setAbierto] = useState(false);
+  const [saldo, setSaldo] = useState({ partidas: 0, monto: 0, retencion: 0 });
   const [error, setError] = useState<string | null>(null);
   const [pending, startTransition] = useTransition();
+  const { partidas, monto, retencion } = saldo;
+  // El saldo se calcula al tocar (no al abrir el editor).
+  const abrir = () =>
+    startTransition(async () => {
+      setError(null);
+      const r = await saldoCierre(obraId);
+      if (!r.ok) return setError(r.error);
+      setSaldo(r.data);
+      setAbierto(true);
+    });
   return (
     <div className="mt-3 flex flex-col gap-2">
-      <Button variant="secondary" onClick={() => setAbierto(true)} disabled={pending}>
+      <Button variant="secondary" onClick={abrir} disabled={pending}>
         <Lock size={18} /> Cerrar obra
       </Button>
       {error && (

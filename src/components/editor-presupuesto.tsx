@@ -3,7 +3,7 @@
 import { MarcaAdicional, nombreAdicional } from "@/components/marca-adicional";
 import { Plus, Search, Trash2 } from "lucide-react";
 import { useRouter } from "next/navigation";
-import { useMemo, useState, useTransition, type KeyboardEvent } from "react";
+import { useMemo, useState, useSyncExternalStore, useTransition, type KeyboardEvent } from "react";
 import { guardarPartidas, type PartidaEdicion } from "@/app/presupuesto/actions";
 import { TODOS } from "@/lib/filtros";
 import { cn, matches, money, qty } from "@/lib/format";
@@ -62,6 +62,21 @@ let nuevas = 0;
  * Presupuesto editable de una obra. En escritorio es una grilla: Enter o las flechas ↑↓ pasan a la
  * misma columna de la fila vecina. En el celular, cada partida se edita en una hoja.
  */
+// Una sola maqueta a la vez: la grilla de escritorio (3 buscadores y 2 campos por fila) se dibujaba también en el
+// celular, oculta, y era el 80 % de la página. El servidor manda la lista; en escritorio se cambia al hidratar.
+const ESCRITORIO = "(min-width: 1024px)";
+function useEscritorio() {
+  return useSyncExternalStore(
+    (l) => {
+      const mq = window.matchMedia(ESCRITORIO);
+      mq.addEventListener("change", l);
+      return () => mq.removeEventListener("change", l);
+    },
+    () => window.matchMedia(ESCRITORIO).matches,
+    () => false,
+  );
+}
+
 export function EditorPresupuesto({
   obraId,
   partidas,
@@ -78,6 +93,7 @@ export function EditorPresupuesto({
   editable: boolean;
 }) {
   const router = useRouter();
+  const escritorio = useEscritorio();
   const originales = useMemo(() => new Map(partidas.map((p) => [p.id, aFila(p)])), [partidas]);
   const [filas, setFilas] = useState<Fila[]>(() => partidas.map(aFila));
   const [eliminadas, setEliminadas] = useState<number[]>([]);
@@ -226,7 +242,8 @@ export function EditorPresupuesto({
       {error && <p role="alert" className="px-1 text-danger">{error}</p>}
 
       {/* Celular: lista; cada partida se edita en una hoja */}
-      <ul className="overflow-hidden rounded-panel bg-surface lg:hidden">
+      {!escritorio && (
+      <ul className="overflow-hidden rounded-panel bg-surface">
         {visibles.map((f) => {
           const it = f.itemId ? item.get(f.itemId) : null;
           const cambiada = f.id == null || !igual(f, originales.get(f.id)!);
@@ -255,9 +272,11 @@ export function EditorPresupuesto({
         })}
         {visibles.length === 0 && <li className="px-4 py-10 text-center text-ink-3">{filtrando ? "Sin partidas con esos filtros" : "Sin partidas"}</li>}
       </ul>
+      )}
 
       {/* Escritorio: grilla */}
-      <div role="grid" aria-label="Partidas del presupuesto" className="hidden overflow-hidden rounded-panel bg-surface lg:block">
+      {escritorio && (
+      <div role="grid" aria-label="Partidas del presupuesto" className="overflow-hidden rounded-panel bg-surface">
         <div role="row" className="grid grid-cols-[6.5rem_8.5rem_1fr_6rem_7rem_7rem_3rem] border-b border-line text-[13px] font-medium text-ink-2">
           {["Etapa", "Requerimiento", "Ítem", "Cantidad", "P.U.", "Parcial", ""].map((h, i) => (
             <span key={i} role="columnheader" className={cn("px-2 py-2", i >= 3 && i <= 5 && "text-right")}>
@@ -344,6 +363,7 @@ export function EditorPresupuesto({
           );
         })}
       </div>
+      )}
 
       {editable && sucio && (
         <ActionBar>

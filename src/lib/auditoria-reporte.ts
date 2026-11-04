@@ -6,6 +6,7 @@ import { createClient } from "@/lib/supabase/server";
 
 export const TABLA_LABEL: Record<string, string> = {
   sesion: "Sesión",
+  huellas: "Huella",
   usuarios: "Cuenta de usuario",
   ordenes_compra: "Orden",
   oc_items: "Línea de orden",
@@ -48,6 +49,8 @@ export const ACCION_LABEL: Record<string, string> = {
   LOGIN: "Inició sesión",
   LOGIN_FALLIDO: "Intento de ingreso fallido",
   LOGOUT: "Cerró sesión",
+  DESBLOQUEO: "Desbloqueó con huella",
+  DESBLOQUEO_FALLIDO: "Desbloqueo fallido",
   CAMBIO_CONTRASENA: "Cambió su contraseña",
   CREAR_USUARIO: "Creó la cuenta",
   EDITAR_USUARIO: "Editó la cuenta",
@@ -56,7 +59,7 @@ export const ACCION_LABEL: Record<string, string> = {
   REACTIVAR: "Reactivó la cuenta",
 };
 
-const ACCIONES_SESION = ["LOGIN", "LOGIN_FALLIDO", "LOGOUT", "CAMBIO_CONTRASENA"];
+const ACCIONES_SESION = ["LOGIN", "LOGIN_FALLIDO", "LOGOUT", "CAMBIO_CONTRASENA", "DESBLOQUEO", "DESBLOQUEO_FALLIDO"];
 
 export type Vista = "sesiones" | "cambios";
 export type FilaAuditoria = {
@@ -158,7 +161,9 @@ export async function reporteAuditoria(f: ReturnType<typeof filtrosDe>, limite: 
     } else if (r.accion === "CREAR_USUARIO") {
       resumen = `${det.nombre ?? ""} · ${det.rol ?? ""}`;
     } else if (r.accion === "LOGIN_FALLIDO") {
-      resumen = String(det.motivo ?? "");
+      resumen = [det.metodo === "huella" ? "con huella" : "", String(det.motivo ?? "")].filter(Boolean).join(" · ");
+    } else if (r.accion === "LOGIN" && det.metodo === "huella") {
+      resumen = "con huella";
     } else if (r.accion === "INSERT" || r.accion === "DELETE") {
       resumen = ["numero", "descripcion", "razon_social", "nombre", "serie", "tipo", "estado", "monto", "total", "cantidad", "motivo"]
         .filter((k) => det[k] != null)

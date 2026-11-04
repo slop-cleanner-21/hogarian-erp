@@ -23,14 +23,6 @@ export async function PaginaObra({ obraId, volver }: { obraId: number; volver: s
     supabase.from("requerimientos").select("codigo").order("orden"),
     supabase.from("detracciones").select("item_id, porcentaje").eq("obra_id", obraId),
   ]);
-  // Para cerrar la obra: lo que falta de cada partida (se da de baja) y la retención por pagar.
-  const [faltantes, { data: retenido }] = await Promise.all([
-    todas((a, b) => supabase.from("partidas").select("id, pu, faltante").eq("obra_id", obraId).order("id").range(a, b)),
-    supabase.from("valorizaciones").select("valorizacion_partidas(retencion)").eq("obra_id", obraId),
-  ]);
-  const conSaldo = faltantes.filter((f) => Number(f.faltante ?? 0) > 0.0001);
-  const montoBaja = conSaldo.reduce((s, f) => s + Number(f.faltante) * Number(f.pu ?? 0), 0);
-  const retencion = (retenido ?? []).flatMap((v) => v.valorizacion_partidas).reduce((s, l) => s + Number(l.retencion), 0);
   if (!obra) notFound();
   const comprado = new Map(avance.map((a) => [a.partida_id, Number(a.comprado)]));
   const filas: PartidaPresupuesto[] = partidas.map((p) => ({
@@ -76,7 +68,7 @@ export async function PaginaObra({ obraId, volver }: { obraId: number; volver: s
             )}
           </dl>
           {borrador && <PublicarPresupuesto obraId={obraId} vacio={filas.length === 0} />}
-          {!borrador && obra.estado !== "CERRADA" && <CerrarObra obraId={obraId} partidas={conSaldo.length} monto={montoBaja} retencion={retencion} />}
+          {!borrador && obra.estado !== "CERRADA" && <CerrarObra obraId={obraId} />}
         </section>
 
         {/* Prod 1: Gerencia agrega los adicionales directo, con el presupuesto ya publicado. */}

@@ -1119,6 +1119,68 @@ export type Database = {
           },
         ];
       };
+      huella_desafios: {
+        Row: {
+          challenge: string;
+          expira_at: string;
+          id: string;
+          user_id: string | null;
+        };
+        ComputedFields: never;
+        Insert: {
+          challenge: string;
+          expira_at?: string;
+          id?: string;
+          user_id?: string | null;
+        };
+        Update: {
+          challenge?: string;
+          expira_at?: string;
+          id?: string;
+          user_id?: string | null;
+        };
+        Relationships: [];
+      };
+      huellas: {
+        Row: {
+          counter: number;
+          created_at: string;
+          credential_id: string;
+          dispositivo: string | null;
+          id: string;
+          public_key: string;
+          rp_id: string;
+          transports: string[];
+          usada_at: string | null;
+          user_id: string;
+        };
+        ComputedFields: never;
+        Insert: {
+          counter?: number;
+          created_at?: string;
+          credential_id: string;
+          dispositivo?: string | null;
+          id?: string;
+          public_key: string;
+          rp_id: string;
+          transports?: string[];
+          usada_at?: string | null;
+          user_id: string;
+        };
+        Update: {
+          counter?: number;
+          created_at?: string;
+          credential_id?: string;
+          dispositivo?: string | null;
+          id?: string;
+          public_key?: string;
+          rp_id?: string;
+          transports?: string[];
+          usada_at?: string | null;
+          user_id?: string;
+        };
+        Relationships: [];
+      };
       items: {
         Row: {
           cuenta_contable: string | null;
@@ -3613,6 +3675,24 @@ export type Database = {
           },
         ];
       };
+      v_resumen_obra: {
+        Row: {
+          adicionales: string[] | null;
+          monto: number | null;
+          obra_id: number;
+          partidas: number | null;
+        };
+        ComputedFields: never;
+        Relationships: [
+          {
+            foreignKeyName: "partidas_obra_id_fkey";
+            columns: ["obra_id"];
+            isOneToOne: false;
+            referencedRelation: "obras";
+            referencedColumns: ["id"];
+          },
+        ];
+      };
       v_retencion_obra: {
         Row: {
           numero_oc: string | null;
@@ -4090,6 +4170,7 @@ export type Database = {
       };
       rol_actual: { Args: Record<PropertyKey, never>; Returns: string };
       rol_en: { Args: { p_roles: string[] }; Returns: boolean };
+      rol_prod1: { Args: { p_rol: string }; Returns: boolean };
       ruta_obra_residente: { Args: { p_name: string }; Returns: boolean };
       set_datos_os: {
         Args: {
@@ -4125,6 +4206,10 @@ export type Database = {
           p_tipo: string;
         };
         Returns: number;
+      };
+      token_cotizacion_de: {
+        Args: { p_numero: string; p_obra: number };
+        Returns: string;
       };
       valorizar: { Args: { p_obra_id: number }; Returns: number };
     };

@@ -2,7 +2,9 @@ import { filtrosDe, reporteAuditoria } from "@/lib/auditoria-reporte";
 import { requireSesion } from "@/lib/supabase/server";
 
 const celda = (v: unknown) => {
-  const s = v == null ? "" : typeof v === "object" ? JSON.stringify(v) : String(v);
+  let s = v == null ? "" : typeof v === "object" ? JSON.stringify(v) : String(v);
+  // Excel no la toma como fórmula (un correo de un intento fallido podría ser «=HYPERLINK(…)»).
+  if (/^[-=+@\t\r]/.test(s)) s = `'${s}`;
   return /[",\n;]/.test(s) ? `"${s.replace(/"/g, '""')}"` : s;
 };
 

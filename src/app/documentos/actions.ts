@@ -38,6 +38,7 @@ export async function registrarAdjunto(input: z.input<typeof Adjunto>, revalidar
     const e2 = await enviarSiLista(supabase, p.data.obraId, p.data.numeroOc);
     if (e2) return { ok: false, error: e2 };
   }
-  revalidatePath(revalidar);
+  // La ruta la manda el cliente: solo una de la app (sin dominio ni parámetros).
+  if (/^\/[\w\-/%.]{0,200}$/.test(revalidar) && !revalidar.startsWith("//")) revalidatePath(revalidar);
   return { ok: true, data: undefined };
 }

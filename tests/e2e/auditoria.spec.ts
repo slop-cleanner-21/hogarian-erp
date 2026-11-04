@@ -6,7 +6,7 @@ import { ROLES, sql, sql1, sqlScript } from "./lib";
 // cierre) quedan con IP y dispositivo; lo que el Admin hace con la clave secreta queda a su nombre; y el Admin
 // lo ve en Auditoría (y en CSV).
 
-const SIN_AUDITORIA = ["audit_log", "notificaciones", "push_suscripciones", "cotizacion_accesos", "datos_demo"];
+const SIN_AUDITORIA = ["audit_log", "notificaciones", "push_suscripciones", "cotizacion_accesos", "datos_demo", "huella_desafios"];
 
 async function entrar(browser: Browser, baseURL: string, email: string, pass: string): Promise<Page> {
   const ctx = await browser.newContext({ baseURL });

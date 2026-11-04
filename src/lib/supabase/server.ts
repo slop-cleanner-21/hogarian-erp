@@ -45,6 +45,20 @@ const getSesion = cache(async (): Promise<Sesion | "sin-perfil" | null> => {
   return { userId: claims.sub, nombre: perfil.nombre ?? claims.email ?? "", rol: perfil.rol as Rol };
 });
 
+/**
+ * Para lo que se hace con la clave secreta (usuarios, empresas, firma, huella): el rol vigente en la base, no el
+ * del token. Un baneo o un cambio de rol rige al instante (el token dura hasta 1 h); sin esto, un Admin
+ * desactivado podía reactivarse y crear cuentas mientras su token siguiera vigente.
+ */
+export async function requireSesionVigente(roles?: Rol[]): Promise<Sesion> {
+  const sesion = await requireSesion(roles);
+  const { data } = await (await createClient()).rpc("mi_rol");
+  const rol = (data ?? "") as Rol | "";
+  if (!rol || !rolEnProd1(rol)) redirect("/sin-acceso");
+  if (roles && rol !== "ADMIN" && !roles.includes(rol)) redirect("/");
+  return { ...sesion, rol };
+}
+
 export async function requireSesion(roles?: Rol[]): Promise<Sesion> {
   const sesion = await getSesion();
   if (!sesion) redirect("/login");

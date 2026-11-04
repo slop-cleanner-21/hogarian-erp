@@ -113,7 +113,7 @@ export default async function PagosPage({ searchParams }: PageProps<"/tesoreria"
   const totalesEtapa = new Map<string, { docs: Set<string>; suma: number }>();
   if (diseno === "etapa") {
     const lineas = await todas<{ obra_id: number | null; numero_oc: string | null; etapa: string | null; parcial: number | null }>((a, b) => {
-      let q = supabase.from("v_oc_items").select("obra_id, numero_oc, etapa, parcial");
+      let q = supabase.from("v_oc_items_calc").select("obra_id, numero_oc, etapa, parcial");
       if (fObra) q = q.eq("obra_id", Number(fObra));
       return q.order("id").range(a, b);
     });

@@ -135,7 +135,7 @@ export default async function OrdenesPage({ searchParams }: PageProps<"/logistic
   const totalesEtapa = new Map<string, { ordenes: Set<string>; suma: number }>();
   if (porEtapa) {
     const lineas = await todas<{ obra_id: number | null; numero_oc: string | null; etapa: string | null; parcial: number | null; estado: string | null }>((a, b) => {
-      let q = supabase.from("v_oc_items").select("obra_id, numero_oc, etapa, parcial, estado");
+      let q = supabase.from("v_oc_items_calc").select("obra_id, numero_oc, etapa, parcial, estado");
       if (obra) q = q.eq("obra_id", Number(obra));
       return q.order("id").range(a, b);
     });

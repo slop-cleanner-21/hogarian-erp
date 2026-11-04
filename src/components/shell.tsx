@@ -26,6 +26,7 @@ import type { Rol } from "@/lib/types";
 import { Sheet } from "./ui/sheet";
 import { logout } from "@/app/login/actions";
 import { ThemeSwitch } from "./theme-switch";
+import { HuellaSheet, marcarSalida } from "./huella";
 
 type NavItem = { href: string; label: string; icon: typeof Package; match?: (p: string, s: URLSearchParams) => boolean };
 
@@ -187,6 +188,7 @@ export function UserMenu({ id, nombre, rol }: { id: string; nombre: string; rol:
   const [open, setOpen] = useState(false);
   const [contrasena, setContrasena] = useState(false);
   const [firma, setFirma] = useState(false);
+  const [huella, setHuella] = useState(false);
   const path = usePathname();
   const actual = moduloActual(path);
   const disponibles = (Object.keys(MODULOS) as Modulo[]).filter(
@@ -248,7 +250,17 @@ export function UserMenu({ id, nombre, rol }: { id: string; nombre: string; rol:
           >
             Cambiar contraseña
           </button>
-          <form action={logout}>
+          <button
+            type="button"
+            onClick={() => {
+              setOpen(false);
+              setHuella(true);
+            }}
+            className="flex h-12 w-full items-center rounded-control px-3 active:bg-ink/8"
+          >
+            Huella
+          </button>
+          <form action={logout} onSubmit={marcarSalida}>
             <button type="submit" className="flex h-12 w-full items-center rounded-control px-3 text-danger active:bg-ink/8">
               Cerrar sesión
             </button>
@@ -257,6 +269,7 @@ export function UserMenu({ id, nombre, rol }: { id: string; nombre: string; rol:
       </Sheet>
       {contrasena && <CambiarContrasena onClose={() => setContrasena(false)} />}
       {firma && <MiFirma onClose={() => setFirma(false)} />}
+      {huella && <HuellaSheet userId={id} onClose={() => setHuella(false)} />}
     </>
   );
 }

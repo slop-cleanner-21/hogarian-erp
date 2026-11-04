@@ -34,7 +34,7 @@ export async function contextoCompra(obraId: number, numero: string): Promise<Co
       supabase.from("v_avance_partida").select("partida_id, etapa, descripcion, unidad, presupuestado, parcial").eq("obra_id", obraId).range(a, b),
     ),
     todas((a, b) =>
-      supabase.from("v_oc_items").select("partida_id, numero_oc, parcial, cantidad, estado").eq("obra_id", obraId).neq("estado", "ANULADA").range(a, b),
+      supabase.from("v_oc_items_calc").select("partida_id, numero_oc, parcial, cantidad, estado").eq("obra_id", obraId).neq("estado", "ANULADA").range(a, b),
     ),
   ]);
 

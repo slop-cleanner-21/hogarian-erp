@@ -10,25 +10,20 @@ const cuenta = (n: number, uno: string, varios: string) => `${n} ${n === 1 ? uno
 /** Obras con el estado de su presupuesto (Gerencia): cada una en su tarjeta, con el monto del presupuesto. */
 export async function ListaObras({ base, tab }: { base: string; tab: "bor" | "pub" }) {
   const supabase = await createClient();
-  const { data, error } = await supabase
-    .from("obras")
-    .select("id, nombre, direccion, presupuesto_estado, empresas(nombre)")
-    .eq("presupuesto_estado", tab === "bor" ? "BORRADOR" : "PUBLICADO")
-    .order("nombre");
+  // Presupuesto de cada obra (partidas, adicionales y monto), ya sumado en la base (v_resumen_obra), a la vez que
+  // las obras: una sola ola.
+  const [{ data, error }, resumenes] = await Promise.all([
+    supabase
+      .from("obras")
+      .select("id, nombre, direccion, presupuesto_estado, empresas(nombre)")
+      .eq("presupuesto_estado", tab === "bor" ? "BORRADOR" : "PUBLICADO")
+      .order("nombre"),
+    todas((a, b) => supabase.from("v_resumen_obra").select("obra_id, partidas, adicionales, monto").order("obra_id").range(a, b)),
+  ]);
   if (error) throw new Error(error.message);
-  // Presupuesto de cada obra: partidas, adicionales y monto (cantidad × P.U.), por páginas (más de 1000 partidas).
-  const ids = data.map((o) => o.id);
-  const partidas = ids.length
-    ? await todas((a, b) => supabase.from("partidas").select("obra_id, requerimiento, cantidad, pu").in("obra_id", ids).order("id").range(a, b))
-    : [];
-  const resumen = new Map<number, { n: number; adicionales: Set<string>; monto: number }>();
-  for (const p of partidas) {
-    const r = resumen.get(p.obra_id) ?? { n: 0, adicionales: new Set<string>(), monto: 0 };
-    r.n += 1;
-    if (p.requerimiento !== "REGULAR") r.adicionales.add(p.requerimiento);
-    r.monto += Number(p.cantidad) * Number(p.pu ?? 0);
-    resumen.set(p.obra_id, r);
-  }
+  const resumen = new Map(
+    resumenes.map((r) => [r.obra_id!, { n: Number(r.partidas), adicionales: new Set(r.adicionales ?? []), monto: Number(r.monto) }]),
+  );
 
   return (
     <>
@@ -46,7 +41,7 @@ export async function ListaObras({ base, tab }: { base: string; tab: "bor" | "pu
           const empresa = (o.empresas as unknown as { nombre: string } | null)?.nombre;
           return (
             <li key={o.id}>
-              <Link href={`${base}/${o.id}`} className="flex flex-col gap-2 rounded-panel bg-surface p-4 active:bg-sunken">
+              <Link href={`${base}/${o.id}`} prefetch={false} className="flex flex-col gap-2 rounded-panel bg-surface p-4 active:bg-sunken">
                 <span className="flex items-start gap-3">
                   {empresa && <LogoEmpresa nombre={empresa} className="h-10 w-12" />}
                   <span className="flex min-w-0 flex-1 flex-col">

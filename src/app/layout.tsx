@@ -4,6 +4,7 @@ import { APP_CORTO, APP_DESCRIPCION, APP_NOMBRE } from "@/lib/marca";
 import { Suspense } from "react";
 import { BarraCarga } from "@/components/barra-carga";
 import { BarrasSistema } from "@/components/barras-sistema";
+import { BloqueoHuella } from "@/components/huella";
 import { RecordarRuta } from "@/components/recordar-ruta";
 import { COLOR_BARRA, THEME_SCRIPT } from "@/lib/theme";
 import "./globals.css";
@@ -54,6 +55,7 @@ export default function RootLayout({ children }: LayoutProps<"/">) {
       <body className="min-h-full">
         {children}
         <BarrasSistema />
+        <BloqueoHuella />
         <Suspense fallback={null}>
           <RecordarRuta />
           <BarraCarga />

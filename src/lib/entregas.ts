@@ -30,7 +30,7 @@ const UNA_HORA = 60 * 60;
 export async function cargarEntregas(obraId: number, numero: string) {
   const supabase = await createClient();
   const [{ data: items, error: e1 }, { data: avance, error: e2 }, { data: entregas, error: e3 }] = await Promise.all([
-    supabase.from("v_oc_items").select("id, descripcion, unidad, cantidad").eq("obra_id", obraId).eq("numero_oc", numero).order("id"),
+    supabase.from("v_oc_items_calc").select("id, descripcion, unidad, cantidad").eq("obra_id", obraId).eq("numero_oc", numero).order("id"),
     supabase.from("v_entregas_item").select("oc_item_id, entregado").eq("obra_id", obraId).eq("numero_oc", numero),
     supabase
       .from("entregas")

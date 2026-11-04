@@ -1,14 +1,14 @@
 import type { Metadata } from "next";
 import { TopBar, UserMenu } from "@/components/shell";
 import { createAdminClient } from "@/lib/supabase/admin";
-import { requireSesion } from "@/lib/supabase/server";
+import { requireSesionVigente } from "@/lib/supabase/server";
 import { EmpresasLista } from "./empresas-lista";
 
 export const metadata: Metadata = { title: "Empresas" };
 
 /** Empresas (solo el Admin): razón social, RUC, dirección fiscal y quién firma sus contratos. */
 export default async function EmpresasPage() {
-  const sesion = await requireSesion(["ADMIN"]);
+  const sesion = await requireSesionVigente(["ADMIN"]);
   const db = createAdminClient();
   const [{ data: empresas, error }, { data: gerentes }] = await Promise.all([
     db.from("empresas").select("id, nombre, razon_social, ruc, direccion, firmante_id").order("nombre"),

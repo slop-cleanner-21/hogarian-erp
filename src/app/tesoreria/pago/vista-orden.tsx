@@ -49,7 +49,7 @@ export async function vistaOrden(
   const [hist, { data: comprobantes }, { data: prov }, pagos, adjuntos, rechazos, { data: guia }, { data: compHist }] = await Promise.all([
     todas((a, b) =>
       supabase
-        .from("v_oc_items")
+        .from("v_oc_items_calc")
         .select("item_id, obra_id, numero_oc, fecha, pu_efectivo")
         .in("item_id", itemIds)
         .neq("estado", "ANULADA")

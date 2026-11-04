@@ -60,6 +60,8 @@ const LECTURA = tabla(`
   perfil_obras                 T   T   T   P   T   T   T   0
   perfiles                     T   T   T   T   T   T   T   T
   perfil_privado               0   0   0   0   0   0   0   0
+  huellas                      0   0   0   0   0   0   0   0
+  huella_desafios              0   0   0   0   0   0   0   0
   personas                     0   0   0   0   T   T   T   T
   proveedor_contactos          T   T   T   0   T   T   T   0
   proveedor_cuentas            T   T   T   0   T   0   0   0
@@ -165,7 +167,7 @@ const RPC: Record<string, string> = {
 };
 // Funciones de lectura o internas que no necesitan fila en RPC; anular_requerimiento va aparte (mira el
 // requerimiento antes que el rol, así que se prueba en SQL revertido).
-const SIN_ROL = /^(fn_|rol_|mi_rol$|es_residente$|obras_residente$|orden_visible_residente$|ruta_obra_residente$|exigir_rol$|faltante$|glosa_rhe_defecto$|siguiente_numero_oc$|get_cotizacion$|enviar_cotizacion$|anular_requerimiento$)/;
+const SIN_ROL = /^(fn_|rol_|mi_rol$|es_residente$|obras_residente$|orden_visible_residente$|ruta_obra_residente$|exigir_rol$|faltante$|glosa_rhe_defecto$|siguiente_numero_oc$|token_cotizacion_de$|rol_prod1$|get_cotizacion$|enviar_cotizacion$|anular_requerimiento$)/;
 const DENEGADO =
   /No tienes permiso|^Solo (Recursos Humanos|Operaciones|Gerencia|Logística|Contabilidad|Tesorería|el Jefe|los residentes|quien lo creó)|Inicia sesión|permission denied for function/i;
 
@@ -182,6 +184,20 @@ const ARCHIVOS: [string, string, string, string][] = [
   ["entregas de obras del residente", "documentos", "name like 'entregas/%' and split_part(name, '/', 2) in ({res})", "LOG CON TES RES GER OPS JEF"],
   ["avances de obras del residente", "documentos", "name like 'avances/%' and split_part(name, '/', 2) in ({res})", "LOG CON TES RES GER OPS JEF"],
 ];
+
+// Prod 1 (20261105130000_prod1_seguridad), sobre la matriz del MVP: Contabilidad, Residente, Ing. de Operaciones
+// y RRHH no existen para la base (como sin perfil), y el Jefe de Operaciones no pasa ninguna función que escriba
+// ni ve archivos salvo las fotos de las entregas.
+const FUERA = ["CON", "RES", "OPS", "RRHH"];
+const sin = (s: string, quitar: string[]) => s.split(/\s+/).filter((k) => k && !quitar.includes(k)).join(" ");
+for (const fila of Object.values(LECTURA)) for (const k of FUERA) fila[k as Corto] = "0";
+for (const e of ESCRITURA) e[1] = sin(e[1], FUERA);
+// Ítems: Logística solo cambia tipo_material (el PATCH de la prueba va sobre la clave); lo prueba seguridad.spec.
+ESCRITURA.find(([t]) => t === "items")![1] = "";
+const RPC_MVP = { ...RPC };
+// mo_partidas solo lee: el Jefe la sigue usando.
+for (const fn of Object.keys(RPC)) RPC[fn] = sin(RPC[fn], fn === "mo_partidas" ? FUERA : [...FUERA, "JEF"]);
+for (const a of ARCHIVOS) a[3] = sin(a[3], a[0].startsWith("entregas") ? FUERA : [...FUERA, "JEF"]);
 
 // ---------------------------------------------------------------------------------------------------------
 type Sesion = { token: string; uid: string };
@@ -266,7 +282,8 @@ const salir = (token: string) => api(token, "POST", "/auth/v1/logout?scope=local
 
 /** Filas visibles por la API (Content-Range), o el código de error. */
 async function contar(token: string | null, rel: string): Promise<number | string> {
-  const r = await api(token, "GET", `/rest/v1/${rel}?select=*`, undefined, { Prefer: "count=exact", Range: "0-0" });
+  // Una columna de la clave (ordenes_compra se lee por columnas: token_cotizacion no).
+  const r = await api(token, "GET", `/rest/v1/${rel}?select=${B.tablas[rel]?.pk?.[0] ?? "*"}`, undefined, { Prefer: "count=exact", Range: "0-0" });
   return r.status >= 400 ? `error ${r.status}` : Number(r.headers.get("content-range")?.split("/")[1]);
 }
 
@@ -423,7 +440,7 @@ test.describe("@permisos funciones (RPC)", () => {
       const detalle = SUJETOS.map((k, i) => `${k} ${r[i].status} ${r[i].msg.slice(0, 60)}`).join("\n");
       expect(ejecutaron, `${fn} se ejecutó sin el rol:\n${detalle}`).toEqual([]);
       expect(pasan, `${fn}: roles que pasan el control de rol\n${detalle}`).toEqual(lista(quienes));
-      if (!quienes) expect(r.every((x) => /permission denied for function/i.test(x.msg)), `${fn}: sin EXECUTE para nadie\n${detalle}`).toBe(true);
+      if (!RPC_MVP[fn]) expect(r.every((x) => /permission denied for function/i.test(x.msg)), `${fn}: sin EXECUTE para nadie\n${detalle}`).toBe(true);
     });
   }
 
@@ -435,7 +452,10 @@ test.describe("@permisos funciones (RPC)", () => {
       `public.anular_requerimiento(${id}, null)`,
     );
     const pasan = CORTOS.filter((_, i) => !DENEGADO.test(r[i]));
-    expect(pasan, CORTOS.map((k, i) => `${k} ${r[i]}`).join("\n")).toEqual(CORTOS.filter((k) => k === "JEF" || S[k].uid === creador));
+    // Prod 1: ni el Jefe ni un creador fuera de prod 1.
+    expect(pasan, CORTOS.map((k, i) => `${k} ${r[i]}`).join("\n")).toEqual(
+      CORTOS.filter((k) => S[k].uid === creador && k !== "JEF" && !FUERA.includes(k)),
+    );
   });
 
   test("anon solo ejecuta get_cotizacion y enviar_cotizacion", async () => {

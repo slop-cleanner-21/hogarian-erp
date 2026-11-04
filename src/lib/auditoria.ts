@@ -5,7 +5,7 @@ import { createAdminClient } from "@/lib/supabase/admin";
 
 /** Eventos que la app registra en la auditoría (los cambios de tablas los registra la base sola). */
 export type EventoApp =
-  | { tabla: "sesion"; accion: "LOGIN" | "LOGIN_FALLIDO" | "LOGOUT" | "CAMBIO_CONTRASENA" }
+  | { tabla: "sesion"; accion: "LOGIN" | "LOGIN_FALLIDO" | "LOGOUT" | "CAMBIO_CONTRASENA" | "DESBLOQUEO" | "DESBLOQUEO_FALLIDO" }
   | { tabla: "usuarios"; accion: "CREAR_USUARIO" | "EDITAR_USUARIO" | "RESTABLECER_CONTRASENA" | "DESACTIVAR" | "REACTIVAR" };
 
 /** IP y dispositivo de quien hace la petición (detrás de Vercel o del túnel, la del cliente real). */

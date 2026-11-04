@@ -1,7 +1,7 @@
 "use server";
 
 import { createAdminClient } from "@/lib/supabase/admin";
-import { requireSesion } from "@/lib/supabase/server";
+import { requireSesionVigente } from "@/lib/supabase/server";
 
 export type Result<T = undefined> = { ok: true; data: T } | { ok: false; error: string };
 
@@ -10,7 +10,7 @@ const MAX = 2 * 1024 * 1024;
 
 /** La firma del gerente (va en los contratos de las OS). Solo el servidor la lee y la guarda. */
 export async function verMiFirma(): Promise<Result<string | null>> {
-  const sesion = await requireSesion(["GERENCIA"]);
+  const sesion = await requireSesionVigente(["GERENCIA"]);
   const db = createAdminClient(sesion.userId);
   const { data } = await db.from("perfil_privado").select("firma_path").eq("user_id", sesion.userId).maybeSingle();
   if (!data?.firma_path) return { ok: true, data: null };
@@ -20,7 +20,7 @@ export async function verMiFirma(): Promise<Result<string | null>> {
 }
 
 export async function guardarMiFirma(form: FormData): Promise<Result> {
-  const sesion = await requireSesion(["GERENCIA"]);
+  const sesion = await requireSesionVigente(["GERENCIA"]);
   const archivo = form.get("firma");
   if (!(archivo instanceof File) || archivo.size === 0) return { ok: false, error: "Elige la imagen de tu firma" };
   const ext = TIPOS[archivo.type];

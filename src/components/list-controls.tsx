@@ -101,6 +101,9 @@ export function Tabs({
             href={`${path}?${next}`}
             replace
             scroll={false}
+            // Sin prefetch: la pestaña se marca al instante y el prefetch (solo el esqueleto en páginas dinámicas)
+            // competía con lo que se ve en datos móviles.
+            prefetch={false}
             onClick={() => setTocada({ value: o.value, desde: current })}
             className={cn(
               "flex h-11 items-center justify-center gap-1 whitespace-nowrap rounded-field text-[15px]",

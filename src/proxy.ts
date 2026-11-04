@@ -8,8 +8,37 @@ import { COOKIE_VISTAS, vistaGuardada } from "@/lib/vistas";
 
 const PUBLICAS = ["/login", "/cotizar", RUTA_ACCESO];
 
+/** Rol de un JWT, sin verificarlo (solo para rechazar; Supabase verifica el resto). */
+function rolDelJwt(jwt: string): string | null {
+  try {
+    const p = jwt.split(".")[1];
+    return JSON.parse(atob(p.replace(/-/g, "+").replace(/_/g, "/"))).role ?? null;
+  } catch {
+    return null;
+  }
+}
+
+/**
+ * Reenvío a Supabase (/sb: local o por túnel; en producción no existe). Con el túnel abierto, /sb publicaba la
+ * base entera, y las claves locales de la CLI son las de su documentación. Exige la contraseña de la demo y la
+ * clave pública, y nunca deja pasar la clave secreta, un token service_role ni la administración de Auth.
+ */
+async function guardarSb(request: NextRequest) {
+  const denegar = () => NextResponse.json({ message: "No permitido" }, { status: 403 });
+  if (accesoActivo() && request.cookies.get(COOKIE_ACCESO)?.value !== (await firmaAcceso())) return denegar();
+  if (request.nextUrl.pathname.startsWith("/sb/auth/v1/admin")) return denegar();
+  const anon = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY;
+  for (const clave of [request.headers.get("apikey"), request.nextUrl.searchParams.get("apikey")]) {
+    if (clave && clave !== anon) return denegar();
+  }
+  const bearer = request.headers.get("authorization")?.replace(/^Bearer\s+/i, "");
+  if (bearer && bearer !== anon && (bearer.startsWith("sb_secret_") || rolDelJwt(bearer) !== "authenticated")) return denegar();
+  return NextResponse.next();
+}
+
 export async function proxy(request: NextRequest) {
   const path = request.nextUrl.pathname;
+  if (path.startsWith("/sb/")) return guardarSb(request);
 
   // Contraseña de la demo: antes que la sesión. Los links de cotización (proveedores) quedan libres.
   if (accesoActivo() && !path.startsWith("/cotizar")) {
@@ -66,7 +95,7 @@ export async function proxy(request: NextRequest) {
 }
 
 export const config = {
-  // Recursos públicos (íconos, manifiesto) y el reenvío a Supabase (/sb, que valida su propia sesión)
-  // no pasan por aquí.
-  matcher: ["/((?!_next/static|_next/image|sb/|favicon.ico|manifest.webmanifest|sw\\.js|apple-icon|icono/|.*\\.(?:svg|png|jpg|webp)$).*)"],
+  // Recursos públicos (íconos, manifiesto) no pasan por aquí. El reenvío a Supabase sí (guardarSb), también sus
+  // imágenes.
+  matcher: ["/sb/:path*", "/((?!_next/static|_next/image|sb/|favicon.ico|manifest.webmanifest|sw\\.js|apple-icon|icono/|.*\\.(?:svg|png|jpg|webp)$).*)"],
 };
