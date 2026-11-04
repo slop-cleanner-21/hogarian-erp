@@ -2,6 +2,8 @@
 
 import { redirect } from "next/navigation";
 import { origen, registrarEvento } from "@/lib/auditoria";
+import { marcarDesbloqueo } from "@/lib/bloqueo-cookies";
+import { captchaDisponible, captchaEnSupabase, espera, estadoIp, falloIp, ipLocal, verificarCaptcha } from "@/lib/captcha";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { createClient } from "@/lib/supabase/server";
 import { MIN_CONTRASENA } from "@/lib/usuarios";
@@ -17,8 +19,8 @@ const MAX_POR_CUENTA = 10;
 const MAX_POR_IP = 30;
 const BLOQUEADO = `Demasiados intentos. Vuelve a intentarlo en ${VENTANA_MIN} minutos.`;
 
-async function demasiadosIntentos(email: string): Promise<boolean> {
-  const { ip } = await origen();
+/** Intentos fallidos recientes (15 min) por cuenta y por IP. */
+async function fallosRecientes(email: string, ip: string | null) {
   const desde = new Date(Date.now() - VENTANA_MIN * 60_000).toISOString();
   const db = createAdminClient();
   const fallidos = (campo: "email" | "ip", valor: string) =>
@@ -30,35 +32,52 @@ async function demasiadosIntentos(email: string): Promise<boolean> {
       .gte("created_at", desde)
       .eq(`detalle->>${campo}`, valor);
   // En local todo llega de la misma máquina (::1): ahí solo cuenta por cuenta.
-  const porIpCuenta = ip && !["::1", "127.0.0.1", "::ffff:127.0.0.1"].includes(ip);
-  const [cuenta, porIp] = await Promise.all([fallidos("email", email), porIpCuenta ? fallidos("ip", ip) : Promise.resolve({ count: 0 })]);
-  return (cuenta.count ?? 0) >= MAX_POR_CUENTA || (porIp.count ?? 0) >= MAX_POR_IP;
+  const [cuenta, porIp] = await Promise.all([fallidos("email", email), ipLocal(ip) ? Promise.resolve({ count: 0 }) : fallidos("ip", ip!)]);
+  return { cuenta: cuenta.count ?? 0, ip: porIp.count ?? 0 };
 }
 
-export async function login(_: string | null, formData: FormData): Promise<string | null> {
+/** Lo que el formulario necesita saber: el error, si debe mostrar el CAPTCHA y cuántos segundos esperar. */
+export type EstadoLogin = { error: string | null; captcha: boolean; espera: number } | null;
+
+const VERIFICACION = "Completa la verificación";
+
+export async function login(_: EstadoLogin, formData: FormData): Promise<EstadoLogin> {
   const supabase = await createClient();
   const email = String(formData.get("email") ?? "").trim().toLowerCase().slice(0, 254);
-  // Bloqueado: no se registra cada intento (serían escrituras anónimas sin tope); ya quedaron los que llevaron aquí.
-  if (await demasiadosIntentos(email)) return BLOQUEADO;
+  const token = String(formData.get("cf-turnstile-response") ?? "");
+  const { ip } = await origen();
+  const [recientes, ipEstado] = await Promise.all([fallosRecientes(email, ip), estadoIp(ip)]);
+  const conCaptcha = ipEstado.captcha && captchaDisponible();
+
+  // Bloqueado o esperando: no se registra cada intento (serían escrituras anónimas sin tope); ya quedaron los que
+  // llevaron aquí.
+  if (recientes.cuenta >= MAX_POR_CUENTA || recientes.ip >= MAX_POR_IP) return { error: BLOQUEADO, captcha: conCaptcha, espera: 0 };
+  const esperar = espera(ipEstado, recientes.ip);
+  if (esperar > 0) return { error: `Espera ${esperar} s para volver a intentarlo`, captcha: conCaptcha, espera: esperar };
+
+  // IP que ya falló 3 veces: CAPTCHA siempre. Si Supabase lo exige (producción), él verifica el token (de un solo uso).
+  if (conCaptcha && !token) return { error: VERIFICACION, captcha: true, espera: 0 };
+  if (conCaptcha && !captchaEnSupabase() && !(await verificarCaptcha(token, ip))) return { error: VERIFICACION, captcha: true, espera: 0 };
+
   const { data, error } = await supabase.auth.signInWithPassword({
     email,
     password: String(formData.get("password") ?? ""),
+    options: captchaEnSupabase() && token ? { captchaToken: token } : undefined,
   });
   if (error) {
-    await registrarEvento({ tabla: "sesion", accion: "LOGIN_FALLIDO", detalle: { email, motivo: error.code ?? error.message } });
-    return "Correo o contraseña incorrectos";
+    // Sin el token o con uno vencido (Supabase lo exige): no cuenta como intento fallido.
+    if (error.code === "captcha_failed") return { error: VERIFICACION, captcha: conCaptcha, espera: 0 };
+    const [{ captcha, nuevo }] = await Promise.all([
+      falloIp(ip),
+      registrarEvento({ tabla: "sesion", accion: "LOGIN_FALLIDO", detalle: { email, motivo: error.code ?? error.message } }),
+    ]);
+    if (nuevo) await registrarEvento({ tabla: "sesion", accion: "CAPTCHA_IP", detalle: { email } });
+    return { error: "Correo o contraseña incorrectos", captcha: captcha && captchaDisponible(), espera: 0 };
   }
   await registrarEvento({ tabla: "sesion", accion: "LOGIN", registro: data.user.id, actor: data.user.id, detalle: { email } });
+  // Entró: el dispositivo queda desbloqueado (y la huella de otra persona en él deja de valer).
+  await marcarDesbloqueo(data.user.id);
   redirect("/");
-}
-
-export async function logout() {
-  const supabase = await createClient();
-  const { data } = await supabase.auth.getClaims();
-  const id = data?.claims?.sub ?? null;
-  await supabase.auth.signOut();
-  if (id) await registrarEvento({ tabla: "sesion", accion: "LOGOUT", registro: id, actor: id, detalle: { email: data?.claims?.email ?? null } });
-  redirect("/login");
 }
 
 /** El usuario cambia su propia contraseña (p. ej. la temporal que le dio el Admin). */

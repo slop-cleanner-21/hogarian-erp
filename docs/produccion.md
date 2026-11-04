@@ -1,7 +1,7 @@
 # Paso a producción (Prod 1)
 
 Vercel (la app) + Supabase en la nube (base, auth y archivos) + un repo de GitHub propio. Hasta el día del
-paso, local sigue igual: accesos rápidos, contraseña de la demo y túnel.
+paso, local sigue igual: accesos rápidos y contraseña de la demo. (El túnel se dio de baja: no se usa.)
 
 ## 1. Lo que hace falta de la realidad
 
@@ -63,7 +63,18 @@ Ensayado en local el 04/11/2026 con este mismo orden (base vacía → Admin → 
    | `VAPID_SUBJECT` | `mailto:<correo de contacto>` |
 
    **No** se definen: `NEXT_PUBLIC_USUARIOS_LOCALES` (botones de acceso rápido), `DEMO_ACCESO` (contraseña de
-   la demo) ni `SERVER_ACTIONS_ORIGENES` (túnel).
+   la demo).
+4. **CAPTCHA del ingreso (Cloudflare Turnstile)**, gratis:
+   1. dash.cloudflare.com › Turnstile › *Add widget*: nombre «Hogarian ERP», dominio de la app (p. ej.
+      `hogarian-erp.vercel.app`), modo **Managed**. Da la *site key* (pública) y la *secret key*.
+   2. Vercel: `NEXT_PUBLIC_TURNSTILE_SITE_KEY` (la pública), `TURNSTILE_SECRET_KEY` (la secreta, sensible) y
+      `CAPTCHA_EN_SUPABASE=1`.
+   3. Supabase Auth › CAPTCHA (o `config push` desde la copia de `config.toml`): proveedor Turnstile con la misma
+      secreta. Desde ahí todo ingreso con contraseña necesita el token: también quien llame directo a la API.
+   4. Volver a desplegar (la pública se fija al compilar). Comprobar: `POST /auth/v1/token?grant_type=password`
+      sin token responde «captcha» (no «credenciales»), y el login de la app entra.
+   Sin esto, la app igual limita los reintentos (espera creciente desde el 3.er fallo por IP, y 10 por cuenta o 30
+   por IP en 15 minutos), pero no muestra CAPTCHA.
 3. Dominio: agregarlo en Vercel y apuntar el DNS. Las huellas (passkeys) van atadas al dominio: las activadas en
    `*.vercel.app` no sirven en el dominio propio, y cada usuario la activa de nuevo.
 

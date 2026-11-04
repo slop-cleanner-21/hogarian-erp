@@ -158,6 +158,47 @@ test.describe("@huella", () => {
     expect(await page.evaluate(() => localStorage.getItem("prod1_huella"))).toBeNull();
     await ctx.close();
   });
+
+  test("el servidor hace cumplir el bloqueo: sin «desbloqueado» no entrega pantallas, ni sin JavaScript", async ({ browser }, info) => {
+    test.skip(info.project.name !== "m390", "escribe en la base: solo en m390");
+    const desde = sql1(`select coalesce(max(id), 0) from audit_log`);
+    const ctx = await browser.newContext({ ...info.project.use });
+    const page = await conHuella(ctx);
+    await alLogin(page);
+    await page.locator('input[name="email"]').fill(EMAIL);
+    await page.locator('input[name="password"]').fill(process.env.ERP_PASS!);
+    await page.getByRole("button", { name: "Ingresar", exact: true }).click();
+    await page.waitForURL((u) => !u.pathname.startsWith("/login"));
+    await menu(page, "Huella");
+    await page.getByRole("button", { name: "Activar en este dispositivo" }).click();
+    await expect(page.getByText(/· este$/)).toBeVisible();
+    const nombres = (await ctx.cookies()).map((c) => c.name);
+    expect(nombres).toEqual(expect.arrayContaining(["prod1_huella_disp", "prod1_desbloqueo"]));
+    // Las cookies del bloqueo no las lee ni las fabrica el navegador.
+    expect((await ctx.cookies()).filter((c) => c.name.startsWith("prod1_huella_disp") || c.name === "prod1_desbloqueo").every((c) => c.httpOnly)).toBe(true);
+
+    // Pasa el tiempo sin usarla: el «desbloqueado» vence.
+    await ctx.clearCookies({ name: "prod1_desbloqueo" });
+
+    // Sin JavaScript (lo que se haría para saltarse el bloqueo del navegador): ninguna pantalla, ni el latido.
+    const sinJs = await browser.newContext({ ...info.project.use, javaScriptEnabled: false, storageState: await ctx.storageState() });
+    const ver = await sinJs.newPage();
+    await ver.goto("/operaciones");
+    await expect(ver).toHaveURL(/\/desbloquear\?volver=%2Foperaciones/);
+    await expect(ver.locator("main")).not.toContainText("Materiales");
+    expect((await sinJs.request.post("/vivo")).status()).toBe(401);
+    expect((await sinJs.request.get("/admin/auditoria/csv", { maxRedirects: 0 })).status()).toBe(307);
+    await sinJs.close();
+
+    // Con la huella: la pantalla de desbloqueo la pide, el servidor la verifica y vuelve a donde iba.
+    await page.goto("/operaciones");
+    await page.waitForURL((u) => u.pathname === "/operaciones", { timeout: 20_000 });
+    await expect(page.locator("main")).toContainText("Materiales");
+    await expect.poll(() => auditoria("DESBLOQUEO", desde), { timeout: 15_000 }).toBeGreaterThanOrEqual(1);
+    // Desbloqueado: el latido lo mantiene.
+    expect((await page.request.post("/vivo")).status()).toBe(204);
+    await ctx.close();
+  });
 });
 
 test.describe("@login", () => {

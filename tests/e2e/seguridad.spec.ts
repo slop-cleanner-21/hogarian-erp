@@ -216,6 +216,13 @@ test.describe("@seguridad", () => {
       body: "[]",
     });
     expect(r.status).toBe(403);
+    // Sin JavaScript una server action va como formulario (sin la cabecera): tampoco.
+    const sinJs = await fetch(`${baseURL}/cotizar/${crypto.randomUUID()}`, {
+      method: "POST",
+      headers: { "Content-Type": "application/x-www-form-urlencoded", Origin: baseURL! },
+      body: `$ACTION_ID_${"0".repeat(42)}=`,
+    });
+    expect(sinJs.status).toBe(403);
   });
 
   test("la huella y sus desafíos: nadie los lee con su sesión", async () => {

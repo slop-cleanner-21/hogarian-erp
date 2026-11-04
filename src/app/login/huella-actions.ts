@@ -2,15 +2,16 @@
 
 import type { AuthenticationResponseJSON, RegistrationResponseJSON } from "@simplewebauthn/server";
 import { redirect } from "next/navigation";
-import { after } from "next/server";
 import { dispositivo } from "@/lib/auditoria-reporte";
 import { origen, registrarEvento } from "@/lib/auditoria";
+import { marcarDispositivo, olvidarDispositivo, soloMarcarDispositivo } from "@/lib/bloqueo-cookies";
 import { huellasDe, opcionesActivar, opcionesFirmar, verificarActivacion, verificarFirma, type Huella } from "@/lib/huella";
 import { createAdminClient } from "@/lib/supabase/admin";
-import { createClient, requireSesion, requireSesionVigente } from "@/lib/supabase/server";
+import { createClient, requireSesionVigente } from "@/lib/supabase/server";
 
 // Entrar y desbloquear con huella. Cada inicio de sesión, desbloqueo, intento fallido, activación y baja queda en la
-// auditoría (las altas y bajas también por el trigger de la tabla).
+// auditoría (las altas y bajas también por el trigger de la tabla). El bloqueo lo hace cumplir también el servidor
+// (src/lib/bloqueo-servidor.ts): estas acciones ponen sus cookies solo tras verificar la huella.
 
 const FALLO = "No se reconoció la huella";
 
@@ -47,31 +48,12 @@ export async function entrarConHuella(respuesta: AuthenticationResponseJSON): Pr
     return { error: FALLO };
   }
   await registrarEvento({ tabla: "sesion", accion: "LOGIN", registro: userId, actor: userId, detalle: { email, metodo: "huella" } });
+  // Este dispositivo tiene su huella y queda desbloqueado.
+  await marcarDispositivo(userId);
   redirect("/");
 }
 
-// ── Desbloquear (con sesión: la app se bloquea al volver tras un rato) ──
-
-// Desbloquear solo abre la pantalla de quien ya tiene sesión (la base sigue mirando su rol en cada consulta): con
-// la sesión del token basta, sin el viaje extra del rol vigente. La auditoría se escribe después de responder.
-export async function opcionesDesbloquear() {
-  const sesion = await requireSesion();
-  return opcionesFirmar(sesion.userId);
-}
-
-export async function desbloquear(respuesta: AuthenticationResponseJSON): Promise<boolean> {
-  const sesion = await requireSesion();
-  const ok = (await verificarFirma(respuesta, sesion.userId)).ok;
-  after(() =>
-    registrarEvento({
-      tabla: "sesion",
-      accion: ok ? "DESBLOQUEO" : "DESBLOQUEO_FALLIDO",
-      registro: sesion.userId,
-      actor: sesion.userId,
-    }),
-  );
-  return ok;
-}
+// ── Desbloquear: por rutas bajo /desbloquear (src/lib/desbloqueo.ts), que funcionan con la pantalla bloqueada ──
 
 // ── Activar y quitar (menú del usuario) ──
 
@@ -94,16 +76,27 @@ export async function activarHuella(
   const sesion = await requireSesionVigente();
   const h = await verificarActivacion(sesion.userId, respuesta, dispositivo((await origen()).agente));
   if (!h) return null;
+  await marcarDispositivo(sesion.userId);
   const { data } = await createAdminClient().auth.admin.getUserById(sesion.userId);
   return { userId: sesion.userId, credentialId: h.credential_id, email: data.user?.email ?? "" };
 }
 
-export async function quitarHuella(id: string): Promise<boolean> {
+/** La huella ya estaba activada en este teléfono (el navegador lo dijo al querer activarla de nuevo): lo marca para
+ *  el bloqueo del servidor. Solo lo hace más estricto para la propia sesión (no desbloquea nada). */
+export async function yaActivadaAqui() {
+  const sesion = await requireSesionVigente();
+  await soloMarcarDispositivo(sesion.userId);
+}
+
+/** Quita una huella. `esteDispositivo`: es la de este teléfono (o al usuario no le queda ninguna): deja de pedirla aquí. */
+export async function quitarHuella(id: string, esteDispositivo = false): Promise<boolean> {
   const sesion = await requireSesionVigente();
   const { error, count } = await createAdminClient(sesion.userId)
     .from("huellas")
     .delete({ count: "exact" })
     .eq("id", id)
     .eq("user_id", sesion.userId);
-  return !error && count === 1;
+  const ok = !error && count === 1;
+  if (ok && (esteDispositivo || (await huellasDe(sesion.userId)).length === 0)) await olvidarDispositivo();
+  return ok;
 }

@@ -1,75 +1,10 @@
-"use client";
+import { origen } from "@/lib/auditoria";
+import { captchaDisponible, captchaEnSupabase, captchaSitio, estadoIp } from "@/lib/captcha";
+import { FormularioLogin } from "./formulario";
 
-import { useActionState, useRef } from "react";
-import { EntrarConHuella, entroConContrasena } from "@/components/huella";
-import { Logo } from "@/components/logo";
-import { TemaBoton } from "@/components/theme-switch";
-import { Button } from "@/components/ui/button";
-import { Field, Input } from "@/components/ui/field";
-import { PasswordInput } from "@/components/ui/password-input";
-import { login } from "./actions";
-
-// Usuarios semilla del entorno local (supabase/seed/usuarios_locales.sql). La variable se fija al compilar: en
-// producción la lista y la contraseña de prueba ni siquiera llegan al navegador.
-const LOCAL = process.env.NEXT_PUBLIC_USUARIOS_LOCALES === "1";
-const USUARIOS_LOCALES = LOCAL
-  ? ([
-      ["Logística", "logistica@erp.local"],
-      ["Tesorería", "tesoreria@erp.local"],
-      ["Gerencia", "gerencia@erp.local"],
-      ["Jefe de Operaciones", "jefeoperaciones@erp.local"],
-      ["Admin", "admin@erp.local"],
-    ] as const)
-  : [];
-const CLAVE_LOCAL = LOCAL ? "erp12345" : "";
-
-export default function LoginPage() {
-  const [error, action, pending] = useActionState(login, null);
-  const form = useRef<HTMLFormElement>(null);
-
-  const entrarComo = (email: string) => {
-    const f = form.current!;
-    (f.elements.namedItem("email") as HTMLInputElement).value = email;
-    (f.elements.namedItem("password") as HTMLInputElement).value = CLAVE_LOCAL;
-    f.requestSubmit();
-  };
-
-  return (
-    <main className="relative mx-auto flex min-h-dvh max-w-sm flex-col justify-center gap-8 px-4 py-10">
-      <div className="absolute right-1 top-[max(0.25rem,env(safe-area-inset-top))]">
-        <TemaBoton />
-      </div>
-      <div className="flex flex-col gap-6">
-        <Logo />
-        <h1 className="rotulo text-[34px] font-semibold leading-none text-ink-2">Ingresar</h1>
-      </div>
-      <EntrarConHuella disabled={pending} />
-      <form
-        ref={form}
-        action={action}
-        onSubmit={(e) => entroConContrasena((e.currentTarget.elements.namedItem("email") as HTMLInputElement).value)}
-        className="flex flex-col gap-4"
-      >
-        <Field label="Correo">
-          <Input name="email" type="email" autoComplete="username" required />
-        </Field>
-        <Field label="Contraseña">
-          <PasswordInput name="password" autoComplete="current-password" required />
-        </Field>
-        {error && <p role="alert" className="text-sm text-danger">{error}</p>}
-        <Button type="submit" size="lg" disabled={pending}>
-          Ingresar
-        </Button>
-      </form>
-      {USUARIOS_LOCALES.length > 0 && (
-        <div className="grid grid-cols-2 gap-2">
-          {USUARIOS_LOCALES.map(([label, email]) => (
-            <Button key={email} variant="secondary" disabled={pending} onClick={() => entrarComo(email)}>
-              {label}
-            </Button>
-          ))}
-        </div>
-      )}
-    </main>
-  );
+/** El ingreso: si la IP ya falló 3 veces, el CAPTCHA aparece desde el primer intento (para siempre). */
+export default async function LoginPage() {
+  const disponible = captchaDisponible();
+  const marcada = disponible && (await estadoIp((await origen()).ip)).captcha;
+  return <FormularioLogin sitekey={disponible ? captchaSitio() : null} marcada={marcada} siempre={disponible && captchaEnSupabase()} />;
 }

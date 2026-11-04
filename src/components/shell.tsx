@@ -25,7 +25,6 @@ import { useState, type ReactNode } from "react";
 import { cn } from "@/lib/format";
 import type { Rol } from "@/lib/types";
 import { Sheet } from "./ui/sheet";
-import { logout } from "@/app/login/actions";
 import { ThemeSwitch } from "./theme-switch";
 import { HuellaSheet, marcarSalida } from "./huella";
 
@@ -274,7 +273,7 @@ export function UserMenu({ id, nombre, rol }: { id: string; nombre: string; rol:
           >
             Huella
           </button>
-          <form action={logout} onSubmit={marcarSalida}>
+          <form method="post" action="/login/salir" onSubmit={marcarSalida}>
             <button type="submit" className="flex h-12 w-full items-center rounded-control px-3 text-danger active:bg-ink/8">
               Cerrar sesión
             </button>

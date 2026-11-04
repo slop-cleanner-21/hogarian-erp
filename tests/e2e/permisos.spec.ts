@@ -63,6 +63,7 @@ const LECTURA = tabla(`
   perfil_privado               0   0   0   0   0   0   0   0
   huellas                      X   X   X   X   X   X   X   X
   huella_desafios              X   X   X   X   X   X   X   X
+  login_ips                    X   X   X   X   X   X   X   X
   personas                     0   0   0   0   T   T   T   T
   proveedor_contactos          T   T   T   0   T   T   T   0
   proveedor_cuentas            T   T   T   0   T   0   0   0

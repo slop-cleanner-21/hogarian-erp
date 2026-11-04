@@ -15,7 +15,7 @@ const nextConfig: NextConfig = {
     },
   },
   experimental: {
-    // Acceso por túnel público (demo desde el celular): se aceptan server actions de esos dominios
+    // Server actions desde otros dominios (no se usa: el túnel se dio de baja). Lista separada por comas
     // (SERVER_ACTIONS_ORIGENES, separados por coma; en .env.local). En producción no se define.
     serverActions: {
       bodySizeLimit: "10mb",

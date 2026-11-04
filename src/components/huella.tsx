@@ -6,21 +6,21 @@ import {
   startAuthentication,
   startRegistration,
   WebAuthnError,
+  type AuthenticationResponseJSON,
+  type PublicKeyCredentialRequestOptionsJSON,
 } from "@simplewebauthn/browser";
 import { Fingerprint } from "lucide-react";
-import { usePathname } from "next/navigation";
+import { usePathname, useRouter } from "next/navigation";
 import { useEffect, useMemo, useRef, useState, useSyncExternalStore, useTransition } from "react";
 import {
   activarHuella,
-  desbloquear,
   entrarConHuella,
   misHuellas,
   opcionesActivarHuella,
-  opcionesDesbloquear,
   opcionesEntrar,
   quitarHuella,
+  yaActivadaAqui,
 } from "@/app/login/huella-actions";
-import { logout } from "@/app/login/actions";
 import { CLAVE_ABIERTA, CLAVE_HUELLA, RUTAS_LIBRES, quitarVelo } from "@/lib/bloqueo";
 import { Logo } from "./logo";
 import { Button } from "./ui/button";
@@ -35,6 +35,34 @@ const NO_OFRECER = "prod1_huella_no";
 // Al abrir la app siempre pide la huella; al volver de otra app, si estuvo fuera más de esto (salir un momento a
 // WhatsApp a mandar un link no la pide).
 const ESPERA = 60_000;
+// Latido mientras la app está a la vista: el servidor renueva el «desbloqueado» (vence a los 3 min sin actividad).
+const LATIDO = 60_000;
+
+// Desbloquear va por rutas bajo /desbloquear (no server actions): funcionan aunque el «desbloqueado» del servidor
+// haya vencido, y el servidor solo desbloquea tras verificar la huella.
+/** Sin sesión (venció): hay que volver a entrar. */
+class SinSesion extends Error {}
+async function opcionesDesbloqueo(): Promise<PublicKeyCredentialRequestOptionsJSON | null> {
+  const r = await fetch("/desbloquear/opciones", { method: "POST" });
+  if (r.status === 401) throw new SinSesion();
+  if (!r.ok) throw new Error("No se pudo desbloquear");
+  return ((await r.json()) as { opciones: PublicKeyCredentialRequestOptionsJSON | null }).opciones;
+}
+async function verificarDesbloqueo(respuesta: AuthenticationResponseJSON): Promise<boolean> {
+  const r = await fetch("/desbloquear/verificar", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(respuesta) });
+  return r.ok && ((await r.json()) as { ok: boolean }).ok === true;
+}
+
+/** «Usar contraseña»: cierra la sesión (un formulario a una ruta: funciona también con la pantalla bloqueada). */
+function UsarContrasena() {
+  return (
+    <form method="post" action="/login/salir" onSubmit={marcarSalida}>
+      <button type="submit" className="h-12 px-4 font-semibold text-ink-2">
+        Usar contraseña
+      </button>
+    </form>
+  );
+}
 
 type Marca = { u: string; e: string; c: string };
 
@@ -108,6 +136,7 @@ async function activarAqui(): Promise<string | null> {
   } catch (e) {
     if (e instanceof WebAuthnError && e.name === "InvalidStateError") {
       const yo = await misHuellas();
+      await yaActivadaAqui();
       guardar({ u: yo.userId, e: yo.email, c: "" });
       abierta();
       return null;
@@ -195,8 +224,9 @@ export function HuellaSheet({ userId, onClose }: { userId: string; onClose: () =
     });
   const quitar = (id: string, credentialId: string) =>
     startTransition(async () => {
-      if (!(await quitarHuella(id))) return setError("No se pudo quitar");
-      if (marca && (marca.c === credentialId || marca.c === "")) guardar(null);
+      const deEste = !!marca && (marca.c === credentialId || marca.c === "");
+      if (!(await quitarHuella(id, deEste))) return setError("No se pudo quitar");
+      if (deEste) guardar(null);
       setDatos(await misHuellas());
     });
 
@@ -299,9 +329,24 @@ export function BloqueoHuella() {
     };
     document.addEventListener("visibilitychange", alCambiar);
     window.addEventListener("pagehide", alSalir);
+    // Latido: mantiene vivo el «desbloqueado» del servidor mientras la app está a la vista; si ya venció (401), se
+    // bloquea aquí también.
+    const latido = window.setInterval(() => {
+      if (document.visibilityState !== "visible" || !marcaDe(crudo())) return;
+      void fetch("/vivo", { method: "POST" })
+        .then((r) => {
+          if (r.status !== 401) return;
+          try {
+            sessionStorage.removeItem(ABIERTA);
+          } catch {}
+          setBloqueada(true);
+        })
+        .catch(() => {});
+    }, LATIDO);
     return () => {
       document.removeEventListener("visibilitychange", alCambiar);
       window.removeEventListener("pagehide", alSalir);
+      window.clearInterval(latido);
     };
   }, [libre, path]);
 
@@ -339,6 +384,7 @@ export function BloqueoHuella() {
  * el servidor la verifica después: si la rechaza, vuelve a bloquear (onFallo). Así se ahorra un viaje de espera.
  */
 function Bloqueo({ error: inicial, onAbrir, onFallo }: { error: string | null; onAbrir: () => void; onFallo: (e: string) => void }) {
+  const router = useRouter();
   const [error, setError] = useState<string | null>(inicial);
   const [pending, startTransition] = useTransition();
   const sola = useRef(false);
@@ -346,13 +392,13 @@ function Bloqueo({ error: inicial, onAbrir, onFallo }: { error: string | null; o
     startTransition(async () => {
       setError(null);
       try {
-        const opciones = await opcionesDesbloquear();
-        // La sesión es de otra persona (sin huella aquí): no hay nada que pedir.
+        const opciones = await opcionesDesbloqueo();
+        // Sin huella que pedir (la sesión es de otra persona, o se quitó): el servidor ya desbloqueó.
         if (!opciones) return (abierta(), onAbrir());
         const respuesta = await startAuthentication({ optionsJSON: opciones });
         abierta();
         onAbrir();
-        desbloquear(respuesta)
+        verificarDesbloqueo(respuesta)
           .then((ok) => {
             if (ok) return;
             try {
@@ -362,6 +408,7 @@ function Bloqueo({ error: inicial, onAbrir, onFallo }: { error: string | null; o
           })
           .catch(() => {});
       } catch (e) {
+        if (e instanceof SinSesion) return router.replace("/login");
         if (!cancelada(e)) setError("No se pudo usar la huella");
       }
     });
@@ -385,12 +432,56 @@ function Bloqueo({ error: inicial, onAbrir, onFallo }: { error: string | null; o
         <Fingerprint size={48} />
       </button>
       {error && <p role="alert" className="text-danger">{error}</p>}
-      <form action={logout} onSubmit={marcarSalida}>
-        <button type="submit" className="h-12 px-4 font-semibold text-ink-2">
-          Usar contraseña
-        </button>
-      </form>
+      <UsarContrasena />
     </div>
+  );
+}
+
+/**
+ * La pantalla /desbloquear: adonde manda el servidor cuando venció el «desbloqueado» (no hay nada detrás). Aquí no
+ * se abre antes de tiempo: espera a que el servidor verifique la huella y vuelve a la pantalla pedida.
+ */
+export function PantallaDesbloqueo({ volver }: { volver: string }) {
+  const router = useRouter();
+  const [error, setError] = useState<string | null>(null);
+  const [pending, startTransition] = useTransition();
+  const sola = useRef(false);
+  const abrir = () =>
+    startTransition(async () => {
+      setError(null);
+      try {
+        const opciones = await opcionesDesbloqueo();
+        if (opciones && !(await verificarDesbloqueo(await startAuthentication({ optionsJSON: opciones })))) {
+          return setError("No se reconoció la huella");
+        }
+        abierta();
+        router.replace(volver);
+      } catch (e) {
+        if (e instanceof SinSesion) return router.replace("/login");
+        if (!cancelada(e)) setError("No se pudo usar la huella");
+      }
+    });
+  useEffect(() => {
+    if (sola.current) return;
+    sola.current = true;
+    abrir();
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- una sola vez al abrir
+  }, []);
+  return (
+    <main aria-label="App bloqueada" className="flex min-h-dvh flex-col items-center justify-center gap-10 bg-bg px-6 pb-[env(safe-area-inset-bottom)] pt-[env(safe-area-inset-top)]">
+      <Logo />
+      <button
+        type="button"
+        onClick={abrir}
+        disabled={pending}
+        aria-label="Desbloquear con huella"
+        className="flex h-24 w-24 items-center justify-center rounded-full bg-primary text-primary-ink active:scale-95 disabled:opacity-60"
+      >
+        <Fingerprint size={48} />
+      </button>
+      {error && <p role="alert" className="text-danger">{error}</p>}
+      <UsarContrasena />
+    </main>
   );
 }
 

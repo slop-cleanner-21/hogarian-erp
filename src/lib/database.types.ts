@@ -1233,6 +1233,28 @@ export type Database = {
           },
         ];
       };
+      login_ips: {
+        Row: {
+          captcha_desde: string | null;
+          fallos: number;
+          ip: string;
+          ultimo_fallo_at: string | null;
+        };
+        ComputedFields: never;
+        Insert: {
+          captcha_desde?: string | null;
+          fallos?: number;
+          ip: string;
+          ultimo_fallo_at?: string | null;
+        };
+        Update: {
+          captcha_desde?: string | null;
+          fallos?: number;
+          ip?: string;
+          ultimo_fallo_at?: string | null;
+        };
+        Relationships: [];
+      };
       notificaciones: {
         Row: {
           created_at: string;
@@ -4048,6 +4070,14 @@ export type Database = {
           isOneToOne: true;
           isSetofReturn: false;
         };
+      };
+      login_fallo_ip: {
+        Args: { p_ip: string };
+        Returns: {
+          captcha: boolean;
+          fallos: number;
+          nuevo_captcha: boolean;
+        }[];
       };
       marcar_cotizacion_enviada: {
         Args: { p_numero: string; p_obra_id: number };

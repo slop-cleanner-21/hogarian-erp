@@ -51,6 +51,7 @@ export const ACCION_LABEL: Record<string, string> = {
   LOGOUT: "Cerró sesión",
   DESBLOQUEO: "Desbloqueó con huella",
   DESBLOQUEO_FALLIDO: "Desbloqueo fallido",
+  CAPTCHA_IP: "La IP pide CAPTCHA desde ahora",
   CAMBIO_CONTRASENA: "Cambió su contraseña",
   CREAR_USUARIO: "Creó la cuenta",
   EDITAR_USUARIO: "Editó la cuenta",
@@ -59,7 +60,7 @@ export const ACCION_LABEL: Record<string, string> = {
   REACTIVAR: "Reactivó la cuenta",
 };
 
-const ACCIONES_SESION = ["LOGIN", "LOGIN_FALLIDO", "LOGOUT", "CAMBIO_CONTRASENA", "DESBLOQUEO", "DESBLOQUEO_FALLIDO"];
+const ACCIONES_SESION = ["LOGIN", "LOGIN_FALLIDO", "LOGOUT", "CAMBIO_CONTRASENA", "DESBLOQUEO", "DESBLOQUEO_FALLIDO", "CAPTCHA_IP"];
 
 export type Vista = "sesiones" | "cambios";
 export type FilaAuditoria = {
@@ -135,7 +136,11 @@ export async function reporteAuditoria(f: ReturnType<typeof filtrosDe>, limite: 
 
   return data.map((r) => {
     const det = (r.detalle ?? {}) as Record<string, unknown>;
-    const quien = r.user_id ? (nombre.get(r.user_id) ?? "Usuario borrado") : r.accion === "LOGIN_FALLIDO" ? String(det.email ?? "—") : "Sistema";
+    const quien = r.user_id
+      ? (nombre.get(r.user_id) ?? "Usuario borrado")
+      : r.accion === "LOGIN_FALLIDO" || r.accion === "CAPTCHA_IP"
+        ? String(det.email ?? "—")
+        : "Sistema";
     // Sin la clave de las tablas de una sola fila (parámetros: «true»).
     const reg = r.registro && r.registro !== "true" ? r.registro : null;
     let objeto = `${TABLA_LABEL[r.tabla] ?? r.tabla}${reg ? ` ${reg}` : ""}`;
@@ -146,6 +151,8 @@ export async function reporteAuditoria(f: ReturnType<typeof filtrosDe>, limite: 
       href = `/consulta/orden/${obraId}/${encodeURIComponent(numero)}`;
     } else if (["usuarios", "perfiles", "perfil_privado"].includes(r.tabla) && r.registro) {
       objeto = `${TABLA_LABEL[r.tabla]} de ${nombre.get(r.registro) ?? "un usuario"}`;
+    } else if (r.accion === "CAPTCHA_IP") {
+      objeto = `IP ${String(det.ip ?? "—")}`;
     } else if (r.tabla === "sesion") {
       objeto = String(det.email ?? "");
     }

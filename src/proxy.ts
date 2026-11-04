@@ -1,6 +1,8 @@
 import { createServerClient } from "@supabase/ssr";
 import { NextResponse, type NextRequest } from "next/server";
 import { COOKIE_ACCESO, RUTA_ACCESO, accesoActivo, firmaAcceso } from "@/lib/acceso";
+import { RUTAS_LIBRES } from "@/lib/bloqueo";
+import { COOKIE_DESBLOQUEO, COOKIE_DISPOSITIVO, desbloqueoPara, desbloqueoVigente, leerFirmado, opcionesDesbloqueo } from "@/lib/bloqueo-servidor";
 import { rolEnProd1 } from "@/lib/prod1";
 import { COOKIE_SESION } from "@/lib/supabase/config";
 import type { Rol } from "@/lib/types";
@@ -48,9 +50,17 @@ export async function proxy(request: NextRequest) {
   const path = request.nextUrl.pathname;
   if (path.startsWith("/sb/")) return guardarSb(request);
 
-  // Sin la contraseña de la demo, ninguna server action (también en /cotizar, la única ruta pública: una server
-  // action se puede llamar desde cualquier ruta). El proveedor envía su cotización por una ruta propia.
-  if (accesoActivo() && request.headers.has("next-action") && request.cookies.get(COOKIE_ACCESO)?.value !== (await firmaAcceso())) {
+  // Sin la contraseña de la demo, ningún POST (las server actions se pueden llamar desde cualquier ruta, también
+  // desde /cotizar, la única pública; con o sin JavaScript: sin él van como formulario, sin la cabecera
+  // Next-Action). Solo las dos rutas públicas: el envío del proveedor y la contraseña de la demo.
+  if (
+    accesoActivo() &&
+    request.method !== "GET" &&
+    request.method !== "HEAD" &&
+    path !== "/acceso/entrar" &&
+    !/^\/cotizar\/[0-9a-f-]{36}\/enviar$/i.test(path) &&
+    request.cookies.get(COOKIE_ACCESO)?.value !== (await firmaAcceso())
+  ) {
     return NextResponse.json({ message: "No permitido" }, { status: 403 });
   }
 
@@ -93,6 +103,27 @@ export async function proxy(request: NextRequest) {
     const redireccion = NextResponse.redirect(new URL("/sin-acceso", request.url));
     response.cookies.getAll().forEach((c) => redireccion.cookies.set(c));
     return redireccion;
+  }
+
+  // Bloqueo con huella, hecho cumplir aquí y no solo en el navegador (desactivar JavaScript no se lo salta): en el
+  // dispositivo con la huella activada, sin «desbloqueado» vigente no se entrega ninguna pantalla. Se renueva con cada
+  // pedido (la app manda un latido cada minuto mientras está a la vista) y vence a los 3 minutos sin actividad.
+  const uid = data?.claims?.sub;
+  if (uid && !RUTAS_LIBRES.some((r) => path === r || path.startsWith(`${r}/`))) {
+    const dueno = await leerFirmado(request.cookies.get(COOKIE_DISPOSITIVO)?.value);
+    if (dueno === uid) {
+      if (await desbloqueoVigente(request.cookies.get(COOKIE_DESBLOQUEO)?.value, uid)) {
+        response.cookies.set(COOKIE_DESBLOQUEO, await desbloqueoPara(uid), opcionesDesbloqueo());
+      } else if (request.method !== "GET" || request.headers.has("next-action")) {
+        return NextResponse.json({ message: "Bloqueado" }, { status: 401, headers: { "Cache-Control": "no-store" } });
+      } else {
+        const destino = new URL("/desbloquear", request.url);
+        destino.searchParams.set("volver", `${path}${request.nextUrl.search}`);
+        const redireccion = NextResponse.redirect(destino);
+        response.cookies.getAll().forEach((c) => redireccion.cookies.set(c));
+        return redireccion;
+      }
+    }
   }
 
   // Lista sin filtros: se abre directamente con la última vista guardada (sin pintarla vacía y saltar).

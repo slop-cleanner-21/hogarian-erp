@@ -135,6 +135,13 @@ export async function verificarActivacion(userId: string, respuesta: Registratio
   return data;
 }
 
+/** Cuántas huellas tiene el usuario en este dominio (las de otro dominio no sirven aquí). */
+export async function huellasAqui(userId: string): Promise<number> {
+  const { rpID } = await sitio();
+  const { count } = await createAdminClient().from("huellas").select("id", { count: "exact", head: true }).eq("user_id", userId).eq("rp_id", rpID);
+  return count ?? 0;
+}
+
 /** Opciones para firmar: al entrar (userId null: cualquier huella de este dominio) o al desbloquear (las suyas). */
 export async function opcionesFirmar(userId: string | null): Promise<PublicKeyCredentialRequestOptionsJSON | null> {
   const { rpID } = await sitio();

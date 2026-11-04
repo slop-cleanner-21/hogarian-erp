@@ -197,8 +197,18 @@ Contabilidad, Residente, Ingeniero de Operaciones y RRHH **no entran**. Sus role
   - Logística solo cambia `tipo_material` de un ítem (no su tolerancia de sobreprecio).
   - Lo que se hace con la clave secreta (Admin, Empresas, firma, huella) mira el rol vigente en la base
     (`requireSesionVigente`): un Admin desactivado pierde el panel al instante. Nadie se reactiva a sí mismo.
-  - Login: 10 intentos fallidos por cuenta o 30 por IP en 15 minutos y espera.
-  - `/sb` (local y túnel) pide la contraseña de la demo y solo deja pasar la clave pública.
+  - **Login: reintentos y CAPTCHA por IP** (`src/lib/captcha.ts`, tabla `login_ips`):
+    - desde el **3.er intento fallido** desde una IP, esa IP pide **CAPTCHA (Cloudflare Turnstile) para siempre**,
+      y cada nuevo fallo reciente la hace esperar más antes de reintentar (5 s, 10 s, 20 s… hasta 5 min, con la
+      cuenta regresiva en el botón); la auditoría registra «La IP pide CAPTCHA desde ahora»;
+    - además, 10 intentos fallidos por cuenta o 30 por IP en 15 minutos y espera;
+    - en producción, con `CAPTCHA_EN_SUPABASE=1`, Supabase Auth exige el CAPTCHA en **todo** ingreso con contraseña
+      (nadie prueba contraseñas directo contra Supabase): para una IP sin fallos es invisible;
+    - sin las claves de Turnstile no hay CAPTCHA: quedan los reintentos con espera y los límites (ver
+      `docs/produccion.md`). En local, claves de prueba de Cloudflare.
+  - `/sb` (local) pide la contraseña de la demo y solo deja pasar la clave pública; sin esa contraseña no pasa ningún
+    POST salvo las dos rutas públicas (`/cotizar/<token>/enviar`, `/acceso/entrar`).
+  - **Túnel: dado de baja** (04/11/2026). No se vuelve a abrir: para probar en el celular, la URL de Vercel.
   - Cabeceras: sin incrustar en otro sitio, `nosniff`, `Referrer-Policy`; los XML / SVG de `/sb` en sandbox.
   - El precio de una cotización debe ser mayor que 0. Los tokens falsos ya no bloquean los links reales.
   - El CSV de la auditoría no lleva fórmulas.
@@ -207,9 +217,6 @@ Contabilidad, Residente, Ingeniero de Operaciones y RRHH **no entran**. Sus role
     ninguna server action (el envío del proveedor y la contraseña de la demo son rutas: `/cotizar/<token>/enviar`,
     `/acceso/entrar`); el contrato del link va sin la imagen de la firma; huellas solo para el servidor y desafíos
     limitados por IP; los intentos de login ya bloqueados no se registran. Ítems: auditados en todo cambio.
-  - Pendiente: CAPTCHA en el login (Supabase Auth acepta intentos directos: solo limita por IP), bloqueo de la app
-    con huella hecho cumplir en el servidor, y un secreto JWT propio en el Supabase local antes de volver a abrir un
-    túnel.
 - **Login:** sol / luna arriba a la derecha (claro u oscuro, el mismo tema del menú).
 - **Huella (passkey, WebAuthn):** cada usuario la activa por dispositivo desde su menú › Huella (ahí ve y quita
   sus dispositivos). En la app instalada (PWA) se ofrece una vez si el teléfono tiene huella o rostro. Con ella:
@@ -219,16 +226,22 @@ Contabilidad, Residente, Ingeniero de Operaciones y RRHH **no entran**. Sus role
     desbloquea con la huella; «Usar contraseña» cierra la sesión. Se abre apenas el teléfono acepta la huella y
     el servidor la verifica después (si la rechaza, vuelve a bloquear). Mientras carga la app recién abierta, la
     pantalla no se muestra (`BLOQUEO_SCRIPT`, `src/lib/bloqueo.ts`).
-- **Barra de navegación de Android** (atrás, inicio, tareas) en la app instalada: la pinta Chrome con el
-  `theme_color` del manifiesto, que no puede seguir el tema; va oscura (con íconos blancos) en los dos temas. La
-  barra de arriba sí sigue el tema (`meta theme-color`, `BarrasSistema`). Las apps ya instaladas toman el color
-  cuando Chrome actualiza la app (o al reinstalarla).
+  - **el servidor hace cumplir el bloqueo** (`src/lib/bloqueo-servidor.ts`, proxy): el dispositivo con la huella
+    activada lleva una cookie firmada; sin «desbloqueado» vigente (otra cookie firmada, httpOnly, que se renueva con
+    cada pedido y un latido cada minuto mientras la app está a la vista, y vence a los 3 minutos sin actividad) no
+    se entrega ninguna pantalla: redirige a `/desbloquear` (y un pedido que no es una pantalla recibe 401).
+    Desactivar JavaScript o ver el código de la página no se lo salta. Desbloquear y cerrar sesión van por rutas
+    (`/desbloquear/opciones`, `/desbloquear/verificar`, `/login/salir`) que funcionan con la pantalla bloqueada.
 
   Si otra persona entra con contraseña en ese dispositivo, la huella deja de ofrecerse. Una huella quitada desde
   otro dispositivo deja de ofrecerse al fallar. Las credenciales (`huellas`, solo la clave pública) y los
   desafíos de un solo uso (`huella_desafios`, 5 min) solo los lee el servidor. Valen solo en el dominio en que se
   activaron: al cambiar de dominio, cada uno la activa de nuevo. Auditoría: «Inició sesión · con huella»,
   «Desbloqueó con huella», intentos fallidos, y cada alta o baja de una huella (`src/lib/huella.ts`).
+- **Barra de navegación de Android** (atrás, inicio, tareas) en la app instalada: la pinta Chrome con el
+  `theme_color` del manifiesto, que no puede seguir el tema; va oscura (con íconos blancos) en los dos temas. La
+  barra de arriba sí sigue el tema (`meta theme-color`, `BarrasSistema`). Las apps ya instaladas toman el color
+  cuando Chrome actualiza la app (o al reinstalarla).
 
 ### Heredado del MVP (ya implementado)
 
@@ -267,7 +280,7 @@ Contabilidad, Residente, Ingeniero de Operaciones y RRHH **no entran**. Sus role
 - **Recepción** de lo que llega (ver arriba).
 - **Paso a producción** (Vercel + Supabase en la nube + repo propio): ver `docs/produccion.md`. Ya quedan
   por variables de entorno los botones de acceso rápido (`NEXT_PUBLIC_USUARIOS_LOCALES`), la contraseña de
-  la demo (`DEMO_ACCESO`), el túnel (`SERVER_ACTIONS_ORIGENES`) y la conexión directa del navegador con
+  la demo (`DEMO_ACCESO`) y la conexión directa del navegador con
   Supabase sin `/sb` (`NEXT_PUBLIC_SUPABASE_DIRECTO=1`); en local siguen como antes hasta el paso.
 - **Quién firma por cada empresa:** ya se elige en Admin › Empresas (sin elegir, el gerente con la firma más
   reciente); falta que respondan si es uno por empresa.

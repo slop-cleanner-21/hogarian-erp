@@ -35,3 +35,4 @@ npx playwright show-report                                      # capturas y tra
 1. Correr la suite (o el área) después del build: es la revisión rápida.
 2. Para lo nuevo, agregar la prueba que lo verifica en la spec del área.
 3. El `ui-auditor` solo revisa a mano lo que una prueba no puede juzgar (diseño, si algo sobra o se entiende) y deja como prueba lo que encuentre.
+- `captcha.spec.ts` usa el Turnstile real con las claves de prueba de Cloudflare: necesita internet (si no, se salta).
