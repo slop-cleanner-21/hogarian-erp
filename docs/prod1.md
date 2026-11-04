@@ -202,6 +202,14 @@ Contabilidad, Residente, Ingeniero de Operaciones y RRHH **no entran**. Sus role
   - Cabeceras: sin incrustar en otro sitio, `nosniff`, `Referrer-Policy`; los XML / SVG de `/sb` en sandbox.
   - El precio de una cotización debe ser mayor que 0. Los tokens falsos ya no bloquean los links reales.
   - El CSV de la auditoría no lleva fórmulas.
+  - Re-auditoría (migración `prod1_seguridad_2`): las rutas de archivos no admiten `..`, `//`, `\` ni `%` (el link
+    entregaba cualquier archivo); precios de cotización solo números válidos; sin la contraseña de la demo no pasa
+    ninguna server action (el envío del proveedor y la contraseña de la demo son rutas: `/cotizar/<token>/enviar`,
+    `/acceso/entrar`); el contrato del link va sin la imagen de la firma; huellas solo para el servidor y desafíos
+    limitados por IP; los intentos de login ya bloqueados no se registran. Ítems: auditados en todo cambio.
+  - Pendiente: CAPTCHA en el login (Supabase Auth acepta intentos directos: solo limita por IP), bloqueo de la app
+    con huella hecho cumplir en el servidor, y un secreto JWT propio en el Supabase local antes de volver a abrir un
+    túnel.
 - **Login:** sol / luna arriba a la derecha (claro u oscuro, el mismo tema del menú).
 - **Huella (passkey, WebAuthn):** cada usuario la activa por dispositivo desde su menú › Huella (ahí ve y quita
   sus dispositivos). En la app instalada (PWA) se ofrece una vez si el teléfono tiene huella o rostro. Con ella:
