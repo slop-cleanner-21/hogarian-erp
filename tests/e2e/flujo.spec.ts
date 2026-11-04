@@ -2,7 +2,7 @@ import crypto from "node:crypto";
 import path from "node:path";
 import type { Browser, BrowserContext, Page } from "@playwright/test";
 import { expect, test } from "./fixtures";
-import { sql, sql1 } from "./lib";
+import { ROLES, sql, sql1 } from "./lib";
 
 // El flujo completo de una OC, solo por las pantallas (sin seeds ni SQL para avanzar; SQL solo para comprobar y
 // para limpiar al final), con cada rol en su propia sesión:
@@ -18,7 +18,8 @@ import { sql, sql1 } from "./lib";
 //   Tesorería) → Tesorería paga el neto → el proveedor ve su orden de servicio pagada.
 
 const ARCHIVO = path.resolve("tests/e2e/archivos/ariant.png");
-const sufijo = String(Date.now() % 1000000).padStart(6, "0");
+// Al azar, no por la hora: los workers arrancan en el mismo milisegundo y compartían el sufijo (y la limpieza).
+const sufijo = String(crypto.randomInt(100000, 1000000));
 const OBRA = `E2E FLUJO ${sufijo}`;
 const MATERIAL = `E2E CEMENTO FLUJO ${sufijo}`;
 const PROVEEDOR = `E2E PROVEEDOR FLUJO ${sufijo}`;
@@ -27,6 +28,9 @@ const CANTIDAD = 100;
 const PU_PRESUPUESTO = 25;
 const PU_PROVEEDOR = 24;
 const SERVICIO = `E2E PINTURA FLUJO ${sufijo}`;
+const OBRA_OS = `E2E FLUJO OS ${sufijo}`;
+const PROVEEDOR_OS = `E2E PROVEEDOR FLUJO OS ${sufijo}`;
+const RUC_OS = `10${sufijo}${String((Date.now() + 7) % 1000).padStart(3, "0")}`;
 const PU_SERVICIO = 2000;
 // RHE de más de S/ 1,500: retiene el 8 % del proveedor (el de un proveedor nuevo).
 const RETENCION = PU_SERVICIO * 0.08;
@@ -54,10 +58,17 @@ async function proveedor(browser: Browser, info: { project: { use: object } }, l
   return { ctx, page };
 }
 
-/** Borra todo lo del flujo (obras «E2E FLUJO …», su proveedor y su material). Pagos y comprobantes no llevan la
- *  obra: van por sus aplicaciones y las líneas de la orden. */
+// Lo del flujo: lo de esta corrida (su sufijo) o lo que dejó una que falló hace más de 30 minutos (por su alta en
+// la auditoría). Lo de otro worker que corre a la vez no se toca.
+const delFlujo = (tabla: string, columna: string, patron: string) =>
+  `select t.id from ${tabla} t where t.${columna} like '${patron}' and (t.${columna} like '%${sufijo}'
+     or not exists (select 1 from audit_log a where a.tabla = '${tabla}' and a.accion = 'INSERT' and a.registro = t.id::text
+                     and a.created_at > now() - interval '30 minutes'))`;
+
+/** Borra lo del flujo (obras «E2E FLUJO …», sus proveedores y sus ítems). Pagos y comprobantes no llevan la obra:
+ *  van por sus aplicaciones y las líneas de la orden. */
 function limpiar() {
-  for (const [obra] of sql(`select id from obras where nombre like 'E2E FLUJO %'`)) {
+  for (const [obra] of sql(delFlujo("obras", "nombre", "E2E FLUJO %"))) {
     sql(`set session_replication_role = replica;
          create temp table _comps as select distinct comprobante_id id from oc_items where obra_id = ${obra} and comprobante_id is not null
            union select comprobante_id from pago_aplicaciones where obra_id = ${obra} and comprobante_id is not null;
@@ -84,18 +95,64 @@ function limpiar() {
          delete from notificaciones where href like '%/${obra}/%' or href like '%/obras/${obra}%';
          delete from obras where id = ${obra};`);
   }
+  const proveedores = delFlujo("proveedores", "razon_social", "E2E PROVEEDOR FLUJO %");
   sql(`set session_replication_role = replica;
-       delete from proveedor_contactos where proveedor_id in (select id from proveedores where razon_social like 'E2E PROVEEDOR FLUJO %');
-       delete from proveedor_cuentas where proveedor_id in (select id from proveedores where razon_social like 'E2E PROVEEDOR FLUJO %');
-       delete from proveedor_tipos_material where proveedor_id in (select id from proveedores where razon_social like 'E2E PROVEEDOR FLUJO %');
-       delete from proveedores where razon_social like 'E2E PROVEEDOR FLUJO %';
-       delete from items where descripcion like 'E2E CEMENTO FLUJO %' or descripcion like 'E2E PINTURA FLUJO %';`);
+       create temp table _prov as ${proveedores};
+       delete from proveedor_contactos where proveedor_id in (select id from _prov);
+       delete from proveedor_cuentas where proveedor_id in (select id from _prov);
+       delete from proveedor_tipos_material where proveedor_id in (select id from _prov);
+       delete from proveedores where id in (select id from _prov);
+       delete from items where id in (${delFlujo("items", "descripcion", "E2E CEMENTO FLUJO %")})
+          or id in (${delFlujo("items", "descripcion", "E2E PINTURA FLUJO %")});`);
 }
 
-test.describe("@flujo flujo completo de una OC por las pantallas", () => {
-  test.describe.configure({ mode: "serial" });
-  let obraId = "";
-  let numero = "";
+type Abrir = (rol: "gerencia" | "logistica", ruta: string) => Promise<Page>;
+
+/** Gerencia: la obra (de ARIANT) con una partida del ítem, y el presupuesto publicado. Devuelve su id. */
+async function crearObra(abrir: Abrir, nombre: string, item: string, cantidad: number, pu: number) {
+  const page = await abrir("gerencia", "/gerencia/obras");
+  await page.getByRole("button", { name: "Nueva obra" }).click();
+  const hoja = page.getByRole("dialog", { name: "Nueva obra" });
+  await hoja.getByLabel("Nombre").fill(nombre);
+  await elegir(page, hoja, "Empresa", "ARIANT");
+  await hoja.getByLabel("Dirección").fill("Av. de Prueba 123, Lima");
+  await hoja.getByRole("button", { name: "Crear obra" }).click();
+  await page.waitForURL(/\/gerencia\/obras\/\d+/);
+  const id = page.url().match(/\/gerencia\/obras\/(\d+)/)![1];
+
+  await page.getByRole("button", { name: "Partida", exact: true }).click();
+  const partida = page.getByRole("dialog", { name: "Partida nueva" });
+  await elegir(page, partida, "Ítem", item);
+  await partida.getByLabel("Cantidad").fill(String(cantidad));
+  await partida.getByLabel("P.U.").fill(String(pu));
+  await partida.getByRole("button", { name: "Listo" }).click();
+  await page.getByRole("button", { name: /^Guardar cambios/ }).click();
+  await expect.poll(() => sql1(`select count(*) from partidas where obra_id = ${id}`)).toBe("1");
+
+  await page.getByRole("button", { name: "Publicar presupuesto" }).click();
+  await page.getByRole("dialog", { name: "¿Publicar el presupuesto?" }).getByRole("button", { name: "Sí" }).click();
+  await expect.poll(() => sql1(`select presupuesto_estado from obras where id = ${id}`)).toBe("PUBLICADO");
+  return { id, page };
+}
+
+/** Logística: el proveedor con un contacto y su comprobante habitual. */
+async function crearProveedor(abrir: Abrir, razon: string, ruc: string, comprobante: RegExp) {
+  const page = await abrir("logistica", "/logistica/proveedores");
+  await page.getByRole("button", { name: "Nuevo proveedor" }).click();
+  const hoja = page.getByRole("dialog", { name: "Nuevo proveedor" });
+  await hoja.getByLabel("RUC / DNI").fill(ruc);
+  await hoja.getByLabel("Razón social").fill(razon);
+  await hoja.getByRole("button", { name: "Agregar contacto" }).click();
+  await hoja.getByLabel("Nombre del contacto").first().fill("Carlos Prueba");
+  await hoja.getByLabel("Teléfono").first().fill("987654321");
+  await elegir(page, hoja, "Comprobante habitual", comprobante);
+  await hoja.getByRole("button", { name: "Guardar" }).click();
+  await expect(hoja).toBeHidden();
+  expect(sql1(`select ruc_o_cod from proveedores where razon_social = '${razon}'`)).toBe(ruc);
+}
+
+test.describe("@flujo flujo completo por las pantallas", () => {
+  // La OC y la OS, cada una con su obra y su proveedor: corren a la vez.
 
   // Limpieza (solo esto va por SQL): lo que creó el flujo, también lo que dejara una corrida anterior que falló.
   // La firma y el DNI de Gerencia (los pone la prueba de la OS) vuelven a como estaban.
@@ -114,10 +171,11 @@ test.describe("@flujo flujo completo de una OC por las pantallas", () => {
     );
   });
 
-  test("de la obra al pago y la constancia", async ({ abrir, browser, revisarPantalla }, info) => {
-
+  test("OC: de la obra al pago y la constancia", async ({ abrir, browser, revisarPantalla }, info) => {
     test.setTimeout(240_000);
     let link = "";
+    let obraId = "";
+    let numero = "";
 
     await test.step("Gerencia crea el material", async () => {
       const page = await abrir("gerencia", "/gerencia/items");
@@ -132,44 +190,13 @@ test.describe("@flujo flujo completo de una OC por las pantallas", () => {
     });
 
     await test.step("Gerencia crea la obra, arma su presupuesto y lo publica", async () => {
-      const page = await abrir("gerencia", "/gerencia/obras");
-      await page.getByRole("button", { name: "Nueva obra" }).click();
-      const hoja = page.getByRole("dialog", { name: "Nueva obra" });
-      await hoja.getByLabel("Nombre").fill(OBRA);
-      await elegir(page, hoja, "Empresa", "ARIANT");
-      await hoja.getByLabel("Dirección").fill("Av. de Prueba 123, Lima");
-      await hoja.getByRole("button", { name: "Crear obra" }).click();
-      await page.waitForURL(/\/gerencia\/obras\/\d+/);
-      obraId = page.url().match(/\/gerencia\/obras\/(\d+)/)![1];
-
-      await page.getByRole("button", { name: "Partida", exact: true }).click();
-      const partida = page.getByRole("dialog", { name: "Partida nueva" });
-      await elegir(page, partida, "Ítem", MATERIAL);
-      await partida.getByLabel("Cantidad").fill(String(CANTIDAD));
-      await partida.getByLabel("P.U.").fill(String(PU_PRESUPUESTO));
-      await partida.getByRole("button", { name: "Listo" }).click();
-      await page.getByRole("button", { name: /^Guardar cambios/ }).click();
-      await expect.poll(() => sql1(`select count(*) from partidas where obra_id = ${obraId}`)).toBe("1");
-
-      await page.getByRole("button", { name: "Publicar presupuesto" }).click();
-      await page.getByRole("dialog", { name: "¿Publicar el presupuesto?" }).getByRole("button", { name: "Sí" }).click();
-      await expect.poll(() => sql1(`select presupuesto_estado from obras where id = ${obraId}`)).toBe("PUBLICADO");
-      await revisarPantalla(page);
+      const r = await crearObra(abrir, OBRA, MATERIAL, CANTIDAD, PU_PRESUPUESTO);
+      obraId = r.id;
+      await revisarPantalla(r.page);
     });
 
     await test.step("Logística crea el proveedor", async () => {
-      const page = await abrir("logistica", "/logistica/proveedores");
-      await page.getByRole("button", { name: "Nuevo proveedor" }).click();
-      const hoja = page.getByRole("dialog", { name: "Nuevo proveedor" });
-      await hoja.getByLabel("RUC / DNI").fill(RUC);
-      await hoja.getByLabel("Razón social").fill(PROVEEDOR);
-      await hoja.getByRole("button", { name: "Agregar contacto" }).click();
-      await hoja.getByLabel("Nombre del contacto").first().fill("Carlos Prueba");
-      await hoja.getByLabel("Teléfono").first().fill("987654321");
-      await elegir(page, hoja, "Comprobante habitual", /^Factura/);
-      await hoja.getByRole("button", { name: "Guardar" }).click();
-      await expect(hoja).toBeHidden();
-      expect(sql1(`select ruc_o_cod from proveedores where razon_social = '${PROVEEDOR}'`)).toBe(RUC);
+      await crearProveedor(abrir, PROVEEDOR, RUC, /^Factura/);
     });
 
     await test.step("Logística crea la OC (con guía) para la obra", async () => {
@@ -359,7 +386,9 @@ test.describe("@flujo flujo completo de una OC por las pantallas", () => {
     });
 
     await test.step("Todo quedó en la auditoría con su autor", async () => {
-      const autor = (rol: string) => sql1(`select user_id from perfiles where rol = '${rol}' order by user_id limit 1`);
+      // El autor por su correo (puede haber otros usuarios con el mismo rol, p. ej. de otra prueba).
+      const CORREO: Record<string, string> = { GERENCIA: ROLES.gerencia, LOGISTICA: ROLES.logistica, TESORERIA: ROLES.tesoreria };
+      const autor = (rol: string) => sql1(`select id from auth.users where email = '${CORREO[rol]}'`);
       const hay = (tabla: string, accion: string, rol: string, donde: string) =>
         Number(sql1(`select count(*) from audit_log where tabla = '${tabla}' and accion = '${accion}' and user_id = '${autor(rol)}' and ${donde}`));
       expect(hay("obras", "INSERT", "GERENCIA", `registro = '${obraId}'`), "Gerencia creó la obra").toBe(1);
@@ -371,13 +400,12 @@ test.describe("@flujo flujo completo de una OC por las pantallas", () => {
   });
 
   test("OS con recibo por honorarios: contrato firmado, retención y pago del neto", async ({ abrir, browser }, info) => {
-
-    test.skip(!obraId, "necesita la obra del flujo de la OC");
     test.setTimeout(240_000);
     let link = "";
     let os = "";
+    let obraId = "";
 
-    await test.step("Gerencia crea el servicio y lo agrega al presupuesto", async () => {
+    await test.step("Gerencia crea el servicio, la obra con él y publica el presupuesto", async () => {
       const items = await abrir("gerencia", "/gerencia/items?clase=serv");
       await items.getByRole("button", { name: "Nuevo servicio" }).click();
       const hoja = items.getByRole("dialog", { name: "Nuevo servicio" });
@@ -388,15 +416,11 @@ test.describe("@flujo flujo completo de una OC por las pantallas", () => {
       await expect(hoja).toBeHidden();
       expect(sql1(`select rubro from items where descripcion = '${SERVICIO}'`)).toBe("SUBCONTRATO");
 
-      const page = await abrir("gerencia", `/gerencia/obras/${obraId}`);
-      await page.getByRole("button", { name: "Partida", exact: true }).click();
-      const partida = page.getByRole("dialog", { name: "Partida nueva" });
-      await elegir(page, partida, "Ítem", SERVICIO);
-      await partida.getByLabel("Cantidad").fill("1");
-      await partida.getByLabel("P.U.").fill("2500");
-      await partida.getByRole("button", { name: "Listo" }).click();
-      await page.getByRole("button", { name: /^Guardar cambios/ }).click();
-      await expect.poll(() => sql1(`select count(*) from partidas where obra_id = ${obraId}`)).toBe("2");
+      obraId = (await crearObra(abrir, OBRA_OS, SERVICIO, 1, 2500)).id;
+    });
+
+    await test.step("Logística crea el proveedor (recibo por honorarios)", async () => {
+      await crearProveedor(abrir, PROVEEDOR_OS, RUC_OS, /^Recibo por honorarios/);
     });
 
     await test.step("Gerencia sube su firma y el Admin le pone el DNI", async () => {
@@ -409,7 +433,7 @@ test.describe("@flujo flujo completo de una OC por las pantallas", () => {
       await expect(hoja).toBeHidden();
 
       const admin = await abrir("admin", "/admin");
-      await admin.locator("main").getByRole("button", { name: /gerencia@erp\.local/ }).click();
+      await admin.locator("main").getByRole("button", { name: /(^|[^\w-])gerencia@erp\.local/ }).click();
       const ficha = admin.getByRole("dialog", { name: "Gerencia" });
       await ficha.getByLabel("DNI").fill("41234567");
       await ficha.getByRole("button", { name: "Guardar" }).click();
@@ -419,12 +443,12 @@ test.describe("@flujo flujo completo de una OC por las pantallas", () => {
 
     await test.step("Logística emite la OS con recibo por honorarios y la fecha de inicio", async () => {
       const page = await abrir("logistica", "/logistica/ordenes/nueva?tipo=OS");
-      await elegir(page, page.locator("main"), "Obra", OBRA);
+      await elegir(page, page.locator("main"), "Obra", OBRA_OS);
       await page.getByPlaceholder("Buscar partida").fill(SERVICIO);
       await page.locator("main label").filter({ hasText: SERVICIO }).first().locator('input[type="checkbox"]').check();
       await page.getByRole("button", { name: /^Continuar/ }).click();
       const main = page.locator("main");
-      await elegir(page, main, "Proveedor", PROVEEDOR);
+      await elegir(page, main, "Proveedor", PROVEEDOR_OS);
       await elegir(page, main, "Comprobante", "Recibo por honorarios");
       await main.getByLabel("Fecha de inicio").fill(masDias(hoyLima(), -3));
       await page.getByRole("button", { name: "Confirmar" }).click();

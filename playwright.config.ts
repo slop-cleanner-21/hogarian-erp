@@ -11,14 +11,19 @@ const movil = devices["iPhone 13"];
 export default defineConfig({
   testDir: "tests/e2e",
   fullyParallel: true,
-  // 6 por defecto: prod1 suele correr junto al MVP (dos stacks de Supabase y dos Next) y con 10 se satura la RAM.
-  workers: Number(process.env.WORKERS ?? 6),
+  // 10 por defecto (medido: 1:44 contra 2:10 con 6, con la RAM sobrada). Si el MVP corre a la vez (dos stacks
+  // de Supabase y dos Next), WORKERS=6.
+  workers: Number(process.env.WORKERS ?? 10),
   retries: 0,
   timeout: 45_000,
   expect: { timeout: 8_000 },
   // SALIDA separa los resultados de corridas simultáneas (Playwright vacía su carpeta al empezar).
   outputDir: `test-results/${process.env.SALIDA ?? "e2e"}`,
-  reporter: [["list"], ["json", { outputFile: `test-results/${process.env.SALIDA ?? "e2e"}.json` }]],
+  // Una barra de avance (tests/e2e/progreso.ts); con REPORTE=list, cada prueba en su línea.
+  reporter: [
+    process.env.REPORTE === "list" ? ["list"] : ["./tests/e2e/progreso.ts"],
+    ["json", { outputFile: `test-results/${process.env.SALIDA ?? "e2e"}.json` }],
+  ],
   use: {
     baseURL: BASE,
     locale: "es-PE",

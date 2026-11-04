@@ -45,6 +45,24 @@ export function sqlScript(script: string): string[][] {
 /** Un solo valor. */
 export const sql1 = (consulta: string) => sql(consulta)[0]?.[0] ?? "";
 
+// El usuario de prueba de cada rol de la base (por su correo). «El primero con ese rol» no sirve: otras pruebas (o
+// una auditoría) crean usuarios con el mismo rol, a veces desactivados, mientras la suite corre en paralelo.
+const ROL_DB: Record<string, Rol> = {
+  LOGISTICA: "logistica",
+  CONTABILIDAD: "contabilidad",
+  TESORERIA: "tesoreria",
+  RESIDENTE: "residente",
+  GERENCIA: "gerencia",
+  OPERACIONES: "operaciones",
+  JEFE_OPERACIONES: "jefe",
+  ADMIN: "admin",
+  RRHH: "rrhh",
+};
+/** SQL: el id del usuario de prueba del rol (LOGISTICA, TESORERIA…). */
+export const uidSql = (rolDb: string) => `(select id from auth.users where email = '${ROLES[ROL_DB[rolDb]]}')`;
+/** El id del usuario de prueba del rol. */
+export const uidDe = (rolDb: string) => sql1(`select ${uidSql(rolDb)}`);
+
 /** Textos que nunca deben verse. */
 export const ERRORES = /No tienes permiso|permission denied|row-level security|Algo salió mal|Application error|Unhandled Runtime Error/i;
 

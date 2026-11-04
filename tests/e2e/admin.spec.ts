@@ -152,7 +152,7 @@ test.describe("@prod1 @admin usuarios", () => {
 
   test("el Admin no puede desactivarse ni quitarse el rol", async ({ abrir }) => {
     const page = await abrir("admin", "/admin");
-    await page.locator("main").getByRole("button", { name: /admin@erp\.local/ }).click();
+    await page.locator("main").getByRole("button", { name: /(^|[^\w-])admin@erp\.local/ }).click();
     const ficha = page.getByRole("dialog", { name: "Administrador" });
     await expect(ficha.getByRole("button", { name: "Restablecer contraseña" })).toBeVisible();
     await expect(ficha.getByRole("button", { name: "Desactivar cuenta" })).toHaveCount(0);

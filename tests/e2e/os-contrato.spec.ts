@@ -1,6 +1,6 @@
 import path from "node:path";
 import { expect, test } from "./fixtures";
-import { sql, sql1, sqlScript } from "./lib";
+import { sql, sql1, sqlScript, uidDe } from "./lib";
 
 // Prod 1: la OS se crea con su comprobante (define el contrato) y la fecha de inicio; el N° no se escribe;
 // la OC sin guía pasa directo a Tesorería al facturarla; retención de 4ta por proveedor y su suspensión;
@@ -55,7 +55,7 @@ test.describe("@prod1 @logistica OS con comprobante y fecha de inicio", () => {
 
   test("la base no acepta un inicio posterior a la fecha de la OS ni otro comprobante que factura o RHE", async () => {
     const [obra, numero, fecha] = sql(`select obra_id, numero, fecha from ordenes_compra where tipo = 'OS' and estado = 'PRECIOS_CONFIRMADOS' order by obra_id, numero limit 1`)[0];
-    const uid = sql1("select user_id from perfiles where rol = 'LOGISTICA' limit 1");
+    const uid = uidDe("LOGISTICA");
     const como = (q: string) =>
       sqlScript(`begin; select set_config('request.jwt.claims', '{"sub":"${uid}","role":"authenticated"}', true) is null;
                  set local role authenticated; ${q}; rollback;`);
@@ -207,7 +207,7 @@ test.describe("@prod1 @gerencia firma y DNI", () => {
 
       // El Admin: Gerencia sin DNI no se guarda; con 8 dígitos sí.
       const admin = await abrir("admin", "/admin");
-      await admin.locator("main").getByRole("button", { name: /gerencia@erp\.local/ }).click();
+      await admin.locator("main").getByRole("button", { name: /(^|[^\w-])gerencia@erp\.local/ }).click();
       const ficha = admin.getByRole("dialog", { name: "Gerencia" });
       await ficha.getByLabel("DNI").fill("4123");
       await expect(ficha.getByRole("button", { name: "Guardar" })).toBeDisabled();
@@ -228,8 +228,10 @@ test.describe("@prod1 @gerencia firma y DNI", () => {
 test.describe("@prod1 datos históricos (Excel)", () => {
   test("la carga del Excel queda marcada como histórica y lo de la app como normal", () => {
     // Sin autor y fuera de las obras DEMO: del Excel. Con autor: creado en la app.
-    expect(sql1(`select count(*) from ordenes_compra o join obras b on b.id = o.obra_id where b.nombre not like 'DEMO%' and o.created_by is null and not o.historico`)).toBe("0");
-    expect(sql1(`select count(*) from ordenes_compra where created_by is not null and historico`)).toBe("0");
+    // Sin lo que otras pruebas están creando en este momento (por SQL, sin autor): la carga es anterior.
+    const viejas = "o.created_at < now() - interval '10 minutes'";
+    expect(sql1(`select count(*) from ordenes_compra o join obras b on b.id = o.obra_id where b.nombre not like 'DEMO%' and b.nombre not like 'AUDIT%' and b.nombre not like 'E2E %' and o.created_by is null and not o.historico and ${viejas}`)).toBe("0");
+    expect(sql1(`select count(*) from ordenes_compra o where o.created_by is not null and o.historico and ${viejas}`)).toBe("0");
     expect(Number(sql1(`select count(*) from comprobantes where historico`))).toBeGreaterThan(0);
     expect(Number(sql1(`select count(*) from pagos where historico`))).toBeGreaterThan(0);
   });
@@ -247,7 +249,7 @@ test.describe("@prod1 datos históricos (Excel)", () => {
 
   test("OS histórica facturada: no espera el contrato firmado (la base la deja ir a Tesorería)", async () => {
     const [obra, numero] = sql(`select obra_id, numero from ordenes_compra where tipo = 'OS' and historico and estado = 'PRECIOS_CONFIRMADOS' order by obra_id, numero limit 1`)[0];
-    const uid = sql1("select user_id from perfiles where rol = 'LOGISTICA' limit 1");
+    const uid = uidDe("LOGISTICA");
     const r = sqlScript(`begin; select set_config('request.jwt.claims', '{"sub":"${uid}","role":"authenticated"}', true) is null;
       update ordenes_compra set estado = 'FACTURADA' where obra_id = ${obra} and numero = '${numero}';
       set local role authenticated;

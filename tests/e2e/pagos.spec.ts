@@ -1,5 +1,5 @@
 import { expect, test } from "./fixtures";
-import { sql, sql1, sqlScript } from "./lib";
+import { sql, sql1, sqlScript, uidDe, uidSql } from "./lib";
 
 // Detracciones (Gerencia las marca, Logística las ve al facturar, Tesorería paga el neto), rechazo con
 // factura nueva e historial de rechazos, y el pago visible en las etapas siguientes de la orden.
@@ -9,7 +9,8 @@ const dinero = (n: number) => n.toLocaleString("es-PE", { minimumFractionDigits:
 
 test.describe("@pagos @gerencia detracciones en el presupuesto", () => {
   test("agregar un ítem con detracción toma 5 %, se guarda y se puede quitar", async ({ abrir, revisarPantalla }, info) => {
-    const [obraId] = sql("select id from obras where estado <> 'CERRADA' and presupuesto_estado = 'PUBLICADO' order by id desc limit 1")[0];
+    // Una obra de la carga (no una que otra prueba esté creando en paralelo).
+    const [obraId] = sql("select id from obras where estado <> 'CERRADA' and presupuesto_estado = 'PUBLICADO' and nombre not like 'E2E %' and nombre not like 'AUDIT%' order by id desc limit 1")[0];
     // Un ítem distinto por proyecto (corren en paralelo).
     const salto = info.project.name === "m360" ? 1 : 0;
     const [itemId, descripcion] = sql(
@@ -174,7 +175,7 @@ test.describe("@pagos @tesoreria pago neto y rechazo", () => {
           and not exists (select 1 from oc_items l join pago_aplicaciones ap on ap.comprobante_id = l.comprobante_id where l.obra_id = o.obra_id and l.numero_oc = o.numero)
           and not exists (select 1 from oc_items l join asientos a on a.comprobante_id = l.comprobante_id where l.obra_id = o.obra_id and l.numero_oc = o.numero)
         limit 1;
-       select set_config('request.jwt.claims', '{"sub":"' || (select user_id from perfiles where rol = 'TESORERIA' limit 1) || '","role":"authenticated"}', true) is null;
+       select set_config('request.jwt.claims', '{"sub":"' || ${uidSql("TESORERIA")} || '","role":"authenticated"}', true) is null;
        savepoint s;
        select rechazar_documento(obra_id, numero, null, 'prueba', false, 'DATOS') from caso;
        select 'DATOS', (select estado::text from ordenes_compra o join caso c using (obra_id) where o.numero = c.numero),
@@ -203,7 +204,7 @@ test.describe("@pagos @tesoreria pago neto y rechazo", () => {
     expect(de("PRECIOS").slice(1)).toEqual(["EMITIDA", "0"]);
     // Sin motivo no hay rechazo.
     expect(() =>
-      sqlScript(`begin; select set_config('request.jwt.claims', '{"sub":"' || (select user_id from perfiles where rol = 'TESORERIA' limit 1) || '","role":"authenticated"}', true) is null;
+      sqlScript(`begin; select set_config('request.jwt.claims', '{"sub":"' || ${uidSql("TESORERIA")} || '","role":"authenticated"}', true) is null;
         select rechazar_documento(obra_id, numero, null, '  ', false, 'DATOS') from ordenes_compra where estado = 'EN_TESORERIA' limit 1; rollback;`),
     ).toThrow(/motivo/);
   });
@@ -330,7 +331,7 @@ test.describe("@pagos @tesoreria prod 1: sin pagos parciales", () => {
   });
 
   test("la base rechaza un pago parcial", async () => {
-    const uid = sql1("select user_id from perfiles where rol = 'TESORERIA' limit 1");
+    const uid = uidDe("TESORERIA");
     let error = "";
     try {
       sqlScript(`begin;

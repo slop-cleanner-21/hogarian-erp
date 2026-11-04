@@ -1,6 +1,6 @@
 import type { Browser, Page } from "@playwright/test";
 import { expect, test } from "./fixtures";
-import { ROLES, sql, sql1, sqlScript } from "./lib";
+import { ROLES, sql, sql1, sqlScript, uidDe } from "./lib";
 
 // Auditoría: toda tabla del negocio registra sus cambios con su autor; las sesiones (inicio, intento fallido,
 // cierre) quedan con IP y dispositivo; lo que el Admin hace con la clave secreta queda a su nombre; y el Admin
@@ -26,7 +26,7 @@ async function entrar(browser: Browser, baseURL: string, email: string, pass: st
 
 /** Ejecuta `consulta` como el usuario de `rol` (en una transacción que se deshace) y devuelve su auditoría nueva. */
 function comoRol(rol: string, consulta: string) {
-  const uid = sql1(`select user_id from perfiles where rol = '${rol}' order by user_id limit 1`);
+  const uid = uidDe(rol);
   const filas = sqlScript(`begin;
     select set_config('request.jwt.claims', '{"sub":"${uid}","role":"authenticated"}', true) is null;
     create temp table antes on commit drop as select coalesce(max(id), 0) m from audit_log;
@@ -40,11 +40,14 @@ function comoRol(rol: string, consulta: string) {
 
 test.describe("@auditoria", () => {
   test("toda tabla del negocio registra sus cambios", () => {
+    // Un trigger de fn_audit en alta, cambio y baja, sin filtrar columnas ni condición (el de ítems del MVP solo
+    // miraba la cuenta y el tipo: el alta de un ítem no quedaba). Huellas: solo alta y baja, a propósito.
     const sin = sql(`select c.relname from pg_class c join pg_namespace n on n.oid = c.relnamespace
                       where n.nspname = 'public' and c.relkind = 'r'
-                        and not exists (select 1 from pg_trigger t where t.tgrelid = c.oid and t.tgname like 'audit%')
+                        and not exists (select 1 from pg_trigger t where t.tgrelid = c.oid and t.tgfoid = 'public.fn_audit'::regproc
+                                          and t.tgtype & 28 = 28 and t.tgattr::text = '' and t.tgqual is null)
                       order by 1`).map(([t]) => t);
-    expect(sin).toEqual(SIN_AUDITORIA.sort());
+    expect(sin).toEqual([...SIN_AUDITORIA, "huellas"].sort());
   });
 
   test("cada rol queda como autor de lo que cambia (Logística, Tesorería, Gerencia)", () => {
@@ -110,7 +113,8 @@ test.describe("@auditoria", () => {
 
       // Auditoría › Cambios: lo ve, con quién y qué.
       const aud = await abrir("admin", "/admin/auditoria?vista=cambios");
-      const fila = aud.getByRole("list", { name: "Registro" }).locator("li").filter({ hasText: "Creó la cuenta" }).first();
+      // La de esta cuenta (en paralelo, otras pruebas también crean cuentas).
+      const fila = aud.getByRole("list", { name: "Registro" }).locator("li").filter({ hasText: "Creó la cuenta" }).filter({ hasText: email }).first();
       await expect(fila).toContainText("Administrador");
       await expect(fila).toContainText("Auditoría E2E");
       // Sesiones: los inicios de sesión.

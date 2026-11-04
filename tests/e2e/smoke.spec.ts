@@ -3,13 +3,19 @@ import { sesion, sql, type Rol } from "./lib";
 
 // Smoke de todas las pantallas de cada rol: carga sin redirigir, sin errores de consola ni 4xx/5xx,
 // sin textos de error, sin desborde horizontal ni <select> nativo. Una prueba por pantalla, en paralelo.
-// Las rutas de detalle se toman de la base (los datos de la demo).
+// Las rutas de detalle se toman de la base (los datos de la demo), DENTRO de cada prueba: los títulos llevan el
+// comodín (:oc, :os, :pago, :obra) y no cambian aunque otras pruebas creen o muevan órdenes en paralelo (con el id
+// en el título, cada worker armaba títulos distintos y Playwright abortaba: «Test not found in the worker»). Se
+// eligen datos que ninguna prueba crea ni borra: órdenes de la carga (sin autor) y obras que no son del flujo.
 const uno = (q: string) => sql(q)[0] ?? [];
-const [ocObra, ocNum] = uno("select obra_id, numero from ordenes_compra where tipo='OC' and estado='RECIBIDA' order by obra_id desc, numero limit 1");
-// Prod 1: las OS de mano de obra se crean directo (sin valorización); se toma una OS cualquiera.
-const [osObra, osNum] = uno("select obra_id, numero from ordenes_compra where tipo='OS' and estado <> 'ANULADA' order by obra_id desc, numero limit 1");
-const [penObra, penNum] = uno("select obra_id, numero from v_por_pagar where estado='PENDIENTE' and doc in ('OC','OS') order by obra_id limit 1");
-const [obraGer] = uno("select id from obras order by id desc limit 1");
+const DETALLE: Record<string, () => string> = {
+  ":oc": () => uno("select obra_id || '/' || numero from ordenes_compra where tipo='OC' and estado='RECIBIDA' and created_by is null order by obra_id desc, numero limit 1")[0],
+  // Prod 1: las OS de mano de obra se crean directo (sin valorización); se toma una OS cualquiera de la carga.
+  ":os": () => uno("select obra_id || '/' || numero from ordenes_compra where tipo='OS' and estado <> 'ANULADA' and created_by is null order by obra_id desc, numero limit 1")[0],
+  ":pago": () => uno("select obra_id || '/' || numero from v_por_pagar where estado='PENDIENTE' and doc in ('OC','OS') order by obra_id, numero limit 1")[0],
+  ":obra": () => uno("select id from obras where nombre not like 'E2E %' and nombre not like 'AUDIT%' order by id desc limit 1")[0],
+};
+const resolver = (ruta: string) => ruta.replace(/:(oc|os|pago|obra)\b/g, (k) => DETALLE[k]());
 
 // Solo los roles de prod 1 tienen pantallas.
 const RUTAS: Partial<Record<Rol, string[]>> = {
@@ -21,9 +27,9 @@ const RUTAS: Partial<Record<Rol, string[]>> = {
     "/logistica/transportistas",
     "/logistica/ordenes/nueva",
     "/logistica/ordenes/nueva?tipo=OS",
-    `/logistica/ordenes/${ocObra}/${ocNum}`,
-    `/logistica/ordenes/${osObra}/${osNum}`,
-    `/consulta/orden/${ocObra}/${ocNum}`,
+    "/logistica/ordenes/:oc",
+    "/logistica/ordenes/:os",
+    "/consulta/orden/:oc",
     "/avisos",
   ],
   tesoreria: [
@@ -31,16 +37,16 @@ const RUTAS: Partial<Record<Rol, string[]>> = {
     "/tesoreria?empresa=todas&area=log",
     "/tesoreria?empresa=todas&area=log&est=pag",
     "/tesoreria?empresa=todas&area=log&est=rec",
-    `/tesoreria/pago/${penObra}/${penNum}`,
+    "/tesoreria/pago/:pago",
     "/tesoreria/consultas",
-    `/consulta/orden/${ocObra}/${ocNum}`,
+    "/consulta/orden/:oc",
   ],
   gerencia: [
     "/gerencia/obras",
-    `/gerencia/obras/${obraGer}`,
+    "/gerencia/obras/:obra",
     "/gerencia/presupuesto",
     "/gerencia/ordenes",
-    `/consulta/orden/${ocObra}/${ocNum}`,
+    "/consulta/orden/:oc",
   ],
   jefe: ["/operaciones"],
 };
@@ -89,7 +95,7 @@ for (const [rol, rutas] of Object.entries(RUTAS) as [Rol, string[]][]) {
   test.describe(`@smoke @${rol}`, () => {
     for (const ruta of rutas) {
       test(`${rol} ${ruta}`, async ({ abrir, revisarPantalla }) => {
-        const page = await abrir(rol, ruta);
+        const page = await abrir(rol, resolver(ruta));
         await revisarPantalla(page);
       });
     }

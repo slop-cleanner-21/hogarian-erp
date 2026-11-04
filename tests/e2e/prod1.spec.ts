@@ -1,6 +1,6 @@
 import path from "node:path";
 import { expect, test } from "./fixtures";
-import { sql, sql1, sqlScript } from "./lib";
+import { sql, sql1, sqlScript, uidDe } from "./lib";
 
 // Flujos propios de prod 1 (sin Contabilidad ni valorizaciones): la guía la registra Logística y las OS
 // de mano de obra se crean directo. Lo que se escribe se revierte al final de cada prueba.
@@ -85,7 +85,7 @@ test.describe("@prod1 @logistica OS de mano de obra", () => {
     await expect(page.locator("main").getByText(descripcion, { exact: true }).first()).toBeVisible();
 
     // La base acepta la OS de mano de obra (como Logística, en una transacción que se deshace).
-    const uid = sql1("select user_id from perfiles where rol = 'LOGISTICA' limit 1");
+    const uid = uidDe("LOGISTICA");
     const proveedor = sql1("select id from proveedores order by id limit 1");
     const r = sqlScript(`begin;
       select set_config('request.jwt.claims', '{"sub":"${uid}","role":"authenticated"}', true);
