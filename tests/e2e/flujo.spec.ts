@@ -1,3 +1,4 @@
+import crypto from "node:crypto";
 import path from "node:path";
 import type { Browser, BrowserContext, Page } from "@playwright/test";
 import { expect, test } from "./fixtures";
@@ -302,9 +303,20 @@ test.describe("@flujo flujo completo de una OC por las pantallas", () => {
       expect(sql1(`select monto from pagos where numero_operacion = 'OP${sufijo}'`)).toBe(`${PU_PROVEEDOR * CANTIDAD}.00`);
     });
 
-    await test.step("El proveedor ve su orden pagada", async () => {
+    await test.step("El proveedor ve su orden pagada, con el pago y su voucher (solo para ver)", async () => {
       const { ctx, page } = await proveedor(browser, info, link);
       await expect(page.locator("header")).toContainText("Pagada");
+      const pagos = page.getByRole("region", { name: "Pagos" });
+      await expect(pagos).toContainText(`Op. OP${sufijo}`);
+      await expect(pagos).toContainText(sol(PU_PROVEEDOR * CANTIDAD));
+      const voucher = await page.request.get(await pagos.getByRole("link", { name: /^Ver voucher/ }).getAttribute("href").then((h) => h!));
+      expect(voucher.status()).toBe(200);
+      expect(voucher.headers()["content-type"]).toMatch(/^image\//);
+      await expect(page.getByText(/^Disponible hasta el \d{2}\/\d{2}\/\d{2,4}$/)).toBeVisible();
+      // Nada se sube desde el link, ni se ve lo interno (presupuesto, rechazos).
+      await expect(page.locator('input[type="file"]')).toHaveCount(0);
+      await expect(page.locator("main")).not.toContainText("Falta la cuenta bancaria");
+      await expect(page.getByText(sol(PU_PRESUPUESTO))).toHaveCount(0);
       await ctx.close();
     });
 
@@ -332,6 +344,18 @@ test.describe("@flujo flujo completo de una OC por las pantallas", () => {
       const fila = jefe.locator("main li").filter({ hasText: MATERIAL });
       await expect(fila).toContainText("Pagado sin entregar");
       await expect(fila).toContainText(String(CANTIDAD));
+    });
+
+    await test.step("El link vence 15 días después del pago", async () => {
+      const { ctx, page } = await proveedor(browser, info, link);
+      const href = await page.getByRole("region", { name: "Pagos" }).getByRole("link", { name: /^Ver voucher/ }).getAttribute("href");
+      // Se simula el paso del tiempo: el pago, de hace 16 días.
+      sql(`update pagos set created_at = now() - interval '16 days' where numero_operacion = 'OP${sufijo}'`);
+      await page.reload();
+      await expect(page.getByText("Este link ya no está disponible")).toBeVisible();
+      expect((await page.request.get(href!)).status()).toBe(404);
+      sql(`update pagos set created_at = now() where numero_operacion = 'OP${sufijo}'`);
+      await ctx.close();
     });
 
     await test.step("Todo quedó en la auditoría con su autor", async () => {
@@ -430,6 +454,18 @@ test.describe("@flujo flujo completo de una OC por las pantallas", () => {
       await expect.poll(() => estado(obraId, os)).toBe("PRECIOS_CONFIRMADOS");
     });
 
+    await test.step("El proveedor descarga desde su link el contrato para firmar (y no puede subirlo ahí)", async () => {
+      const { ctx, page } = await proveedor(browser, info, link);
+      const enlace = page.getByRole("region", { name: "Contrato" }).getByRole("link", { name: "Contrato para firmar" });
+      await expect(enlace).toBeVisible();
+      const pdf = await page.request.get((await enlace.getAttribute("href"))!);
+      expect(pdf.status()).toBe(200);
+      expect(pdf.headers()["content-type"]).toBe("application/pdf");
+      expect((await pdf.body()).subarray(0, 5).toString()).toBe("%PDF-");
+      await expect(page.locator('input[type="file"]')).toHaveCount(0);
+      await ctx.close();
+    });
+
     await test.step("Logística descarga el contrato, registra el recibo y sube el firmado: va sola a Tesorería", async () => {
       const page = await abrir("logistica", `/logistica/ordenes/${obraId}/${os}?tipo=OS`);
       const contrato = page.getByRole("region", { name: "Contrato" });
@@ -466,13 +502,25 @@ test.describe("@flujo flujo completo de una OC por las pantallas", () => {
       await page.getByRole("dialog", { name: "¿Aprobar pago?" }).getByRole("button", { name: "Sí" }).click();
       await expect.poll(() => estado(obraId, os), { timeout: 15_000 }).toBe("PAGADA");
       expect(sql1(`select monto from pagos where numero_operacion = 'OS${sufijo}'`)).toBe((PU_SERVICIO - RETENCION).toFixed(2));
-      expect(sql1(`select retencion from comprobantes where serie = 'E001' and numero = '${sufijo}'`)).toBe(RETENCION.toFixed(2));
+      expect(
+        sql1(`select c.retencion from comprobantes c where c.id = (select comprobante_id from oc_items where obra_id = ${obraId} and numero_oc = '${os}' limit 1)`),
+      ).toBe(RETENCION.toFixed(2));
     });
 
-    await test.step("El proveedor ve su orden de servicio pagada en el mismo link", async () => {
+    await test.step("El proveedor ve su orden de servicio pagada: la retención, el voucher y el contrato firmado", async () => {
       const { ctx, page } = await proveedor(browser, info, link);
       await expect(page.locator("header")).toContainText("Orden de servicio");
       await expect(page.locator("header")).toContainText("Pagada");
+      await expect(page.locator("main")).toContainText(`Retención 4ta− ${sol(RETENCION)}`);
+      await expect(page.getByRole("region", { name: "Pagos" })).toContainText(sol(PU_SERVICIO - RETENCION));
+      const firmado = page.getByRole("region", { name: "Contrato" }).getByRole("link", { name: "Contrato firmado" });
+      const r = await page.request.get((await firmado.getAttribute("href"))!);
+      expect(r.status()).toBe(200);
+      // Otro token u otro voucher: nada.
+      expect((await page.request.get(`/cotizar/${crypto.randomUUID()}/archivo?tipo=contrato`)).status()).toBe(404);
+      expect((await page.request.get(`${link}/archivo?tipo=voucher&id=1`)).status()).toBe(404);
+      await expect(page.locator('input[type="file"]')).toHaveCount(0);
+      if (process.env.CAPTURA_PROVEEDOR) await page.screenshot({ path: process.env.CAPTURA_PROVEEDOR, fullPage: true });
       await ctx.close();
     });
   });

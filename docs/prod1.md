@@ -56,9 +56,17 @@ Contabilidad, Residente, Ingeniero de Operaciones y RRHH **no entran**. Sus role
   - Arriba del contrato va el **logo de la empresa** (PNG para PDF en `public/empresas/pdf/`: react-pdf no lee
     WebP ni SVG; `logoPdfEmpresa`).
 - **Link del proveedor:** mientras la orden está «Cotizando» cotiza en él; desde que se confirman los precios, el
-  mismo link le muestra su orden (precios confirmados, total y estado: Confirmada, En pago, Pagada, constancia
-  enviada), sin poder cambiarla. Vale hasta que la orden se anula (antes vencía al confirmar los precios);
-  rechazar por precios lo renueva.
+  mismo link le muestra su orden, solo para ver (nada se sube desde ahí, tampoco el contrato firmado):
+  - precios confirmados, total y estado (Confirmada, En pago, Pagada, constancia enviada);
+  - la retención de 4ta y la detracción de su comprobante;
+  - sus pagos (fecha, banco, N° de operación, monto) con el voucher;
+  - en una OS, el contrato: el firmado si Logística ya lo subió; si no, el contrato para firmar (generado en el
+    servidor, con el logo y la firma de Gerencia).
+
+  No ve el presupuesto, la revisión interna (sobreprecio, rechazos y sus motivos), cuentas, la factura ni la guía.
+  Los archivos los entrega `/cotizar/<token>/archivo`, que valida el token en la base (`archivo_link`, solo con la
+  clave secreta) sin mostrar el almacenamiento. El link **vence 15 días después del pago** (`link_vigente`) o al
+  anularse la orden; rechazar por precios lo renueva.
 - **Retención de 4ta categoría** (LIR art. 71): solo en recibos por honorarios de **más de S/ 1,500**, por el %
   del proveedor (8 % por defecto; Logística lo cambia en su ficha). Tesorería paga el neto y la retención
   queda registrada. No se retiene si el proveedor tiene **suspensión de 4ta** vigente: Logística la marca en

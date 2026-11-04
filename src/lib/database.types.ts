@@ -3807,6 +3807,10 @@ export type Database = {
         Args: { p_id: number; p_motivo: string };
         Returns: undefined;
       };
+      archivo_link: {
+        Args: { p_id: number; p_tipo: string; p_token: string };
+        Returns: Json;
+      };
       asignar_cuenta_item: {
         Args: { p_cuenta: string; p_item_id: number };
         Returns: undefined;
@@ -3998,6 +4002,49 @@ export type Database = {
       guardar_retenciones: {
         Args: { p_obra_id: number; p_retenciones: Json };
         Returns: number;
+      };
+      link_pagada_at: {
+        Args: { p_numero: string; p_obra: number };
+        Returns: string;
+      };
+      link_vigente: {
+        Args: { p_token: string };
+        Returns: {
+          comprobante_tipo:
+            | Database["public"]["Enums"]["tipo_comprobante"]
+            | null;
+          contrato_enviado_at: string | null;
+          cotizacion_enviada_at: string | null;
+          cotizacion_estado: Database["public"]["Enums"]["cotizacion_estado"];
+          cotizacion_recibida_at: string | null;
+          created_at: string;
+          created_by: string | null;
+          entrega_cerrada_at: string | null;
+          entrega_cerrada_by: string | null;
+          entrega_cerrada_motivo: string | null;
+          es_retencion: boolean;
+          estado: Database["public"]["Enums"]["estado_oc"];
+          fecha: string;
+          fecha_inicio: string | null;
+          glosa_rhe: string | null;
+          historico: boolean;
+          motivo_anulacion: string | null;
+          numero: string;
+          obra_id: number;
+          proveedor_id: number;
+          requiere_guia: boolean;
+          tipo: Database["public"]["Enums"]["tipo_orden"];
+          token_cotizacion: string | null;
+          updated_at: string;
+          updated_by: string | null;
+          valorizacion_id: number | null;
+        };
+        SetofOptions: {
+          from: "*";
+          to: "ordenes_compra";
+          isOneToOne: true;
+          isSetofReturn: false;
+        };
       };
       marcar_cotizacion_enviada: {
         Args: { p_numero: string; p_obra_id: number };

@@ -5,6 +5,7 @@ import { ActionBar } from "@/components/action-bar";
 import { TemaProveedor } from "@/components/tema-proveedor";
 import { Button } from "@/components/ui/button";
 import { NumberInput } from "@/components/ui/field";
+import { FileText, Receipt } from "lucide-react";
 import { fecha, qty, soles, solesPu } from "@/lib/format";
 import { guardar, leer } from "@/lib/recordar";
 import { enviarCotizacion } from "./actions";
@@ -20,6 +21,13 @@ export type CotizacionData = {
   /** «cotizar» mientras está cotizando; «orden» con los precios ya confirmados (la ve en el mismo link). */
   modo?: "cotizar" | "orden";
   estado?: "CONFIRMADA" | "EN_PAGO" | "PAGADA" | "ENVIADA" | null;
+  /** Pagada: el link vale hasta esta fecha (15 días después del pago). */
+  vence?: string | null;
+  retencion?: number | null;
+  detraccion?: number | null;
+  pagos?: { id: number; fecha: string; monto: number; banco: string | null; operacion: string | null; vouchers: number[] }[] | null;
+  /** OS: su contrato (el firmado, si Logística ya lo subió). */
+  contrato?: { firmado: boolean } | null;
   items: { id: number; descripcion: string; unidad: string; cantidad: number; pu_cotizado: number | null }[];
 };
 
@@ -137,6 +145,7 @@ function Formulario({ token, data, conBorrador }: { token: string; data: Cotizac
           <span className="font-semibold">Total</span>
           <span className="rotulo text-[28px] font-semibold">{soles(total)}</span>
         </div>
+        {orden && <Orden token={token} data={data} />}
         {error && <p role="alert" className="text-danger">{error}</p>}
         {enviada && !orden && <p role="status" className="font-medium text-ok">Cotización enviada</p>}
       </main>
@@ -147,6 +156,69 @@ function Formulario({ token, data, conBorrador }: { token: string; data: Cotizac
           </Button>
         </ActionBar>
       )}
+    </>
+  );
+}
+
+const ENLACE = "flex min-h-12 items-center gap-2 rounded-field px-1 font-semibold text-primary active:bg-ink/8";
+
+/**
+ * Lo que el proveedor ve de su orden ya confirmada: lo que se le descontó, sus pagos con el voucher y (OS) el
+ * contrato. Solo para ver: nada se sube desde aquí.
+ */
+function Orden({ token, data }: { token: string; data: CotizacionData }) {
+  const archivo = (q: string) => `/cotizar/${token}/archivo?${q}`;
+  const pagos = data.pagos ?? [];
+  return (
+    <>
+      {(Number(data.retencion) > 0 || Number(data.detraccion) > 0) && (
+        <dl className="num grid grid-cols-[1fr_auto] gap-x-4 gap-y-1 rounded-panel bg-surface p-4 text-[15px]">
+          {Number(data.retencion) > 0 && (
+            <>
+              <dt className="text-ink-2">Retención 4ta</dt>
+              <dd className="text-right">− {soles(Number(data.retencion))}</dd>
+            </>
+          )}
+          {Number(data.detraccion) > 0 && (
+            <>
+              <dt className="text-ink-2">Detracción</dt>
+              <dd className="text-right">− {soles(Number(data.detraccion))}</dd>
+            </>
+          )}
+        </dl>
+      )}
+      {pagos.length > 0 && (
+        <section aria-label="Pagos" className="rounded-panel bg-surface p-4">
+          <h2 className="rotulo pb-1 text-[19px] font-semibold">Pagos</h2>
+          <ul className="flex flex-col divide-y divide-line">
+            {pagos.map((p) => (
+              <li key={p.id} className="py-2">
+                <div className="num flex flex-wrap items-baseline justify-between gap-x-3">
+                  <span className="text-ink-2">
+                    {fecha(p.fecha)}
+                    {p.banco && ` · ${p.banco}`}
+                    {p.operacion && ` · Op. ${p.operacion}`}
+                  </span>
+                  <span className="font-semibold">{soles(Number(p.monto))}</span>
+                </div>
+                {p.vouchers.map((v, i) => (
+                  <a key={v} href={archivo(`tipo=voucher&id=${v}`)} target="_blank" rel="noopener noreferrer" className={ENLACE}>
+                    <Receipt size={19} /> Ver voucher{p.vouchers.length > 1 ? ` ${i + 1}` : ""}
+                  </a>
+                ))}
+              </li>
+            ))}
+          </ul>
+        </section>
+      )}
+      {data.contrato && (
+        <section aria-label="Contrato" className="rounded-panel bg-surface p-4">
+          <a href={archivo("tipo=contrato")} target="_blank" rel="noopener noreferrer" className={ENLACE}>
+            <FileText size={19} /> {data.contrato.firmado ? "Contrato firmado" : "Contrato para firmar"}
+          </a>
+        </section>
+      )}
+      {data.vence && <p className="num px-1 text-[14px] text-ink-3">Disponible hasta el {fecha(data.vence)}</p>}
     </>
   );
 }

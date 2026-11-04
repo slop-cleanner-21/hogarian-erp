@@ -33,7 +33,7 @@ function comoRol(rol: string, consulta: string) {
     set local role authenticated;
     ${consulta};
     reset role;
-    select 'A', tabla, accion, coalesce(user_id::text, '-') from audit_log where id > (select m from antes) order by id;
+    select 'A', tabla, accion, coalesce(user_id::text, '-') from audit_log where id > (select m from antes) and tabla <> 'sesion' order by id;
     rollback;`);
   return { uid, filas: filas.filter((f) => f[0] === "A").map((f) => f.slice(1)) };
 }
