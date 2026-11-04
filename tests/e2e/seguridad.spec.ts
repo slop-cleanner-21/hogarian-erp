@@ -65,7 +65,7 @@ test.describe("@seguridad", () => {
 
   test("el proveedor no puede cotizar en 0", async () => {
     const [t, item] = sql(`select o.token_cotizacion, i.id from ordenes_compra o join oc_items i on i.obra_id = o.obra_id and i.numero_oc = o.numero
-                           where o.token_cotizacion is not null and o.cotizacion_estado = 'ENVIADA' order by o.obra_id, o.numero limit 1`)[0] ?? [];
+                           where o.token_cotizacion is not null and o.estado = 'EMITIDA' and o.cotizacion_estado = 'ENVIADA' order by o.obra_id, o.numero limit 1`)[0] ?? [];
     test.skip(!t, "sin links de cotización abiertos");
     const r = await rest(null, "rpc/enviar_cotizacion", { method: "POST", body: JSON.stringify({ p_token: t, p_precios: [{ item_id: Number(item), pu: 0 }] }) });
     expect(r.status).toBeGreaterThanOrEqual(400);
@@ -73,7 +73,7 @@ test.describe("@seguridad", () => {
   });
 
   test("tokens falsos no bloquean los links reales (en una transacción)", () => {
-    const t = sql1(`select token_cotizacion from ordenes_compra where token_cotizacion is not null and cotizacion_estado = 'ENVIADA' limit 1`);
+    const t = sql1(`select token_cotizacion from ordenes_compra where token_cotizacion is not null and estado = 'EMITIDA' and cotizacion_estado = 'ENVIADA' limit 1`);
     test.skip(!t, "sin links de cotización abiertos");
     const r = sqlScript(`begin;
       insert into cotizacion_accesos (token, accion, ok) select gen_random_uuid(), 'VER', false from generate_series(1, 80);

@@ -20,13 +20,15 @@ const s = StyleSheet.create({
   cD: { flex: 1, paddingRight: 6 },
   cU: { width: 36 },
   cQ: { width: 50, textAlign: "right" },
-  cP: { width: 60, textAlign: "right" },
+  cP: { width: 66, textAlign: "right" },
   cT: { width: 70, textAlign: "right" },
   glosa: { marginTop: 4, padding: 8, border: "1 solid #111" },
   firmas: { flexDirection: "row", justifyContent: "space-between", marginTop: 12 },
   firmaCol: { width: "42%" },
   firmaImg: { height: 44, justifyContent: "flex-end", alignItems: "center" },
   firma: { borderTop: "1 solid #111", paddingTop: 4, textAlign: "center" },
+  membrete: { flexDirection: "row", alignItems: "center", marginBottom: 14, paddingBottom: 8, borderBottom: "0.5 solid #ccc" },
+  logo: { height: 40, maxWidth: 160, objectFit: "contain" },
 });
 
 /** Quien firma por la empresa (el gerente): su firma va como imagen sobre la línea. */
@@ -38,7 +40,20 @@ export type DatosContrato = {
   representante: Representante | null;
   /** Razón social y domicilio de la empresa (Admin › Empresas); sin ellos, el nombre corto. */
   empresa?: { razonSocial: string | null; direccion: string | null };
+  /** Logo de la empresa (URL de un PNG), arriba del contrato. */
+  logo?: string | null;
 };
+
+/** Arriba del contrato: el logo de la empresa (sin logo, nada). */
+function Membrete({ logo }: { logo?: string | null }) {
+  if (!logo) return null;
+  return (
+    <View style={s.membrete}>
+      {/* eslint-disable-next-line jsx-a11y/alt-text -- Image de react-pdf, no un <img> */}
+      <Image src={logo} style={s.logo} />
+    </View>
+  );
+}
 
 /** «HOGARIAN S.A.C., con RUC …, con domicilio en …» (lo que haya cargado el Admin). */
 const nombreEmpresa = (orden: VOrden, datos?: DatosContrato) => datos?.empresa?.razonSocial || orden.empresa;
@@ -102,8 +117,8 @@ export function ContratoDoc({ orden, items, datos }: { orden: VOrden; items: VOc
               <Text style={s.cD}>{it.descripcion}</Text>
               <Text style={s.cU}>{it.unidad}</Text>
               <Text style={s.cQ}>{qty(it.cantidad)}</Text>
-              <Text style={s.cP}>{precio(it.pu_efectivo ?? it.pu_partida)}</Text>
-              <Text style={s.cT}>{money(parcial(it))}</Text>
+              <Text style={s.cP}>S/ {precio(it.pu_efectivo ?? it.pu_partida)}</Text>
+              <Text style={s.cT}>S/ {money(parcial(it))}</Text>
             </View>
           ))}
           <View style={s.total}>
@@ -214,6 +229,7 @@ export function ContratoDoc({ orden, items, datos }: { orden: VOrden; items: VOc
   return (
     <Document title={`Contrato OS ${orden.numero}`}>
       <Page size="A4" style={s.page}>
+        <Membrete logo={datos?.logo} />
         <Text style={s.h1}>CONTRATO DE LOCACIÓN DE SERVICIOS</Text>
         <Text style={{ textAlign: "center", marginTop: 2 }}>OS N° {orden.numero}</Text>
 
@@ -335,8 +351,8 @@ function ContratoComercial({ orden, items, datos, total }: { orden: VOrden; item
               <Text style={s.cD}>{it.descripcion}</Text>
               <Text style={s.cU}>{it.unidad}</Text>
               <Text style={s.cQ}>{qty(it.cantidad)}</Text>
-              <Text style={s.cP}>{precio(it.pu_efectivo ?? it.pu_partida)}</Text>
-              <Text style={s.cT}>{money(parcial(it))}</Text>
+              <Text style={s.cP}>S/ {precio(it.pu_efectivo ?? it.pu_partida)}</Text>
+              <Text style={s.cT}>S/ {money(parcial(it))}</Text>
             </View>
           ))}
           <View style={s.total}>
@@ -429,6 +445,7 @@ function ContratoComercial({ orden, items, datos, total }: { orden: VOrden; item
   return (
     <Document title={`Contrato OS ${orden.numero}`}>
       <Page size="A4" style={s.page}>
+        <Membrete logo={datos?.logo} />
         <Text style={s.h1}>CONTRATO DE PRESTACIÓN DE SERVICIOS</Text>
         <Text style={{ textAlign: "center", marginTop: 2 }}>OS N° {orden.numero}</Text>
 

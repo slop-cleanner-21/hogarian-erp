@@ -428,8 +428,10 @@ test.describe("@prod1 @gerencia lista de obras", () => {
     const page = await abrir("gerencia", "/gerencia/obras?tab=pub");
     const fmt = new Intl.NumberFormat("es-PE", { minimumFractionDigits: 2, maximumFractionDigits: 2 });
     const obras = sql(`select o.id, o.nombre, count(p.id), coalesce(sum(p.cantidad * coalesce(p.pu, 0)), 0) from obras o
-                       left join partidas p on p.obra_id = o.id where o.presupuesto_estado = 'PUBLICADO' group by 1, 2 order by 2`);
-    await expect(page.locator("main li a[href^='/gerencia/obras/']")).toHaveCount(obras.length);
+                       left join partidas p on p.obra_id = o.id where o.presupuesto_estado = 'PUBLICADO'
+                         and o.nombre not like 'E2E FLUJO %' group by 1, 2 order by 2`);
+    // Sin la obra que crea flujo.spec en paralelo.
+    await expect(page.locator("main li a[href^='/gerencia/obras/']").filter({ hasNotText: "E2E FLUJO" })).toHaveCount(obras.length);
     for (const [id, nombre, n, monto] of obras.slice(0, 6)) {
       const tarjeta = page.locator(`main a[href='/gerencia/obras/${id}']`);
       await expect(tarjeta, nombre).toContainText(nombre);

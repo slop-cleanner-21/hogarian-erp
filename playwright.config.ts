@@ -33,13 +33,13 @@ export default defineConfig({
     {
       name: "m390",
       dependencies: ["sesiones"],
-      testIgnore: /sesiones\.setup\.ts/,
+      testIgnore: [/sesiones\.setup\.ts/, /flujo\.spec\.ts/],
       use: { ...movil, browserName: "chromium", viewport: { width: 390, height: 844 }, colorScheme: "light" },
     },
     {
       name: "m360",
       dependencies: ["sesiones"],
-      testIgnore: /sesiones\.setup\.ts/,
+      testIgnore: [/sesiones\.setup\.ts/, /flujo\.spec\.ts/],
       use: {
         ...movil,
         browserName: "chromium",
@@ -47,6 +47,14 @@ export default defineConfig({
         screen: { width: 360, height: 780 },
         colorScheme: "dark",
       },
+    },
+    // El flujo completo crea una obra publicada, un proveedor y órdenes: corre solo, después de los demás (las
+    // pruebas que comparan listas con SQL verían la obra a medio crear).
+    {
+      name: "flujo",
+      dependencies: ["m390", "m360"],
+      testMatch: /flujo\.spec\.ts/,
+      use: { ...movil, browserName: "chromium", viewport: { width: 390, height: 844 }, colorScheme: "light" },
     },
   ],
 });

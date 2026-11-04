@@ -52,7 +52,13 @@ Contabilidad, Residente, Ingeniero de Operaciones y RRHH **no entran**. Sus role
   - El contrato lleva la **firma de Gerencia** (imagen que sube el gerente en «Mi firma», su menú), con su
     nombre y DNI (lo pone el Admin al crear su usuario; obligatorio en Gerencia). Firma y DNI están en
     `perfil_privado` y en `documentos/firmas/`: solo los lee el servidor. Si hay varios gerentes, firma el de
-    la firma más reciente.
+    la firma más reciente. La firma se pide al armar el PDF (`firmaContrato`), no viaja con la orden.
+  - Arriba del contrato va el **logo de la empresa** (PNG para PDF en `public/empresas/pdf/`: react-pdf no lee
+    WebP ni SVG; `logoPdfEmpresa`).
+- **Link del proveedor:** mientras la orden está «Cotizando» cotiza en él; desde que se confirman los precios, el
+  mismo link le muestra su orden (precios confirmados, total y estado: Confirmada, En pago, Pagada, constancia
+  enviada), sin poder cambiarla. Vale hasta que la orden se anula (antes vencía al confirmar los precios);
+  rechazar por precios lo renueva.
 - **Retención de 4ta categoría** (LIR art. 71): solo en recibos por honorarios de **más de S/ 1,500**, por el %
   del proveedor (8 % por defecto; Logística lo cambia en su ficha). Tesorería paga el neto y la retención
   queda registrada. No se retiene si el proveedor tiene **suspensión de 4ta** vigente: Logística la marca en
@@ -265,6 +271,8 @@ Los dos pueden correr a la vez.
 - **Reinicio de datos:** `npx supabase db reset` (carga también `usuarios_locales.sql`, solo local), y luego `db:demo-entregas`, `db:simular`, `db:demo-archivos`,
   `db:demo-fotos`, `db:demo-requerimientos` y `ERP_PASS=erp12345 npm run db:demo-tesoreria`.
 - **Pruebas:** `ERP_DEMO=… ERP_PASS=erp12345 npx playwright test` contra `:3100`. La base de las pruebas es
-  `supabase_db_erp-prod1`.
+  `supabase_db_erp-prod1`. `tests/e2e/flujo.spec.ts` recorre el flujo entero solo por las pantallas (sin seeds;
+  SQL solo para comprobar y limpiar): obra, presupuesto, proveedor, OC con guía y OS con recibo por honorarios,
+  link del proveedor, factura, rechazo y reenvío, pago, constancia, consulta, seguimiento y auditoría.
 - **Build:** `npm run build`. Luego hay que matar el `next start` de prod 1 (el del puerto 3100, no el del
   MVP) y comprobar que un chunk CSS o JS responda 200.
