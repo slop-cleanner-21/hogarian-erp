@@ -4064,6 +4064,20 @@ export type Database = {
         Returns: number;
       };
       hash_relleno: { Args: Record<PropertyKey, never>; Returns: string };
+      hook_sin_correo: { Args: { event: Json }; Returns: Json };
+      ingreso_intentar: {
+        Args: {
+          p_clave: string;
+          p_conocido: string;
+          p_detalle?: Json;
+          p_email: string;
+          p_ip: string;
+        };
+        Returns: {
+          espera: number;
+          user_id: string;
+        }[];
+      };
       ingreso_valido: {
         Args: { p_clave: string; p_email: string };
         Returns: string;

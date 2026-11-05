@@ -7,7 +7,8 @@ import { ROLES, sesionApi, sql, sql1, sqlScript } from "./lib";
 // Ingreso con contraseña (migración prod1_credenciales, src/app/login/actions.ts):
 // - la contraseña la verifica el servidor (`credenciales`); en Supabase Auth hay una al azar: probarlas directo contra
 //   su API no sirve, ni cambiarla ahí con un token;
-// - 3 intentos fallidos por cuenta y 10 por IP en 10 minutos; pasado el tope, espera.
+// - intentos fallidos en 10 minutos: 3 por IP y cuenta, 10 por IP, y 20 por cuenta desde dispositivos no conocidos
+//   (los dispositivos donde la cuenta ya entró no se frenan por los fallos de otros: nadie deja afuera al dueño).
 // La IP se simula con X-Forwarded-For, solo en los pedidos a la app (en local la cabecera se respeta; en Vercel la
 // pone Vercel con la IP real).
 
@@ -52,6 +53,11 @@ async function intentar(page: Page, email: string, clave: string) {
     page.waitForResponse((r) => r.request().method() === "POST" && new URL(r.url()).pathname === "/login"),
     page.getByRole("button", { name: /^Ingresar/ }).click(),
   ]);
+  // Tras la respuesta, React vacía el formulario: con la máquina cargada, eso llega después y borraba lo que el
+  // siguiente intento ya había escrito (y el formulario no se enviaba). Se espera a que lo vacíe (o a que entre).
+  await page
+    .waitForFunction(() => !location.pathname.startsWith("/login") || (document.querySelector('input[name="password"]') as HTMLInputElement | null)?.value === "")
+    .catch(() => {});
 }
 const mensaje = (page: Page) => page.locator('p[role="alert"]');
 
@@ -80,7 +86,7 @@ test.describe("@seguridad @ingreso intentos y contraseñas", () => {
     test.skip(info.project.name !== "m390", "escribe en la base");
   });
 
-  test("3 intentos fallidos por cuenta: espera, ni con la contraseña correcta; las demás cuentas entran", async ({ browser }, info) => {
+  test("3 intentos fallidos desde una IP: esa IP espera con esa cuenta; otras cuentas y otras IP entran", async ({ browser }, info) => {
     const c = await cuentaTemporal();
     const ip = ipDePrueba();
     try {
@@ -102,6 +108,12 @@ test.describe("@seguridad @ingreso intentos y contraseñas", () => {
       await otra.page.waitForURL((u) => !u.pathname.startsWith("/login"));
       await otra.ctx.close();
 
+      // Desde otra IP, la misma cuenta entra: los fallos de un tercero no dejan afuera al dueño.
+      const dueno = await desdeIp(browser, info, ipDePrueba());
+      await intentar(dueno.page, c.email, CLAVE());
+      await dueno.page.waitForURL((u) => !u.pathname.startsWith("/login"));
+      await dueno.ctx.close();
+
       // Pasados los 10 minutos (se simula moviendo los intentos), la cuenta entra.
       sql(`update audit_log set created_at = created_at - interval '11 minutes' where tabla = 'sesion' and detalle->>'email' = '${c.email}'`);
       const luego = await desdeIp(browser, info, ip);
@@ -111,6 +123,101 @@ test.describe("@seguridad @ingreso intentos y contraseñas", () => {
     } finally {
       c.borrar();
       sql(`delete from audit_log where tabla = 'sesion' and detalle->>'ip' = '${ip}'`);
+    }
+  });
+
+  test("un ataque desde muchas IP frena a los dispositivos nuevos, pero no al que ya entró con la cuenta", async ({ browser }, info) => {
+    const c = await cuentaTemporal();
+    try {
+      // El dueño ya entró antes desde su celular (queda «conocido»).
+      const celular = await desdeIp(browser, info, ipDePrueba());
+      await intentar(celular.page, c.email, CLAVE());
+      await celular.page.waitForURL((u) => !u.pathname.startsWith("/login"));
+      const conocido = (await celular.ctx.cookies()).find((x) => x.name === "prod1_conocido");
+      expect(conocido?.httpOnly).toBe(true);
+      // 20 fallidos desde 20 IP distintas, en dispositivos no conocidos.
+      sql(`insert into audit_log (tabla, accion, detalle)
+           select 'sesion', 'LOGIN_FALLIDO', jsonb_build_object('email', '${c.email}', 'ip', '198.19.250.' || g, 'motivo', 'invalid_credentials')
+             from generate_series(1, 20) g`);
+      // Un dispositivo nuevo (otra IP): espera, aun con la contraseña correcta.
+      const nuevo = await desdeIp(browser, info, ipDePrueba());
+      await intentar(nuevo.page, c.email, CLAVE());
+      await expect(mensaje(nuevo.page)).toHaveText(/^Demasiados intentos/);
+      await nuevo.ctx.close();
+      // El celular del dueño (conocido) entra igual, también desde otra red.
+      await celular.ctx.clearCookies({ name: "sb-prod1-auth-token" });
+      const otraRed = await browser.newContext({ ...info.project.use, storageState: await celular.ctx.storageState() });
+      await celular.ctx.close();
+      await otraRed.route(
+        (u) => u.host === new URL(test.info().project.use.baseURL!).host,
+        (r) => r.continue({ headers: { ...r.request().headers(), "x-forwarded-for": ipDePrueba() } }),
+      );
+      const p = await otraRed.newPage();
+      await p.goto("/login");
+      await intentar(p, c.email, CLAVE());
+      await p.waitForURL((u) => !u.pathname.startsWith("/login"));
+      await otraRed.close();
+      // Una cookie de «conocido» inventada no sirve (va firmada por el servidor).
+      const falso = await browser.newContext({ ...info.project.use });
+      await falso.addCookies([{ name: "prod1_conocido", value: `conocido:x:${c.email}.firmafalsa`, url: info.project.use.baseURL! }]);
+      await falso.route(
+        (u) => u.host === new URL(test.info().project.use.baseURL!).host,
+        (r) => r.continue({ headers: { ...r.request().headers(), "x-forwarded-for": ipDePrueba() } }),
+      );
+      const pf = await falso.newPage();
+      await pf.goto("/acceso");
+      if (pf.url().includes("/acceso")) {
+        await pf.locator('input[name="clave"]').fill(process.env.ERP_DEMO!);
+        await pf.getByRole("button", { name: "Entrar" }).click();
+        await pf.waitForURL((u) => !u.pathname.startsWith("/acceso"));
+      }
+      await pf.goto("/login");
+      await intentar(pf, c.email, CLAVE());
+      await expect(mensaje(pf)).toHaveText(/^Demasiados intentos/);
+      await falso.close();
+    } finally {
+      c.borrar();
+      sql(`delete from audit_log where tabla = 'sesion' and detalle->>'email' = '${c.email}'`);
+    }
+  });
+
+  test("con pedidos simultáneos, el tope sigue siendo 3", async ({ browser }, info) => {
+    const c = await cuentaTemporal();
+    const ip = ipDePrueba();
+    try {
+      // 8 intentos a la vez desde la misma IP: solo 3 llegan a verificarse (y quedan como fallidos).
+      const intentos = await Promise.all(
+        Array.from({ length: 8 }, async () => {
+          const { ctx, page } = await desdeIp(browser, info, ip);
+          await page.locator('input[name="email"]').fill(c.email);
+          await page.locator('input[name="password"]').fill("no-es-esta-1");
+          return { ctx, page };
+        }),
+      );
+      await Promise.all(
+        intentos.map(({ page }) =>
+          Promise.all([
+            page.waitForResponse((r) => r.request().method() === "POST" && new URL(r.url()).pathname === "/login"),
+            page.getByRole("button", { name: /^Ingresar/ }).click(),
+          ]),
+        ),
+      );
+      for (const { ctx } of intentos) await ctx.close();
+      expect(sql1(`select count(*) from audit_log where tabla = 'sesion' and accion = 'LOGIN_FALLIDO' and detalle->>'email' = '${c.email}'`)).toBe("3");
+    } finally {
+      c.borrar();
+      sql(`delete from audit_log where tabla = 'sesion' and detalle->>'ip' = '${ip}'`);
+    }
+  });
+
+  test("Auth no manda códigos ni recuperación por correo", async () => {
+    for (const ruta of ["otp", "recover"]) {
+      const r = await fetch(`${SB}/auth/v1/${ruta}`, {
+        method: "POST",
+        headers: { apikey: ANON, "Content-Type": "application/json" },
+        body: JSON.stringify({ email: ROLES.tesoreria, create_user: false }),
+      });
+      expect(r.status, ruta).toBeGreaterThanOrEqual(400);
     }
   });
 
@@ -179,12 +286,13 @@ test.describe("@seguridad @ingreso intentos y contraseñas", () => {
       create function pg_temp.medir(p_email text) returns float language plpgsql as $f$
       declare t timestamptz := clock_timestamp();
       begin
-        perform public.ingreso_valido(p_email, 'no-es-esta-1');
+        perform public.ingreso_intentar(p_email, 'no-es-esta-1', null, null);
         return extract(epoch from clock_timestamp() - t) * 1000;
       end $f$;
       select least(pg_temp.medir('${c.email}'), pg_temp.medir('${c.email}'), pg_temp.medir('${c.email}')),
              least(pg_temp.medir('${nadie}'), pg_temp.medir('${nadie}'), pg_temp.medir('${nadie}'));`);
     c.borrar();
+    sql(`delete from audit_log where tabla = 'sesion' and detalle->>'email' = '${nadie}'`);
     const [existe, noExiste] = fila.map(Number);
     expect(existe).toBeGreaterThan(5);
     expect(Math.abs(existe - noExiste)).toBeLessThan(Math.max(existe, noExiste) * 0.5);

@@ -121,10 +121,10 @@ test.describe("@seguridad", () => {
     expect(r.headers.get("content-security-policy")).toMatch(/frame-ancestors 'none'/);
   });
 
-  test("login: tras 3 intentos fallidos la cuenta queda en espera", async ({ browser }, info) => {
+  test("login: tras 20 intentos fallidos (desde dispositivos no conocidos) la cuenta queda en espera", async ({ browser }, info) => {
     const email = `e2e-fuerza-${crypto.randomUUID().slice(0, 8)}@erp.local`;
     sql(`insert into audit_log (tabla, accion, detalle)
-         select 'sesion', 'LOGIN_FALLIDO', jsonb_build_object('email', '${email}', 'motivo', 'invalid_credentials') from generate_series(1, 3)`);
+         select 'sesion', 'LOGIN_FALLIDO', jsonb_build_object('email', '${email}', 'motivo', 'invalid_credentials') from generate_series(1, 20)`);
     const page = await alLogin(browser, info);
     await page.locator('input[name="email"]').fill(email);
     await page.locator('input[name="password"]').fill("cualquiera1");

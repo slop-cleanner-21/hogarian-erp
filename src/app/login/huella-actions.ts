@@ -6,6 +6,7 @@ import { dispositivo } from "@/lib/auditoria-reporte";
 import { origen, registrarEvento } from "@/lib/auditoria";
 import { activarBloqueoSesion, marcarDispositivo, olvidarDispositivo, quitarBloqueoSesion, soloMarcarDispositivo } from "@/lib/bloqueo-cookies";
 import { huellasDe, opcionesActivar, opcionesFirmar, verificarActivacion, verificarFirma, type Huella } from "@/lib/huella";
+import { marcarConocido } from "@/lib/dispositivo-conocido";
 import { abrirSesion } from "@/lib/sesion-servidor";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { createClient, requireSesionVigente } from "@/lib/supabase/server";
@@ -39,6 +40,7 @@ export async function entrarConHuella(respuesta: AuthenticationResponseJSON): Pr
     return { error: abierta.motivo === "desactivada" ? abierta.error : FALLO };
   }
   const email = abierta.email;
+  await marcarConocido(email);
   await registrarEvento({ tabla: "sesion", accion: "LOGIN", registro: userId, actor: userId, detalle: { email, metodo: "huella" } });
   // Este dispositivo tiene su huella y queda desbloqueado (la sesión nueva, con bloqueo en la base).
   await activarBloqueoSesion(supabase, true);

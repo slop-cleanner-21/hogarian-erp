@@ -27,7 +27,8 @@ paso, local sigue igual: accesos rápidos y contraseña de la demo. (El túnel s
    copia de `config.toml` con `site_url` y `additional_redirect_urls` del dominio de la app (el del repo apunta a
    local) y `max_frequency = "1m0s"`; revisar el diff antes (`yes n | npx supabase config push --workdir <copia>`).
    La copia lleva lo mismo que el repo en contraseñas (`password_requirements = "letters_digits"`,
-   `secure_password_change = true`) y `token_verifications = 300`: todo ingreso canjea un enlace mágico desde el
+   `secure_password_change = true`), `otp_length = 10`, `otp_expiry = 300`, el hook `[auth.hook.send_email]`
+   (`pg-functions://postgres/public/hook_sin_correo`: Auth no manda correos) y `token_verifications = 300`: todo ingreso canjea un enlace mágico desde el
    servidor (una sola IP para todos). Las contraseñas no están en Auth (`credenciales`): el primer Admin lo crea el
    script, que la guarda ahí.
    La clave secreta se copia del panel (Project Settings › API Keys): `supabase projects api-keys` la muestra

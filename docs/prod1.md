@@ -204,11 +204,19 @@ Contabilidad, Residente, Ingeniero de Operaciones y RRHH **no entran**. Sus role
     que vale). El servidor verifica la contraseña (`ingreso_valido`, que tarda lo mismo exista o no la cuenta) y abre
     la sesión con un enlace mágico de un solo uso, generado y canjeado ahí mismo, como la huella
     (`src/lib/sesion-servidor.ts`). Alta, restablecimiento y cambio: `fijar_contrasena` (cierra las demás sesiones).
-  - **Login: intentos** (`src/app/login/actions.ts`): 3 fallidos por cuenta (desde cualquier IP) o 10 por IP en
-    10 minutos y espera hasta que el más viejo cumpla los 10 minutos, aun con la contraseña correcta (la cuenta
-    regresiva en el botón). Por IP es más alto para no dejar afuera a toda una oficina por los errores de uno. Sin
-    CAPTCHA (se retiró: con las contraseñas fuera de Auth no hace falta). Contra el que deja una cuenta en espera a
-    propósito: la huella sigue entrando.
+  - **Login: intentos** (`ingreso_intentar`, migración `prod1_ingreso_atomico`; atómico: contar, verificar y registrar van
+    juntos, con un bloqueo por cuenta). Intentos fallidos en 10 minutos, y espera hasta que el más viejo los cumpla
+    (aun con la contraseña correcta; la cuenta regresiva en el botón):
+    - **3 por IP y cuenta**: los fallos de un tercero solo lo hacen esperar a él; el dueño entra desde otra IP;
+    - **10 por IP** (todas las cuentas): no deja afuera a toda una oficina por los errores de uno;
+    - **20 por cuenta desde dispositivos no conocidos** (un ataque repartido en muchas IP). No frena a los
+      **dispositivos conocidos**, donde la cuenta ya entró antes (cookie firmada `prod1_conocido`, httpOnly,
+      `src/lib/dispositivo-conocido.ts`): nadie deja afuera al dueño sabiendo su correo; esos solo cuentan sus propios
+      fallos (3). La huella tampoco pasa por estos topes.
+
+    Sin CAPTCHA (con las contraseñas fuera de Auth no hace falta). Auth no manda correos (hook `send_email` →
+    `hook_sin_correo`): ni códigos ni recuperación que se puedan pedir y adivinar; los enlaces de las sesiones los
+    genera y canjea el servidor (códigos de 10 caracteres, 5 minutos).
   - «Cerrar sesión» cierra solo la de ese dispositivo. Una sesión cerrada no da nada aunque su token siga vigente.
   - `/sb` (local) pide la contraseña de la demo y solo deja pasar la clave pública; sin esa contraseña no pasa ningún
     POST salvo las dos rutas públicas (`/cotizar/<token>/enviar`, `/acceso/entrar`).

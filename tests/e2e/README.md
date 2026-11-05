@@ -35,4 +35,4 @@ npx playwright show-report                                      # capturas y tra
 1. Correr la suite (o el área) después del build: es la revisión rápida.
 2. Para lo nuevo, agregar la prueba que lo verifica en la spec del área.
 3. El `ui-auditor` solo revisa a mano lo que una prueba no puede juzgar (diseño, si algo sobra o se entiende) y deja como prueba lo que encuentre.
-- `ingreso.spec.ts` simula IPs con X-Forwarded-For y usa cuentas propias: 3 intentos fallidos por cuenta en 10 minutos la dejan esperando (no fallar a propósito con las cuentas de prueba compartidas; si se hace, borrar esos LOGIN_FALLIDO).
+- `ingreso.spec.ts` simula IPs con X-Forwarded-For y usa cuentas propias (3 fallidos por IP y cuenta, 10 por IP y 20 por cuenta desde dispositivos nuevos, en 10 minutos). En local la IP no cuenta: no fallar a propósito 20 veces con las cuentas compartidas; si se hace, borrar esos LOGIN_FALLIDO.
