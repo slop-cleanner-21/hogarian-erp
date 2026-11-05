@@ -19,7 +19,7 @@ import { todas } from "@/lib/paginar";
 
 // Pendientes: lo que espera una acción de Logística (cotizar, facturar, enviar, constancia, entrega).
 // Una pestaña por estado. «Enviada» (EN_ENTREGA): ya se envió la constancia de pago al proveedor (prod 1 aún no
-// registra lo que llega). Las recibidas (Excel, MVP) se ven en «Todas».
+// registra lo que llega). «Recibida»: las del Excel (y del MVP) con su entrega registrada. «Anulada».
 const TABS = {
   cot: ["EMITIDA"],
   prec: ["PRECIOS_CONFIRMADOS"],
@@ -27,6 +27,8 @@ const TABS = {
   teso: ["EN_TESORERIA"],
   pag: ["PAGADA"],
   ent: ["EN_ENTREGA"],
+  rec: ["RECIBIDA"],
+  anu: ["ANULADA"],
   todas: null,
 } satisfies Record<string, EstadoOC[] | null>;
 const PESTANAS: Record<keyof typeof TABS, string> = {
@@ -37,6 +39,8 @@ const PESTANAS: Record<keyof typeof TABS, string> = {
   teso: "Tesorería",
   pag: "Pagada",
   ent: "Enviada",
+  rec: "Recibida",
+  anu: "Anulada",
   todas: "Todas",
 };
 
@@ -460,8 +464,8 @@ export default async function OrdenesPage({ searchParams }: PageProps<"/logistic
           param="tab"
           current={tab}
           quitar={["estado"]}
-          // Siete pestañas: en dos filas, con nombres cortos, para que se vean todas a 360 px.
-          porFila={4}
+          // Nueve pestañas: en dos filas, con nombres cortos, para que se vean todas a 360 px.
+          porFila={5}
           options={(Object.entries(TABS) as [keyof typeof TABS, EstadoOC[] | null][]).map(([value]) => ({
             value,
             label: value === "fact" && tipo === "OS" ? "Contrato" : PESTANAS[value],

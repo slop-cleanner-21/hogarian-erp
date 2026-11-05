@@ -82,9 +82,9 @@ Contabilidad, Residente, Ingeniero de Operaciones y RRHH **no entran**. Sus role
   constancia de pago al proveedor y ahí se queda; su detalle avisa «Los residentes aún no pueden marcar
   las entregas».
 - **Logística › OC / OS:** una pestaña por estado, con nombres cortos y en dos filas para que se vean
-  todas a 360 px (Cotizando, Facturar, Guía en OC o Contrato en OS, Tesorería / Pagada, Enviada, Todas). En
-  «Guía» / «Contrato» (facturadas) cada fila dice lo que falta: «Subir guía» o «Firmar contrato»; las recibidas
-  (Excel, MVP) se ven en «Todas».
+  todas a 360 px (Cotizando, Facturar, Guía en OC o Contrato en OS, Tesorería, Pagada / Enviada, Recibida (las del
+  Excel y el MVP), Anulada, Todas). En «Guía» / «Contrato» (facturadas) cada fila dice lo que falta: «Subir guía» o
+  «Firmar contrato».
 - **Pago completo:** Tesorería paga siempre la orden entera (todo su saldo): el monto viene fijo y
   `pagar_documento` rechaza un pago parcial. Una orden vieja con pago parcial se paga por lo que le falta.
   El total de la orden muestra la detracción y la retención (Logística y Tesorería), para que lo pagado
