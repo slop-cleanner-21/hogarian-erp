@@ -76,7 +76,7 @@ Ensayado en local el 04/11/2026 con este mismo orden (base vacía → Admin → 
 
 | | |
 |---|---|
-| App | https://hogarian-erp-phi.vercel.app (Vercel, equipo **HOGARIAN GROUP**, proyecto `hogarian-erp`, conectado a `main`) |
+| App | https://hogarian-erp.vercel.app (también https://hogarian-erp-phi.vercel.app; Vercel, equipo **HOGARIAN GROUP**, proyecto `hogarian-erp`, conectado a `main`) |
 | Supabase | proyecto `fwdhevzbludhehoyfnho` (organización **hogariangroup**, sa-east-1, Micro) |
 | Claves locales | `.env.produccion.local` (no se sube): contraseña de la base, URL, clave pública y secreta |
 
@@ -93,8 +93,8 @@ nuevo en este.
 - `vercel.json` fija el framework (`nextjs`) y la región (`gru1`); `package.json`, Node 24.
 
 El entorno de pruebas anterior (Vercel `josev-7139/hogarian-erp`, Supabase `yqhdknwllnartyswbkoa` en la organización
-personal, sus claves en `.env.pruebas-personal.local`) quedó sin uso: el de Vercel ya no despliega (desconectado del
-repo). Se pueden borrar.
+personal, sus claves en `.env.pruebas-personal.local`) quedó sin uso: el de Vercel se borró (así
+`hogarian-erp.vercel.app` pasó al proyecto del equipo); el de Supabase se puede borrar.
 
 ## 4. Antes de abrirlo a todos
 
