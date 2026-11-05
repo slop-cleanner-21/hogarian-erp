@@ -4078,10 +4078,6 @@ export type Database = {
           user_id: string;
         }[];
       };
-      ingreso_valido: {
-        Args: { p_clave: string; p_email: string };
-        Returns: string;
-      };
       link_pagada_at: {
         Args: { p_numero: string; p_obra: number };
         Returns: string;
