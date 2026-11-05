@@ -2,28 +2,42 @@ import { execFileSync } from "node:child_process";
 import path from "node:path";
 import type { Page } from "@playwright/test";
 
+// Con ERP_PROD (lo pone scripts/recorrido-prod.mjs) las pruebas corren contra producción: cuentas temporales e2e.*,
+// sesiones en otra carpeta y la base de la nube. Sin ella, todo como siempre (local).
+export const EN_PROD = !!process.env.ERP_PROD;
+const correo = (local: string, rol: string) => (EN_PROD ? `e2e.${rol}@hogarian.test` : `${local}@erp.local`);
+
 export const ROLES = {
-  logistica: "logistica@erp.local",
-  contabilidad: "contabilidad@erp.local",
-  tesoreria: "tesoreria@erp.local",
-  residente: "residente@erp.local",
-  gerencia: "gerencia@erp.local",
-  operaciones: "operaciones@erp.local",
-  jefe: "jefeoperaciones@erp.local",
-  admin: "admin@erp.local",
-  rrhh: "rrhh@erp.local",
+  logistica: correo("logistica", "logistica"),
+  contabilidad: correo("contabilidad", "contabilidad"),
+  tesoreria: correo("tesoreria", "tesoreria"),
+  residente: correo("residente", "residente"),
+  gerencia: correo("gerencia", "gerencia"),
+  operaciones: correo("operaciones", "operaciones"),
+  jefe: correo("jefeoperaciones", "jefe"),
+  admin: correo("admin", "admin"),
+  rrhh: correo("rrhh", "rrhh"),
 } as const;
 export type Rol = keyof typeof ROLES;
 
-export const sesion = (rol: Rol) => path.resolve(`tests/e2e/.auth/${rol}.json`);
+export const sesion = (rol: Rol) => path.resolve(`tests/e2e/.auth/${EN_PROD ? "prod/" : ""}${rol}.json`);
+
+/** psql en el contenedor local: contra esa base o, en producción, contra la de la nube (la clave va por el entorno). */
+const psql = (...args: string[]) => [
+  "exec",
+  ...(args.includes("-c") ? [] : ["-i"]),
+  "-e",
+  "PGCLIENTENCODING=UTF8",
+  ...(EN_PROD ? ["-e", "PGPASSWORD"] : []),
+  "supabase_db_erp-prod1",
+  "psql",
+  ...(EN_PROD ? [process.env.ERP_PROD!] : ["-U", "postgres"]),
+  ...args,
+];
 
 /** Consulta a la base local como postgres. Devuelve las filas como texto separado por «|». */
 export function sql(consulta: string): string[][] {
-  const out = execFileSync(
-    "docker",
-    ["exec", "-e", "PGCLIENTENCODING=UTF8", "supabase_db_erp-prod1", "psql", "-U", "postgres", "-At", "-F", "|", "-c", consulta],
-    { encoding: "utf8" },
-  );
+  const out = execFileSync("docker", psql("-At", "-F", "|", "-c", consulta), { encoding: "utf8" });
   return out
     .split("\n")
     .filter((l) => l !== "")
@@ -31,11 +45,7 @@ export function sql(consulta: string): string[][] {
 }
 /** Varias sentencias (p. ej. begin … rollback): devuelve las filas de todas, separadas por «|». */
 export function sqlScript(script: string): string[][] {
-  const out = execFileSync(
-    "docker",
-    ["exec", "-i", "-e", "PGCLIENTENCODING=UTF8", "supabase_db_erp-prod1", "psql", "-U", "postgres", "-At", "-q", "-F", "|", "-v", "ON_ERROR_STOP=1"],
-    { encoding: "utf8", input: script },
-  );
+  const out = execFileSync("docker", psql("-At", "-q", "-F", "|", "-v", "ON_ERROR_STOP=1"), { encoding: "utf8", input: script });
   return out
     .split("\n")
     .filter((l) => l !== "")

@@ -16,7 +16,8 @@ export default defineConfig({
   workers: Number(process.env.WORKERS ?? 10),
   retries: 0,
   timeout: 45_000,
-  expect: { timeout: 8_000 },
+  // Contra producción (scripts/recorrido-prod.mjs) cada consulta cruza la red: más margen.
+  expect: { timeout: process.env.ERP_PROD ? 25_000 : 8_000 },
   // SALIDA separa los resultados de corridas simultáneas (Playwright vacía su carpeta al empezar).
   outputDir: `test-results/${process.env.SALIDA ?? "e2e"}`,
   // Una barra de avance (tests/e2e/progreso.ts); con REPORTE=list, cada prueba en su línea.
@@ -30,8 +31,8 @@ export default defineConfig({
     timezoneId: "America/Lima",
     screenshot: "only-on-failure",
     trace: "retain-on-failure",
-    actionTimeout: 10_000,
-    navigationTimeout: 30_000,
+    actionTimeout: process.env.ERP_PROD ? 25_000 : 10_000,
+    navigationTimeout: process.env.ERP_PROD ? 60_000 : 30_000,
   },
   projects: [
     { name: "sesiones", testMatch: /sesiones\.setup\.ts/ },

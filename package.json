@@ -11,6 +11,7 @@
     "start": "node --max-old-space-size=4096 node_modules/next/dist/bin/next start -p 3100",
     "lint": "eslint",
     "test:e2e": "playwright test",
+    "test:prod": "node --env-file=.env.produccion.local scripts/recorrido-prod.mjs",
     "db:types": "supabase gen types typescript --local > src/lib/database.types.ts",
     "db:demo-entregas": "node --env-file=.env.local scripts/demo-entregas.mjs",
     "db:simular": "node --env-file=.env.local scripts/simular-obra.mjs",

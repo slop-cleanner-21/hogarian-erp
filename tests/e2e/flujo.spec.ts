@@ -37,7 +37,7 @@ const RETENCION = PU_SERVICIO * 0.08;
 const hoyLima = () => new Date().toLocaleDateString("en-CA", { timeZone: "America/Lima" });
 const masDias = (iso: string, d: number) => new Date(new Date(`${iso}T12:00:00Z`).getTime() + d * 864e5).toISOString().slice(0, 10);
 const sol = (n: number) => `S/ ${n.toLocaleString("en-US", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
-const uidGerencia = () => sql1(`select u.id from auth.users u where u.email = 'gerencia@erp.local'`);
+const uidGerencia = () => sql1(`select u.id from auth.users u where u.email = '${ROLES.gerencia}'`);
 
 const estado = (obra: string, numero: string) => sql1(`select estado from ordenes_compra where obra_id = ${obra} and numero = '${numero}'`);
 
@@ -172,7 +172,7 @@ test.describe("@flujo flujo completo por las pantallas", () => {
   });
 
   test("OC: de la obra al pago y la constancia", async ({ abrir, browser, revisarPantalla }, info) => {
-    test.setTimeout(240_000);
+    test.setTimeout(process.env.ERP_PROD ? 600_000 : 240_000);
     let link = "";
     let obraId = "";
     let numero = "";
@@ -400,7 +400,7 @@ test.describe("@flujo flujo completo por las pantallas", () => {
   });
 
   test("OS con recibo por honorarios: contrato firmado, retención y pago del neto", async ({ abrir, browser }, info) => {
-    test.setTimeout(240_000);
+    test.setTimeout(process.env.ERP_PROD ? 600_000 : 240_000);
     let link = "";
     let os = "";
     let obraId = "";
@@ -433,7 +433,7 @@ test.describe("@flujo flujo completo por las pantallas", () => {
       await expect(hoja).toBeHidden();
 
       const admin = await abrir("admin", "/admin");
-      await admin.locator("main").getByRole("button", { name: /(^|[^\w-])gerencia@erp\.local/ }).click();
+      await admin.locator("main").getByRole("button", { name: new RegExp(`(^|[^\\w-])${ROLES.gerencia.replaceAll(".", "\\.")}`) }).click();
       const ficha = admin.getByRole("dialog", { name: "Gerencia" });
       await ficha.getByLabel("DNI").fill("41234567");
       await ficha.getByRole("button", { name: "Guardar" }).click();

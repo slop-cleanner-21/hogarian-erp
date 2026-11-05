@@ -377,5 +377,10 @@ Los dos pueden correr a la vez.
   `supabase_db_erp-prod1`. `tests/e2e/flujo.spec.ts` recorre el flujo entero solo por las pantallas (sin seeds;
   SQL solo para comprobar y limpiar): obra, presupuesto, proveedor, OC con guía y OS con recibo por honorarios,
   link del proveedor, factura, rechazo y reenvío, pago, constancia, consulta, seguimiento y auditoría.
+- **Recorrido en producción:** `npm run test:prod` (`scripts/recorrido-prod.mjs`) corre ese mismo `flujo.spec.ts` contra
+  `hogarian-erp.vercel.app` y la base de la nube, con obras, proveedores e ítems «E2E» nuevos y cuentas temporales
+  `e2e.<rol>@hogarian.test` (contraseña al azar, nunca las reales). Limpia aunque falle y compara las filas de todas las
+  tablas con las de antes. Si se corta, `npm run test:prod -- --limpiar`. Los usuarios reales pueden ver avisos en la
+  campana mientras corre (y push, si tienen el celular activado): conviene correrlo sin nadie trabajando.
 - **Build:** `npm run build`. Luego hay que matar el `next start` de prod 1 (el del puerto 3100, no el del
   MVP) y comprobar que un chunk CSS o JS responda 200.
