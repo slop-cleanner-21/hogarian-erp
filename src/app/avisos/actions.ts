@@ -2,6 +2,7 @@
 
 import { revalidatePath } from "next/cache";
 import { z } from "zod";
+import { eventosDe, porDefecto } from "@/lib/avisos";
 import { createClient, requireSesion } from "@/lib/supabase/server";
 
 const Suscripcion = z.object({
@@ -47,6 +48,25 @@ export async function borrarAvisos(ids?: number[]): Promise<string | null> {
   let q = supabase.from("notificaciones").delete().eq("user_id", userId);
   if (ids) q = q.in("id", ids);
   const { error } = await q;
+  revalidatePath("/avisos");
+  return error ? error.message : null;
+}
+
+/**
+ * Qué avisos recibe (de los que su rol puede elegir) y cuáles también al celular. Se guarda solo lo que cambió del
+ * defecto (los de su rol llegan; los de los demás, no).
+ */
+export async function guardarPreferencia(tipo: string, avisar: boolean, celular: boolean): Promise<string | null> {
+  const { userId, rol } = await requireSesion();
+  const evento = eventosDe(rol).find((e) => e.tipo === tipo);
+  if (!evento) return "Ese aviso no es para tu rol";
+  const elegido = { avisar: !!avisar, celular: !!avisar && !!celular };
+  const defecto = porDefecto(evento.propio);
+  const supabase = await createClient();
+  const { error } =
+    elegido.avisar === defecto.avisar && elegido.celular === defecto.celular
+      ? await supabase.from("aviso_preferencias").delete().eq("user_id", userId).eq("tipo", tipo)
+      : await supabase.from("aviso_preferencias").upsert({ user_id: userId, tipo, ...elegido }, { onConflict: "user_id,tipo" });
   revalidatePath("/avisos");
   return error ? error.message : null;
 }

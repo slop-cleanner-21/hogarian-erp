@@ -564,6 +564,28 @@ export type Database = {
           },
         ];
       };
+      aviso_preferencias: {
+        Row: {
+          avisar: boolean;
+          celular: boolean;
+          tipo: string;
+          user_id: string;
+        };
+        ComputedFields: never;
+        Insert: {
+          avisar: boolean;
+          celular: boolean;
+          tipo: string;
+          user_id: string;
+        };
+        Update: {
+          avisar?: boolean;
+          celular?: boolean;
+          tipo?: string;
+          user_id?: string;
+        };
+        Relationships: [];
+      };
       comprobantes: {
         Row: {
           anulado_at: string | null;
@@ -1290,6 +1312,7 @@ export type Database = {
           href: string | null;
           id: number;
           leida_at: string | null;
+          push: boolean;
           push_enviado_at: string | null;
           tipo: string;
           titulo: string;
@@ -1302,6 +1325,7 @@ export type Database = {
           href?: string | null;
           id?: number;
           leida_at?: string | null;
+          push?: boolean;
           push_enviado_at?: string | null;
           tipo: string;
           titulo: string;
@@ -1313,6 +1337,7 @@ export type Database = {
           href?: string | null;
           id?: number;
           leida_at?: string | null;
+          push?: boolean;
           push_enviado_at?: string | null;
           tipo?: string;
           titulo?: string;

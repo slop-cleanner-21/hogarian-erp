@@ -31,6 +31,8 @@ export async function enviarAvisosPendientes() {
     .from("notificaciones")
     .select("id, user_id, titulo, cuerpo, href")
     .is("push_enviado_at", null)
+    // Solo los que el usuario quiere también en el celular (sus preferencias de avisos).
+    .eq("push", true)
     .gte("created_at", desde)
     .order("id")
     .limit(200);

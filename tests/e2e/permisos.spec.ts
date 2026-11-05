@@ -50,6 +50,7 @@ const LECTURA = tabla(`
   guias                        T   T   T   0   T   0   0   0
   items                        T   T   T   T   T   T   T   0
   notificaciones               M   M   M   M   M   M   M   M
+  aviso_preferencias           M   M   M   M   M   M   M   M
   obra_etapas                  T   T   T   T   T   T   T   0
   obras                        T   T   T   P   T   T   T   0
   oc_items                     T   T   T   P   T   T   T   0

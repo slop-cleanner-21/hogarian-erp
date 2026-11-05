@@ -301,3 +301,61 @@ test.describe("@avisos la campana", () => {
     expect(filas.map(([u]) => u).sort()).toEqual([...activos("JEFE_OPERACIONES"), ...activos("OPERACIONES")].sort());
   });
 });
+
+test.describe("@avisos cada uno elige sus avisos", () => {
+  test("quien apaga un aviso de su rol no lo recibe; el Admin que se suma sí (sin celular, si así lo eligió)", () => {
+    const [obra, numero] = ordenEnTesoreria(4) ?? [];
+    test.skip(!obra, "sin órdenes por pagar");
+    const log = uidDe("LOGISTICA");
+    const admin = uidDe("ADMIN");
+    const ger = uidDe("GERENCIA");
+    // En una transacción que se revierte: Logística apaga el rechazo; el Admin se suma (sin celular); Gerencia, nada.
+    const filas = sqlScript(`begin;
+      insert into aviso_preferencias (user_id, tipo, avisar, celular) values ('${log}', 'RECHAZO', false, false), ('${admin}', 'RECHAZO', true, false);
+      select set_config('request.jwt.claims', '{"sub":"${uidDe("TESORERIA")}","role":"authenticated"}', true);
+      set local role authenticated;
+      ${rechazar(obra, numero)};
+      reset role;
+      select user_id || '|' || push from notificaciones where tipo = 'RECHAZO' and created_at = now() order by 1;
+      rollback;`).filter((f) => f.length === 2 && /^[0-9a-f-]{36}$/.test(f[0]));
+    const recibieron = new Map(filas.map(([u, p]) => [u, p]));
+    expect(recibieron.has(log), "apagó el aviso").toBe(false);
+    expect(recibieron.get(admin), "el Admin, sin celular").toBe("false");
+    expect(recibieron.has(ger), "Gerencia no se sumó").toBe(false);
+    // Los demás de Logística, como siempre (con celular).
+    for (const u of activos("LOGISTICA").filter((x) => x !== log)) expect(recibieron.get(u), u).toBe("true");
+  });
+
+  test("en Avisos: cada rol ve los suyos (activos); el Admin ve todos por área (apagados) y elige", async ({ abrir }) => {
+    const admin = uidDe("ADMIN");
+    try {
+      const log = await abrir("logistica", "/avisos");
+      await log.getByRole("button", { name: "Elegir avisos" }).click();
+      const hojaLog = log.getByRole("dialog", { name: "Elegir avisos" });
+      await expect(hojaLog.getByRole("listitem")).toHaveText([/proveedor envió su cotización/, /Tesorería rechazó/, /adicional/]);
+      for (const s of await hojaLog.getByRole("switch", { name: "Avisar" }).all()) await expect(s).toHaveAttribute("aria-checked", "true");
+
+      const page = await abrir("admin", "/avisos");
+      await page.getByRole("button", { name: "Elegir avisos" }).click();
+      const hoja = page.getByRole("dialog", { name: "Elegir avisos" });
+      await expect(hoja.getByRole("heading", { level: 3 })).toHaveText(["Logística", "Tesorería", "Operaciones"]);
+      for (const s of await hoja.getByRole("switch", { name: "Avisar" }).all()) await expect(s).toHaveAttribute("aria-checked", "false");
+      // Se suma a «Llegó una orden por pagar»: en la campana, sin celular; luego también al celular.
+      const evento = hoja.getByRole("listitem", { name: "Llegó una orden por pagar" });
+      await expect(evento.getByRole("switch", { name: "Al celular" })).toBeDisabled();
+      await evento.getByRole("switch", { name: "Avisar" }).click();
+      await expect.poll(() => sql1(`select avisar || ' ' || celular from aviso_preferencias where user_id = '${admin}' and tipo = 'POR_PAGAR'`)).toBe("true false");
+      await evento.getByRole("switch", { name: "Al celular" }).click();
+      await expect.poll(() => sql1(`select avisar || ' ' || celular from aviso_preferencias where user_id = '${admin}' and tipo = 'POR_PAGAR'`)).toBe("true true");
+      // Se recuerda.
+      await page.reload();
+      await page.getByRole("button", { name: "Elegir avisos" }).click();
+      await expect(page.getByRole("dialog", { name: "Elegir avisos" }).getByRole("listitem", { name: "Llegó una orden por pagar" }).getByRole("switch", { name: "Al celular" })).toHaveAttribute("aria-checked", "true");
+      // Apagarlo vuelve al defecto (no queda guardado).
+      await page.getByRole("dialog", { name: "Elegir avisos" }).getByRole("listitem", { name: "Llegó una orden por pagar" }).getByRole("switch", { name: "Avisar" }).click();
+      await expect.poll(() => sql1(`select count(*) from aviso_preferencias where user_id = '${admin}' and tipo = 'POR_PAGAR'`)).toBe("0");
+    } finally {
+      sql(`delete from aviso_preferencias where user_id = '${admin}'`);
+    }
+  });
+});

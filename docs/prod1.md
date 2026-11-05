@@ -177,6 +177,11 @@ Contabilidad, Residente y RRHH **no entran**. Sus roles siguen en la base
 
   La campana cuenta los sin leer sin recargar (Realtime); al abrir Avisos quedan leídos. Cada aviso sale también como
   notificación push si el teléfono la activó.
+
+  **Cada uno elige sus avisos** (Avisos › «Elegir avisos»; migración `prod1_preferencias_avisos`, `src/lib/avisos.ts`):
+  por evento, «Avisar» (campana) y «Al celular» (push, solo si avisa). Los de su rol llegan por defecto, con celular;
+  el Admin y Gerencia pueden sumarse a cualquier evento de los demás (por área), que arranca apagado y, al sumarse, sin
+  celular: así no se les llena el teléfono. Solo se guarda lo que cambió del defecto.
 - **Varias personas a la vez:** lo resuelve la base. Pagar, rechazar, enviar a Tesorería, registrar la factura, confirmar
   precios y anular bloquean la orden y revisan su estado: si dos actúan a la vez, la segunda espera y, si la orden ya
   cambió, recibe el error (un solo pago; o el pago o el rechazo; la cotización del proveedor, una vez). Las pantallas no
