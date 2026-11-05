@@ -48,6 +48,11 @@ paso, local sigue igual: accesos rápidos y contraseña de la demo. (El túnel s
    `demo` ni los scripts `db:demo-*`.
 5. Respaldos: activar los diarios del plan (o *Point in Time Recovery*).
 
+Para volver a cargar el Excel en una base ya en uso: `scripts/produccion/recargar-datos.sh`, en una sola transacción (si
+falla, no cambia nada). Borra lo operativo y corre los mismos seeds; conserva cuentas, auditoría, catálogos, parámetros y
+lo que el Admin puso en las empresas. Antes, un respaldo con `pg_dump`. Los links de cotización cambian y no borra archivos
+del storage. Se usó el 05/11/2026: datos idénticos a los anteriores, salvo los accesos a links.
+
 Ensayado en local el 04/11/2026 con este mismo orden (base vacía → Admin → carga): 734 órdenes históricas,
 1988 entregas históricas y todas las pantallas sin errores.
 
