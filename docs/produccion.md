@@ -72,24 +72,28 @@ Ensayado en local el 04/11/2026 con este mismo orden (base vacía → Admin → 
 3. Dominio: agregarlo en Vercel y apuntar el DNS. Las huellas (passkeys) van atadas al dominio: las activadas en
    `*.vercel.app` no sirven en el dominio propio, y cada usuario la activa de nuevo.
 
-## Entorno de pruebas (04/11/2026)
-
-En las cuentas personales hasta sacar el ERP a producción (05/11/2026: se decidió no transferir todavía). Luego se
-transfieren (Supabase › Project Settings › General › Transfer project; Vercel › Settings › General › Transfer
-Project; la URL de Supabase y la de Vercel no cambian, y las huellas siguen valiendo):
-
-- **Costo en Supabase:** la organización `hogariangroup` es de pago y su crédito de cómputo ya lo usa
-  `hogarian-comercial`: el ERP suma **$10/mes**. Tras transferirlo, subirlo a **Micro** (Compute and Disk) sin costo
-  extra (reinicia la base unos 2 minutos).
-- **Costo en Vercel:** el equipo Pro cobra **$20/mes por miembro que despliega**, no por proyecto (Viewer es gratis).
-  El ERP no suma un fijo: sus builds y funciones salen de los $20 de crédito incluido. En un equipo Pro solo se
-  despliegan los commits de autores que son miembros (el correo del commit debe estar en la cuenta de Vercel), y
-  hay que revisar la conexión de Git (Settings › Git) tras el traspaso.
+## Producción en las cuentas de la empresa (06/11/2026)
 
 | | |
 |---|---|
-| App | https://hogarian-erp.vercel.app (Vercel `josev-7139/hogarian-erp`, conectado a `main`) |
-| Supabase | proyecto `yqhdknwllnartyswbkoa` (organización personal, sa-east-1) |
+| App | https://hogarian-erp-hogarian-group.vercel.app (Vercel, equipo **HOGARIAN GROUP**, proyecto `hogarian-erp`, conectado a `main`) |
+| Supabase | proyecto `fwdhevzbludhehoyfnho` (organización **hogariangroup**, sa-east-1, Micro) |
+| Claves locales | `.env.empresa.local` (no se sube): contraseña de la base, URL, clave pública y secreta |
+
+Se armaron nuevos (no transferidos): migraciones con `db push`, Auth con `config push` (copia de `config.toml` con la URL
+de la app), y los datos copiados del entorno de pruebas tal cual (`pg_dump --data-only` de `public`, `auth.users` y
+`auth.identities`, cargados con `session_replication_role = replica`: sin disparar auditoría ni el trigger de las
+contraseñas, que viajan en `credenciales`). Las claves VAPID son nuevas. Las huellas van atadas al dominio: se activan de
+nuevo en este.
+
+- **Costo:** Supabase suma **$10/mes** (Micro, en la organización de pago). Vercel cobra por miembro que despliega, no
+  por proyecto: el ERP sale de los $20 de crédito del equipo.
+- En el equipo Pro solo se despliegan los commits de autores que son miembros (el correo del commit, en la cuenta de
+  Vercel).
+- `vercel.json` fija el framework (`nextjs`) y la región (`gru1`); `package.json`, Node 24.
+
+El entorno de pruebas anterior (Vercel `josev-7139/hogarian-erp`, Supabase `yqhdknwllnartyswbkoa` en la organización
+personal, `.env.produccion.local`) quedó sin uso.
 
 ## 4. Antes de abrirlo a todos
 

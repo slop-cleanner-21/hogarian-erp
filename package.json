@@ -2,6 +2,9 @@
   "name": "erp-prod1",
   "version": "0.1.0",
   "private": true,
+  "engines": {
+    "node": "24.x"
+  },
   "scripts": {
     "dev": "node --max-old-space-size=4096 node_modules/next/dist/bin/next dev -p 3100",
     "build": "node --max-old-space-size=6144 node_modules/next/dist/bin/next build",
