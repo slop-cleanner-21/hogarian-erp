@@ -2,7 +2,20 @@ import { createServerClient } from "@supabase/ssr";
 import { NextResponse, type NextRequest } from "next/server";
 import { COOKIE_ACCESO, RUTA_ACCESO, accesoActivo, firmaAcceso } from "@/lib/acceso";
 import { RUTAS_LIBRES } from "@/lib/bloqueo";
-import { COOKIE_DESBLOQUEO, COOKIE_DISPOSITIVO, desbloqueoPara, desbloqueoVigente, leerFirmado, opcionesDesbloqueo } from "@/lib/bloqueo-servidor";
+import {
+  COOKIE_DESBLOQUEO,
+  COOKIE_DISPOSITIVO,
+  COOKIE_LIBRE,
+  RENOVAR_MS,
+  VENTANA_MS,
+  desbloqueoHasta,
+  desbloqueoPara,
+  leerFirmado,
+  librePara,
+  libreVigente,
+  opcionesDesbloqueo,
+  opcionesLibre,
+} from "@/lib/bloqueo-servidor";
 import { rolEnProd1 } from "@/lib/prod1";
 import { COOKIE_SESION } from "@/lib/supabase/config";
 import type { Rol } from "@/lib/types";
@@ -105,22 +118,35 @@ export async function proxy(request: NextRequest) {
     return redireccion;
   }
 
-  // Bloqueo con huella, hecho cumplir aquí y no solo en el navegador (desactivar JavaScript no se lo salta): en el
-  // dispositivo con la huella activada, sin «desbloqueado» vigente no se entrega ninguna pantalla. Se renueva con cada
-  // pedido (la app manda un latido cada minuto mientras está a la vista) y vence a los 3 minutos sin actividad.
+  // Bloqueo con huella, hecho cumplir aquí y en la base (no solo en el navegador: ni desactivar JavaScript ni borrar
+  // cookies se lo salta). Una sesión con la huella activada, sin «desbloqueado» vigente, no recibe ninguna pantalla (y
+  // la base no le da datos). El «desbloqueado» se renueva con los pedidos (la app manda un latido cada minuto mientras
+  // está a la vista) y vence a los 3 minutos sin actividad. Lo resuelve la base (bloqueo_estado, que además lo renueva);
+  // las cookies firmadas solo evitan preguntarle en cada pedido: un «desbloqueado» renovado hace menos de 45 s, o
+  // «sin bloqueo» de esta misma sesión (10 min).
   const uid = data?.claims?.sub;
-  if (uid && !RUTAS_LIBRES.some((r) => path === r || path.startsWith(`${r}/`))) {
-    const dueno = await leerFirmado(request.cookies.get(COOKIE_DISPOSITIVO)?.value);
-    if (dueno === uid) {
-      if (await desbloqueoVigente(request.cookies.get(COOKIE_DESBLOQUEO)?.value, uid)) {
-        response.cookies.set(COOKIE_DESBLOQUEO, await desbloqueoPara(uid), opcionesDesbloqueo());
-      } else if (request.method !== "GET" || request.headers.has("next-action")) {
-        return NextResponse.json({ message: "Bloqueado" }, { status: 401, headers: { "Cache-Control": "no-store" } });
-      } else {
+  const sid = typeof data?.claims?.session_id === "string" ? data.claims.session_id : null;
+  if (uid && sid && !RUTAS_LIBRES.some((r) => path === r || path.startsWith(`${r}/`))) {
+    const hasta = await desbloqueoHasta(request.cookies.get(COOKIE_DESBLOQUEO)?.value, uid);
+    const reciente = hasta !== null && hasta - Date.now() > VENTANA_MS - RENOVAR_MS;
+    if (!reciente && !(await libreVigente(request.cookies.get(COOKIE_LIBRE)?.value, sid))) {
+      let { data: estado } = await supabase.rpc("bloqueo_estado");
+      // Una sesión abierta antes de que la base llevara el bloqueo, en un dispositivo con la huella: queda bloqueada.
+      if (estado === "libre" && (await leerFirmado(request.cookies.get(COOKIE_DISPOSITIVO)?.value)) === uid) {
+        await supabase.rpc("bloqueo_activar", { p_abierta: false });
+        estado = "bloqueada";
+      }
+      if (estado === "abierta") response.cookies.set(COOKIE_DESBLOQUEO, await desbloqueoPara(uid), opcionesDesbloqueo());
+      else if (estado === "libre") response.cookies.set(COOKIE_LIBRE, await librePara(sid), opcionesLibre());
+      else if (estado === "bloqueada") {
+        if (request.method !== "GET" || request.headers.has("next-action")) {
+          return NextResponse.json({ message: "Bloqueado" }, { status: 401, headers: { "Cache-Control": "no-store" } });
+        }
         const destino = new URL("/desbloquear", request.url);
         destino.searchParams.set("volver", `${path}${request.nextUrl.search}`);
         const redireccion = NextResponse.redirect(destino);
         response.cookies.getAll().forEach((c) => redireccion.cookies.set(c));
+        redireccion.cookies.delete(COOKIE_DESBLOQUEO);
         return redireccion;
       }
     }

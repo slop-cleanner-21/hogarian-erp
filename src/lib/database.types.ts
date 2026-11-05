@@ -2431,6 +2431,28 @@ export type Database = {
           },
         ];
       };
+      sesiones_bloqueo: {
+        Row: {
+          created_at: string;
+          desbloqueado_hasta: string;
+          session_id: string;
+          user_id: string;
+        };
+        ComputedFields: never;
+        Insert: {
+          created_at?: string;
+          desbloqueado_hasta: string;
+          session_id: string;
+          user_id: string;
+        };
+        Update: {
+          created_at?: string;
+          desbloqueado_hasta?: string;
+          session_id?: string;
+          user_id?: string;
+        };
+        Relationships: [];
+      };
       solicitud_adjuntos: {
         Row: {
           created_at: string;
@@ -3848,6 +3870,14 @@ export type Database = {
         Args: { p_asignar: boolean; p_obra_id: number; p_persona_id: number };
         Returns: undefined;
       };
+      bloqueo_activar: { Args: { p_abierta: boolean }; Returns: undefined };
+      bloqueo_desbloquear: { Args: { p_session: string }; Returns: undefined };
+      bloqueo_estado: { Args: Record<PropertyKey, never>; Returns: string };
+      bloqueo_quitar: {
+        Args: { p_session: string; p_user: string };
+        Returns: undefined;
+      };
+      bloqueo_ventana: { Args: Record<PropertyKey, never>; Returns: string };
       cambiar_destino_igv: {
         Args: { p_comprobante_id: number; p_destino: string };
         Returns: undefined;
@@ -3866,6 +3896,10 @@ export type Database = {
         Returns: number;
       };
       contabilizar_pago: { Args: { p_pago_id: number }; Returns: number };
+      contrasena_correcta: {
+        Args: { p_clave: string; p_user: string };
+        Returns: boolean;
+      };
       crear_orden: {
         Args: {
           p_items: Json;
@@ -4252,6 +4286,7 @@ export type Database = {
       rol_en: { Args: { p_roles: string[] }; Returns: boolean };
       rol_prod1: { Args: { p_rol: string }; Returns: boolean };
       ruta_obra_residente: { Args: { p_name: string }; Returns: boolean };
+      sesion_bloqueada: { Args: Record<PropertyKey, never>; Returns: boolean };
       set_datos_os: {
         Args: {
           p_comprobante: Database["public"]["Enums"]["tipo_comprobante"];

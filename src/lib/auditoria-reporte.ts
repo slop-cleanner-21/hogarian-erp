@@ -53,6 +53,7 @@ export const ACCION_LABEL: Record<string, string> = {
   DESBLOQUEO_FALLIDO: "Desbloqueo fallido",
   CAPTCHA_IP: "La IP pide CAPTCHA desde ahora",
   CAMBIO_CONTRASENA: "Cambió su contraseña",
+  CAMBIO_CONTRASENA_FALLIDO: "Cambio de contraseña fallido",
   CREAR_USUARIO: "Creó la cuenta",
   EDITAR_USUARIO: "Editó la cuenta",
   RESTABLECER_CONTRASENA: "Restableció la contraseña",
@@ -60,7 +61,7 @@ export const ACCION_LABEL: Record<string, string> = {
   REACTIVAR: "Reactivó la cuenta",
 };
 
-const ACCIONES_SESION = ["LOGIN", "LOGIN_FALLIDO", "LOGOUT", "CAMBIO_CONTRASENA", "DESBLOQUEO", "DESBLOQUEO_FALLIDO", "CAPTCHA_IP"];
+const ACCIONES_SESION = ["LOGIN", "LOGIN_FALLIDO", "LOGOUT", "CAMBIO_CONTRASENA", "CAMBIO_CONTRASENA_FALLIDO", "DESBLOQUEO", "DESBLOQUEO_FALLIDO", "CAPTCHA_IP"];
 
 export type Vista = "sesiones" | "cambios";
 export type FilaAuditoria = {

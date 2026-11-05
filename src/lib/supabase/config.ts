@@ -11,8 +11,12 @@ export const SUPABASE_DIRECTO = process.env.NEXT_PUBLIC_SUPABASE_DIRECTO === "1"
 /** Ruta pública por la que la app reenvía a Supabase (solo sin conexión directa). */
 export const RUTA_SUPABASE = "/sb";
 
-/** Nombre fijo de la cookie de sesión: navegador y servidor usan URLs distintas. */
-export const COOKIE_SESION = { name: "sb-prod1-auth-token" } as const;
+/**
+ * La cookie de sesión: nombre fijo (navegador y servidor usan URLs distintas), solo por HTTPS en producción y sin
+ * viajar en pedidos de otros sitios. No puede ser httpOnly: el navegador la lee para hablar con Supabase (lo que la
+ * protege si alguien llega a leerla en un dispositivo bloqueado: la base no le da nada a esa sesión).
+ */
+export const COOKIE_SESION = { name: "sb-prod1-auth-token", sameSite: "lax", ...(SUPABASE_DIRECTO ? { secure: true } : {}) } as const;
 
 /** URL de Supabase para el servidor (interna). */
 export const URL_SUPABASE = process.env.NEXT_PUBLIC_SUPABASE_URL!;

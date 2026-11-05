@@ -70,6 +70,13 @@ test.describe("@prod1 @admin usuarios", () => {
       await u.page.getByRole("button", { name: "Usuario" }).click();
       await u.page.getByRole("button", { name: "Cambiar contraseña" }).click();
       const cambio = u.page.getByRole("dialog", { name: "Cambiar contraseña" });
+      // Sin la actual correcta, no la cambia.
+      await cambio.getByLabel("Contraseña actual").fill("no-es-esta-1");
+      await cambio.getByLabel(/^Nueva contraseña/).fill("propia-e2e-123");
+      await cambio.getByLabel("Repetir la contraseña").fill("propia-e2e-123");
+      await cambio.getByRole("button", { name: "Cambiar contraseña" }).click();
+      await expect(cambio.getByRole("alert")).toHaveText("La contraseña actual no es correcta");
+      await cambio.getByLabel("Contraseña actual").fill(temporal);
       await cambio.getByLabel(/^Nueva contraseña/).fill("propia-e2e-123");
       await cambio.getByLabel("Repetir la contraseña").fill("propia-e2e-123");
       await cambio.getByRole("button", { name: "Cambiar contraseña" }).click();

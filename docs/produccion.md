@@ -26,6 +26,8 @@ paso, local sigue igual: accesos rápidos y contraseña de la demo. (El túnel s
    Auth (registro apagado: **en la nube arranca abierto**; sin confirmación por correo): `config push` desde una
    copia de `config.toml` con `site_url` y `additional_redirect_urls` del dominio de la app (el del repo apunta a
    local) y `max_frequency = "1m0s"`; revisar el diff antes (`yes n | npx supabase config push --workdir <copia>`).
+   La copia lleva lo mismo que el repo en contraseñas: `password_requirements = "letters_digits"` y
+   `secure_password_change = true`.
    La clave secreta se copia del panel (Project Settings › API Keys): `supabase projects api-keys` la muestra
    enmascarada. Sirve también la `service_role` clásica.
 3. Crear el primer Admin (la contraseña temporal se muestra una vez):

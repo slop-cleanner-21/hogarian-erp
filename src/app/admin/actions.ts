@@ -7,7 +7,7 @@ import { registrarEvento } from "@/lib/auditoria";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { requireSesionVigente } from "@/lib/supabase/server";
 import type { Rol } from "@/lib/types";
-import { contrasenaAlAzar, MIN_CONTRASENA } from "@/lib/usuarios";
+import { contrasenaAlAzar, contrasenaValida, MIN_CONTRASENA } from "@/lib/usuarios";
 
 export type Result<T = undefined> = { ok: true; data: T } | { ok: false; error: string };
 
@@ -47,13 +47,16 @@ async function guardarDni(db: ReturnType<typeof createAdminClient>, id: string, 
 function mensaje(e: { message: string; code?: string } | null) {
   if (!e) return "No se pudo guardar";
   if (e.code === "email_exists" || /already (been )?registered/i.test(e.message)) return "Ya hay una cuenta con ese correo";
-  if (e.code === "weak_password" || /password/i.test(e.message)) return `La contraseña debe tener al menos ${MIN_CONTRASENA} caracteres`;
+  if (e.code === "weak_password" || /password/i.test(e.message)) return `La contraseña debe tener al menos ${MIN_CONTRASENA} caracteres, con letras y números`;
   return e.message;
 }
 
 const Crear = Datos.extend({
   rol: Rol_,
-  contrasena: z.string().min(MIN_CONTRASENA, `La contraseña debe tener al menos ${MIN_CONTRASENA} caracteres`).max(72),
+  contrasena: z.string().superRefine((c, ctx) => {
+    const error = contrasenaValida(c);
+    if (error) ctx.addIssue({ code: "custom", message: error });
+  }),
 }).refine(conDni, { message: SIN_DNI });
 
 export async function crearUsuario(input: z.input<typeof Crear>): Promise<Result<string>> {

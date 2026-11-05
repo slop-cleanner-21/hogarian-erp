@@ -13,7 +13,7 @@ const LIMA = "America/Lima";
 const cuando = new Intl.DateTimeFormat("es-PE", { day: "2-digit", month: "2-digit", year: "numeric", hour: "2-digit", minute: "2-digit", timeZone: LIMA });
 
 const ACCIONES = {
-  sesiones: ["LOGIN", "LOGIN_FALLIDO", "LOGOUT", "CAMBIO_CONTRASENA", "DESBLOQUEO", "DESBLOQUEO_FALLIDO", "CAPTCHA_IP"],
+  sesiones: ["LOGIN", "LOGIN_FALLIDO", "LOGOUT", "CAMBIO_CONTRASENA", "CAMBIO_CONTRASENA_FALLIDO", "DESBLOQUEO", "DESBLOQUEO_FALLIDO", "CAPTCHA_IP"],
   cambios: ["INSERT", "UPDATE", "DELETE", "CREAR_USUARIO", "EDITAR_USUARIO", "RESTABLECER_CONTRASENA", "DESACTIVAR", "REACTIVAR"],
 };
 

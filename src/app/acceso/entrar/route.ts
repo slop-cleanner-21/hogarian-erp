@@ -1,5 +1,5 @@
 import { timingSafeEqual } from "node:crypto";
-import { COOKIE_ACCESO, firmaAcceso } from "@/lib/acceso";
+import { COOKIE_ACCESO, accesoActivo, firmaAcceso } from "@/lib/acceso";
 
 // La contraseña de la demo (local o túnel). Una ruta, no una server action: sin esta contraseña el proxy no deja
 // pasar ninguna server action (se pueden llamar desde cualquier ruta, también desde esta pública).
@@ -11,6 +11,7 @@ const igual = (a: string, b: string) => {
 };
 
 export async function POST(req: Request) {
+  if (!accesoActivo()) return new Response(null, { status: 404 });
   const clave = String((await req.formData().catch(() => null))?.get("clave") ?? "");
   const esperada = process.env.DEMO_ACCESO ?? "";
   const destino = (ruta: string) => new URL(ruta, req.url);

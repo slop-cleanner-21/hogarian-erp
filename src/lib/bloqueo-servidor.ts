@@ -5,11 +5,21 @@
 // - prod1_desbloqueo: «desbloqueado hasta»; se renueva con cada pedido y vence a los VENTANA_MS sin actividad (la
 //   app manda un latido cada minuto mientras está a la vista). Vencido, el proxy no entrega pantallas: redirige a
 //   /desbloquear (y a un pedido que no es una pantalla le responde 401).
-// Las dos van firmadas (HMAC con un secreto del servidor) y son httpOnly: el navegador no las puede leer ni fabricar.
+// - prod1_sin_bloqueo: la base dijo hace poco que esta sesión no tiene bloqueo (para no preguntarle en cada pedido).
+// Van firmadas (HMAC con un secreto del servidor) y son httpOnly: el navegador no las puede leer ni fabricar.
+//
+// Las cookies son solo para responder rápido: lo que manda es la base (sesiones_bloqueo, migración prod1_seguridad_3).
+// Una sesión con bloqueo vencido no lee ni escribe nada, aunque se borren las cookies o se use el token directo contra
+// la API; el proxy le pregunta a la base cuando no tiene una cookie reciente que lo resuelva.
 
 export const COOKIE_DISPOSITIVO = "prod1_huella_disp";
 export const COOKIE_DESBLOQUEO = "prod1_desbloqueo";
+export const COOKIE_LIBRE = "prod1_sin_bloqueo";
 export const VENTANA_MS = 3 * 60_000;
+/** Con un «desbloqueado» renovado hace menos que esto, el proxy no le pregunta a la base. */
+export const RENOVAR_MS = 45_000;
+/** Cuánto vale la marca «sin bloqueo» de una sesión. */
+const LIBRE_MS = 10 * 60_000;
 const UN_ANIO = 60 * 60 * 24 * 365;
 
 export const opcionesCookie = (maxAge?: number) =>
@@ -17,6 +27,7 @@ export const opcionesCookie = (maxAge?: number) =>
 export const opcionesDispositivo = () => opcionesCookie(UN_ANIO);
 // La de desbloqueo vive lo mismo que su ventana (firmada además con su vencimiento).
 export const opcionesDesbloqueo = () => opcionesCookie(Math.ceil(VENTANA_MS / 1000));
+export const opcionesLibre = () => opcionesCookie(LIBRE_MS / 1000);
 
 const enc = new TextEncoder();
 let clave: Promise<CryptoKey> | null = null;
@@ -49,10 +60,23 @@ export async function leerFirmado(cookie: string | undefined): Promise<string | 
 /** Valor de la cookie de desbloqueo de un usuario, vigente por una ventana desde ahora. */
 export const desbloqueoPara = (userId: string) => firmar(`${userId}:${Date.now() + VENTANA_MS}`);
 
+/** Hasta cuándo vale la cookie de desbloqueo para ese usuario (null: no vale o venció). */
+export async function desbloqueoHasta(cookie: string | undefined, userId: string): Promise<number | null> {
+  const v = await leerFirmado(cookie);
+  if (!v) return null;
+  const [u, hasta] = v.split(":");
+  return u === userId && Number(hasta) > Date.now() ? Number(hasta) : null;
+}
+
 /** Si la cookie de desbloqueo vale para ese usuario y no venció. */
-export async function desbloqueoVigente(cookie: string | undefined, userId: string) {
+export const desbloqueoVigente = async (cookie: string | undefined, userId: string) => (await desbloqueoHasta(cookie, userId)) !== null;
+
+/** Marca «sin bloqueo» de una sesión (session_id del JWT). */
+export const librePara = (sesionId: string) => firmar(`libre:${sesionId}:${Date.now() + LIBRE_MS}`);
+
+export async function libreVigente(cookie: string | undefined, sesionId: string) {
   const v = await leerFirmado(cookie);
   if (!v) return false;
-  const [u, hasta] = v.split(":");
-  return u === userId && Number(hasta) > Date.now();
+  const [marca, sid, hasta] = v.split(":");
+  return marca === "libre" && sid === sesionId && Number(hasta) > Date.now();
 }

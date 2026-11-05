@@ -128,7 +128,9 @@ test.describe("@seguridad", () => {
     expect(r.headers.get("content-security-policy")).toMatch(/frame-ancestors 'none'/);
   });
 
-  test("login: tras 10 intentos fallidos la cuenta queda en espera", async ({ browser }, info) => {
+  // Con CAPTCHA (en local, las claves de prueba de Turnstile) la cuenta no se bloquea: pide CAPTCHA (así nadie deja
+  // afuera a otro a propósito). Sin claves, se bloquea 15 minutos.
+  test("login: tras 10 intentos fallidos la cuenta pide CAPTCHA (o queda en espera sin CAPTCHA)", async ({ browser }, info) => {
     const email = `e2e-fuerza-${crypto.randomUUID().slice(0, 8)}@erp.local`;
     sql(`insert into audit_log (tabla, accion, detalle)
          select 'sesion', 'LOGIN_FALLIDO', jsonb_build_object('email', '${email}', 'motivo', 'invalid_credentials') from generate_series(1, 10)`);
@@ -136,7 +138,12 @@ test.describe("@seguridad", () => {
     await page.locator('input[name="email"]').fill(email);
     await page.locator('input[name="password"]').fill("cualquiera1");
     await page.getByRole("button", { name: "Ingresar", exact: true }).click();
-    await expect(page.getByText(/Demasiados intentos/)).toBeVisible();
+    if (process.env.NEXT_PUBLIC_TURNSTILE_SITE_KEY ?? env.NEXT_PUBLIC_TURNSTILE_SITE_KEY) {
+      await expect(page.locator('p[role="alert"]')).toHaveText("Completa la verificación");
+      await expect(page.locator('[data-captcha="visible"]')).toHaveCount(1);
+    } else {
+      await expect(page.getByText(/Demasiados intentos/)).toBeVisible();
+    }
     sql(`delete from audit_log where tabla = 'sesion' and detalle->>'email' = '${email}'`);
     await page.context().close();
   });
@@ -206,6 +213,11 @@ test.describe("@seguridad", () => {
       expect(r.status, String(pu)).toBeGreaterThanOrEqual(400);
     }
     expect(sql1(`select count(*) from oc_items where pu_cotizado = 'NaN' or pu_cotizado >= 1e8`)).toBe("0");
+    // Datos mal formados: un mensaje propio, no el error de Postgres.
+    for (const precios of [[{ item_id: "abc", pu: 1 }], [{ item_id: Number(item), pu: "abc" }], [1, 2], [{ item_id: 1.5, pu: 1 }]]) {
+      const r = await rest(null, "rpc/enviar_cotizacion", { method: "POST", body: JSON.stringify({ p_token: t, p_precios: precios }) });
+      expect((await r.json()).message, JSON.stringify(precios)).toBe("Formato de precios inválido");
+    }
   });
 
   test("sin la contraseña de la demo no pasa ninguna server action (tampoco en /cotizar)", async ({ baseURL }) => {
@@ -241,5 +253,90 @@ test.describe("@seguridad", () => {
       // Sin la cookie de la demo: 403 (si la hay, lo que pase lleva nosniff y sandbox).
       expect([403, 400, 404]).toContain(s.status);
     }
+  });
+
+  // Re-auditoría contra producción (migración 20261105200000_prod1_seguridad_3).
+
+  test("/desbloquear nunca manda a otro dominio", async ({ browser }, info) => {
+    const ctx = await browser.newContext({ ...info.project.use, storageState: sesion("tesoreria") });
+    const page = await ctx.newPage();
+    // El navegador toma «\» como «/» y quita tabuladores: todas serían //example.com.
+    for (const volver of ["/%5Cexample.com", "/%5C%5Cexample.com", "/%09/example.com", "//example.com", "/.//example.com", "https://example.com"]) {
+      await page.goto(`/desbloquear?volver=${volver}`);
+      await page.waitForURL((u) => !u.pathname.startsWith("/desbloquear"), { timeout: 15_000 });
+      expect(new URL(page.url()).host, volver).toBe(new URL(info.project.use.baseURL!).host);
+    }
+    await ctx.close();
+  });
+
+  test("cada rol sube archivos solo a sus carpetas", async () => {
+    const s = crypto.randomUUID().slice(0, 8);
+    const [log, tes, ger, jef] = await Promise.all([ROLES.logistica, ROLES.tesoreria, ROLES.gerencia, ROLES.jefe].map(token));
+    const casos: [string, string, string, string, boolean][] = [
+      ["TES", tes, "documentos", `pagos/e2e-${s}/v.pdf`, true],
+      ["LOG", log, "documentos", `pagos/e2e-${s}/l.pdf`, false],
+      ["LOG", log, "documentos", `guias/e2e-${s}/g.pdf`, true],
+      ["TES", tes, "documentos", `guias/e2e-${s}/t.pdf`, false],
+      ["LOG", log, "documentos", `999999/e2e-${s}/CONTRATO/c.pdf`, true],
+      ["GER", ger, "documentos", `999999/e2e-${s}/CONTRATO/g.pdf`, false],
+      ["LOG", log, "documentos", `entregas/e2e-${s}/e.pdf`, false],
+      ["LOG", log, "documentos", `e2e-${s}/suelto.pdf`, false],
+      ["LOG", log, "comprobantes", `e2e-${s}/f.pdf`, true],
+      ["TES", tes, "comprobantes", `e2e-${s}/t.pdf`, false],
+      ["GER", ger, "comprobantes", `e2e-${s}/g.pdf`, false],
+      ["JEF", jef, "documentos", `guias/e2e-${s}/j.pdf`, false],
+    ];
+    const subidos: [string, string][] = [];
+    try {
+      const r = await Promise.all(
+        casos.map(([, jwt, bucket, ruta]) =>
+          fetch(`${SB}/storage/v1/object/${bucket}/${ruta}`, {
+            method: "POST",
+            headers: { apikey: ANON, Authorization: `Bearer ${jwt}`, "Content-Type": "application/pdf" },
+            body: "%PDF-1.4 e2e",
+          }),
+        ),
+      );
+      const mal = casos
+        .map(([rol, , bucket, ruta, puede], i) => {
+          if (r[i].ok) subidos.push([bucket, ruta]);
+          return r[i].ok === puede ? null : `${rol} ${bucket}/${ruta}: ${r[i].status}`;
+        })
+        .filter(Boolean);
+      expect(mal).toEqual([]);
+    } finally {
+      for (const [bucket, ruta] of subidos) {
+        await fetch(`${SB}/storage/v1/object/${bucket}`, {
+          method: "DELETE",
+          headers: { apikey: SECRETA, Authorization: `Bearer ${SECRETA}`, "Content-Type": "application/json" },
+          body: JSON.stringify({ prefixes: [ruta] }),
+        });
+      }
+    }
+  });
+
+  test("anon y las sesiones no pueden truncar ni crear triggers en las tablas", () => {
+    expect(
+      sql1(`select count(*) from information_schema.table_privileges
+             where table_schema = 'public' and grantee in ('anon', 'authenticated') and privilege_type in ('TRUNCATE', 'TRIGGER', 'REFERENCES')`),
+    ).toBe("0");
+  });
+
+  test("la contraseña actual la verifica solo el servidor; y el bloqueo, solo el servidor lo levanta", async () => {
+    const jwt = await token(ROLES.gerencia);
+    for (const [fn, args] of [
+      ["contrasena_correcta", { p_user: crypto.randomUUID(), p_clave: "x" }],
+      ["bloqueo_desbloquear", { p_session: crypto.randomUUID() }],
+      ["bloqueo_quitar", { p_session: crypto.randomUUID(), p_user: crypto.randomUUID() }],
+    ] as const) {
+      expect((await rest(jwt, `rpc/${fn}`, { method: "POST", body: JSON.stringify(args) })).status, fn).toBeGreaterThanOrEqual(400);
+      expect((await rest(null, `rpc/${fn}`, { method: "POST", body: JSON.stringify(args) })).status, `anon ${fn}`).toBeGreaterThanOrEqual(400);
+    }
+  });
+
+  test("en producción, la lista de usuarios locales y su contraseña no llegan al navegador", () => {
+    // El bundle se compila con NEXT_PUBLIC_USUARIOS_LOCALES fija (next.config.ts, env): sin ella, el código se elimina.
+    const config = fs.readFileSync("next.config.ts", "utf8");
+    expect(config).toMatch(/NEXT_PUBLIC_USUARIOS_LOCALES: process\.env\.NEXT_PUBLIC_USUARIOS_LOCALES \?\? "0"/);
   });
 });

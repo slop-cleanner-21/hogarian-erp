@@ -1,10 +1,14 @@
+import { notFound } from "next/navigation";
 import { Logo } from "@/components/logo";
 import { Button } from "@/components/ui/button";
 import { Field } from "@/components/ui/field";
 import { PasswordInput } from "@/components/ui/password-input";
+import { accesoActivo } from "@/lib/acceso";
 
 // Contraseña de la demo: un formulario común que va a /acceso/entrar (una ruta, no una server action).
 export default async function AccesoPage({ searchParams }: PageProps<"/acceso">) {
+  // Sin contraseña de la demo (producción), no existe.
+  if (!accesoActivo()) notFound();
   const { error } = await searchParams;
   return (
     <main className="mx-auto flex min-h-dvh max-w-sm flex-col justify-center gap-8 px-4 py-10">

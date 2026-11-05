@@ -6,6 +6,9 @@ const nextConfig: NextConfig = {
   // Sin «X-Powered-By: Next.js».
   poweredByHeader: false,
   devIndicators: false,
+  // Fijas al compilar aunque no estén definidas: así el código que depende de ellas se elimina del bundle (en
+  // producción, la lista de usuarios locales y su contraseña de prueba no llegan al navegador).
+  env: { NEXT_PUBLIC_USUARIOS_LOCALES: process.env.NEXT_PUBLIC_USUARIOS_LOCALES ?? "0" },
   turbopack: {
     rules: {
       "*.css": {

@@ -1,6 +1,28 @@
-import type { BrowserContext, Page } from "@playwright/test";
+import fs from "node:fs";
+import type { BrowserContext, Cookie, Page } from "@playwright/test";
 import { expect, test } from "./fixtures";
 import { ROLES, sql, sql1 } from "./lib";
+
+const SB = "http://127.0.0.1:55321";
+const ANON = /^NEXT_PUBLIC_SUPABASE_ANON_KEY=(.*)$/m.exec(fs.readFileSync(".env.local", "utf8"))![1].trim().replace(/^["']|["']$/g, "");
+
+/** El token de la sesión del navegador (la cookie de Supabase, que puede venir en partes). */
+function tokenDe(cookies: Cookie[]) {
+  const partes = cookies
+    .filter((c) => c.name === "sb-prod1-auth-token" || c.name.startsWith("sb-prod1-auth-token."))
+    .sort((a, b) => a.name.localeCompare(b.name, "en", { numeric: true }))
+    .map((c) => decodeURIComponent(c.value))
+    .join("");
+  const json = partes.startsWith("base64-") ? Buffer.from(partes.slice(7), "base64url").toString("utf8") : partes;
+  return JSON.parse(json).access_token as string;
+}
+/** Lo que la base le da a ese token, directo por la API (sin pasar por la app). */
+async function directo(jwt: string) {
+  const h = { apikey: ANON, Authorization: `Bearer ${jwt}`, "Content-Type": "application/json" };
+  const obras = (await (await fetch(`${SB}/rest/v1/obras?select=id`, { headers: h })).json()) as unknown[];
+  const rol = await (await fetch(`${SB}/rest/v1/rpc/mi_rol`, { method: "POST", headers: h, body: "{}" })).json();
+  return { obras: obras.length, rol };
+}
 
 // Huella (passkey): se activa desde el menú, sirve para entrar sin contraseña y para desbloquear la app al volver
 // tras un rato; se quita desde el menú. El lector de huella es el autenticador virtual de Chromium (CDP).
@@ -51,7 +73,7 @@ test.describe("@huella", () => {
     sql(`delete from huellas where user_id = '${uid()}'`);
   });
   test.afterEach(() => {
-    sql(`delete from huellas where user_id = '${uid()}'`);
+    sql(`delete from huellas where user_id = '${uid()}'; delete from sesiones_bloqueo where user_id = '${uid()}'`);
   });
 
   test("activar, entrar con huella, desbloquear y quitar", async ({ browser }, info) => {
@@ -177,7 +199,11 @@ test.describe("@huella", () => {
     // Las cookies del bloqueo no las lee ni las fabrica el navegador.
     expect((await ctx.cookies()).filter((c) => c.name.startsWith("prod1_huella_disp") || c.name === "prod1_desbloqueo").every((c) => c.httpOnly)).toBe(true);
 
-    // Pasa el tiempo sin usarla: el «desbloqueado» vence.
+    const jwt = tokenDe(await ctx.cookies());
+    expect(await directo(jwt)).toEqual({ obras: expect.any(Number), rol: "JEFE_OPERACIONES" });
+
+    // Pasa el tiempo sin usarla: el «desbloqueado» vence (en la base, que es la que manda, y su cookie).
+    sql(`update sesiones_bloqueo set desbloqueado_hasta = now() where user_id = '${uid()}'`);
     await ctx.clearCookies({ name: "prod1_desbloqueo" });
 
     // Sin JavaScript (lo que se haría para saltarse el bloqueo del navegador): ninguna pantalla, ni el latido.
@@ -190,13 +216,26 @@ test.describe("@huella", () => {
     expect((await sinJs.request.get("/admin/auditoria/csv", { maxRedirects: 0 })).status()).toBe(307);
     await sinJs.close();
 
+    // Borrar las cookies del bloqueo (DevTools) tampoco: lo sabe la base, por la sesión.
+    const sinCookies = await browser.newContext({ ...info.project.use, javaScriptEnabled: false, storageState: await ctx.storageState() });
+    await sinCookies.clearCookies({ name: "prod1_huella_disp" });
+    await sinCookies.clearCookies({ name: "prod1_sin_bloqueo" });
+    const ver2 = await sinCookies.newPage();
+    await ver2.goto("/operaciones");
+    await expect(ver2).toHaveURL(/\/desbloquear\?volver=%2Foperaciones/);
+    expect((await sinCookies.request.post("/vivo")).status()).toBe(401);
+    await sinCookies.close();
+    // Y el token de la sesión, directo contra la API: la base no le da nada ni la reconoce con su rol.
+    expect(await directo(jwt)).toEqual({ obras: 0, rol: "" });
+
     // Con la huella: la pantalla de desbloqueo la pide, el servidor la verifica y vuelve a donde iba.
     await page.goto("/operaciones");
     await page.waitForURL((u) => u.pathname === "/operaciones", { timeout: 20_000 });
     await expect(page.locator("main")).toContainText("Materiales");
     await expect.poll(() => auditoria("DESBLOQUEO", desde), { timeout: 15_000 }).toBeGreaterThanOrEqual(1);
-    // Desbloqueado: el latido lo mantiene.
+    // Desbloqueado: el latido lo mantiene, y la base vuelve a darle sus datos.
     expect((await page.request.post("/vivo")).status()).toBe(204);
+    expect((await directo(jwt)).rol).toBe("JEFE_OPERACIONES");
     await ctx.close();
   });
 });

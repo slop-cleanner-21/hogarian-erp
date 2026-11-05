@@ -10,6 +10,7 @@ import { Sheet } from "./ui/sheet";
 
 /** Cambiar la propia contraseña (desde el menú del usuario). */
 export function CambiarContrasena({ onClose }: { onClose: () => void }) {
+  const [actual, setActual] = useState("");
   const [nueva, setNueva] = useState("");
   const [repetida, setRepetida] = useState("");
   const [listo, setListo] = useState(false);
@@ -20,7 +21,7 @@ export function CambiarContrasena({ onClose }: { onClose: () => void }) {
   const guardar = () =>
     startTransition(async () => {
       setError(null);
-      const e = await cambiarMiContrasena(nueva);
+      const e = await cambiarMiContrasena(actual, nueva);
       if (e) return setError(e);
       setListo(true);
     });
@@ -36,7 +37,7 @@ export function CambiarContrasena({ onClose }: { onClose: () => void }) {
             Listo
           </Button>
         ) : (
-          <Button size="lg" onClick={guardar} disabled={pending || nueva.length < MIN_CONTRASENA || nueva !== repetida}>
+          <Button size="lg" onClick={guardar} disabled={pending || !actual || nueva.length < MIN_CONTRASENA || nueva !== repetida}>
             Cambiar contraseña
           </Button>
         )
@@ -44,7 +45,10 @@ export function CambiarContrasena({ onClose }: { onClose: () => void }) {
     >
       {!listo && (
         <div className="flex flex-col gap-4 p-4">
-          <Field label={`Nueva contraseña (mín. ${MIN_CONTRASENA})`}>
+          <Field label="Contraseña actual">
+            <PasswordInput value={actual} onChange={(e) => setActual(e.target.value)} autoComplete="current-password" />
+          </Field>
+          <Field label={`Nueva contraseña (mín. ${MIN_CONTRASENA}, con letras y números)`}>
             <PasswordInput value={nueva} onChange={(e) => setNueva(e.target.value)} autoComplete="new-password" />
           </Field>
           <Field label="Repetir la contraseña">

@@ -38,7 +38,7 @@ const LECTURA = tabla(`
   audit_log                    0   0   0   0   0   0   0   0
   avance_fotos                 T   T   T   P   T   T   T   0
   avances                      T   T   T   P   T   T   T   0
-  comprobantes                 T   T   T   0   T   T   T   0
+  comprobantes                 T   T   T   0   T   T   0   0
   comprobantes_historial       T   T   T   0   0   0   0   0
   cotizacion_accesos           T   0   0   0   0   0   0   0
   cuentas_contables            0   T   0   0   T   0   0   0
@@ -55,7 +55,7 @@ const LECTURA = tabla(`
   oc_items                     T   T   T   P   T   T   T   0
   ordenes_compra               T   T   T   P   T   T   T   0
   ordenes_pago                 T   T   T   0   0   0   0   0
-  pago_aplicaciones            T   T   T   0   T   T   T   0
+  pago_aplicaciones            T   T   T   0   T   T   0   0
   pagos                        T   T   T   0   T   0   0   0
   partidas                     T   T   T   P   T   T   T   0
   perfil_obras                 T   T   T   P   T   T   T   0
@@ -64,23 +64,24 @@ const LECTURA = tabla(`
   huellas                      X   X   X   X   X   X   X   X
   huella_desafios              X   X   X   X   X   X   X   X
   login_ips                    X   X   X   X   X   X   X   X
-  personas                     0   0   0   0   T   T   T   T
-  proveedor_contactos          T   T   T   0   T   T   T   0
+  sesiones_bloqueo             X   X   X   X   X   X   X   X
+  personas                     0   0   0   0   T   T   0   T
+  proveedor_contactos          T   T   T   0   T   T   0   0
   proveedor_cuentas            T   T   T   0   T   0   0   0
-  proveedor_tipos_material     T   T   T   0   T   T   T   0
+  proveedor_tipos_material     T   T   T   0   T   T   0   0
   proveedores                  T   T   T   P   T   T   T   0
   push_suscripciones           M   M   M   M   M   M   M   M
   rechazos                     T   T   T   0   T   0   0   0
   requerimientos               T   T   T   T   T   T   T   0
   requerimientos_obra          T   T   T   0   T   T   T   0
   requerimientos_obra_items    T   T   T   0   T   T   T   0
-  retenciones                  T   T   T   0   T   T   T   0
-  detracciones                 T   T   T   0   T   T   T   0
+  retenciones                  T   T   T   0   T   T   0   0
+  detracciones                 T   T   T   0   T   T   0   0
   parametros                   T   T   T   T   T   T   T   T
-  solicitud_adjuntos           0   0   0   0   T   T   T   0
-  solicitudes                  0   0   0   0   T   T   T   T
+  solicitud_adjuntos           0   0   0   0   T   T   0   0
+  solicitudes                  0   0   0   0   T   T   0   T
   tipos_material               T   T   T   T   T   T   T   0
-  transportistas               T   T   T   0   T   T   T   0
+  transportistas               T   T   T   0   T   T   0   0
   valorizacion_partidas        T   T   T   T   T   T   T   0
   valorizaciones               T   T   T   P   T   T   T   0
 `);
@@ -169,7 +170,7 @@ const RPC: Record<string, string> = {
 };
 // Funciones de lectura o internas que no necesitan fila en RPC; anular_requerimiento va aparte (mira el
 // requerimiento antes que el rol, así que se prueba en SQL revertido).
-const SIN_ROL = /^(fn_|rol_|mi_rol$|es_residente$|obras_residente$|orden_visible_residente$|ruta_obra_residente$|exigir_rol$|faltante$|glosa_rhe_defecto$|siguiente_numero_oc$|token_cotizacion_de$|rol_prod1$|get_cotizacion$|enviar_cotizacion$|anular_requerimiento$)/;
+const SIN_ROL = /^(fn_|rol_|mi_rol$|es_residente$|obras_residente$|orden_visible_residente$|ruta_obra_residente$|exigir_rol$|faltante$|glosa_rhe_defecto$|siguiente_numero_oc$|token_cotizacion_de$|rol_prod1$|get_cotizacion$|enviar_cotizacion$|anular_requerimiento$|sesion_bloqueada$|bloqueo_estado$|bloqueo_activar$)/;
 const DENEGADO =
   /No tienes permiso|^Solo (Recursos Humanos|Operaciones|Gerencia|Logística|Contabilidad|Tesorería|el Jefe|los residentes|quien lo creó)|Inicia sesión|permission denied for function/i;
 

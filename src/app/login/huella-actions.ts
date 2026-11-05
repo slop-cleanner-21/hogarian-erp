@@ -4,7 +4,7 @@ import type { AuthenticationResponseJSON, RegistrationResponseJSON } from "@simp
 import { redirect } from "next/navigation";
 import { dispositivo } from "@/lib/auditoria-reporte";
 import { origen, registrarEvento } from "@/lib/auditoria";
-import { marcarDispositivo, olvidarDispositivo, soloMarcarDispositivo } from "@/lib/bloqueo-cookies";
+import { activarBloqueoSesion, marcarDispositivo, olvidarDispositivo, quitarBloqueoSesion, soloMarcarDispositivo } from "@/lib/bloqueo-cookies";
 import { huellasDe, opcionesActivar, opcionesFirmar, verificarActivacion, verificarFirma, type Huella } from "@/lib/huella";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { createClient, requireSesionVigente } from "@/lib/supabase/server";
@@ -48,7 +48,8 @@ export async function entrarConHuella(respuesta: AuthenticationResponseJSON): Pr
     return { error: FALLO };
   }
   await registrarEvento({ tabla: "sesion", accion: "LOGIN", registro: userId, actor: userId, detalle: { email, metodo: "huella" } });
-  // Este dispositivo tiene su huella y queda desbloqueado.
+  // Este dispositivo tiene su huella y queda desbloqueado (la sesión nueva, con bloqueo en la base).
+  await activarBloqueoSesion(supabase, true);
   await marcarDispositivo(userId);
   redirect("/");
 }
@@ -76,6 +77,7 @@ export async function activarHuella(
   const sesion = await requireSesionVigente();
   const h = await verificarActivacion(sesion.userId, respuesta, dispositivo((await origen()).agente));
   if (!h) return null;
+  await activarBloqueoSesion(await createClient(), true);
   await marcarDispositivo(sesion.userId);
   const { data } = await createAdminClient().auth.admin.getUserById(sesion.userId);
   return { userId: sesion.userId, credentialId: h.credential_id, email: data.user?.email ?? "" };
@@ -85,6 +87,7 @@ export async function activarHuella(
  *  el bloqueo del servidor. Solo lo hace más estricto para la propia sesión (no desbloquea nada). */
 export async function yaActivadaAqui() {
   const sesion = await requireSesionVigente();
+  await activarBloqueoSesion(await createClient(), true);
   await soloMarcarDispositivo(sesion.userId);
 }
 
@@ -97,6 +100,14 @@ export async function quitarHuella(id: string, esteDispositivo = false): Promise
     .eq("id", id)
     .eq("user_id", sesion.userId);
   const ok = !error && count === 1;
-  if (ok && (esteDispositivo || (await huellasDe(sesion.userId)).length === 0)) await olvidarDispositivo();
-  return ok;
+  if (!ok) return false;
+  const ninguna = (await huellasDe(sesion.userId)).length === 0;
+  if (esteDispositivo || ninguna) {
+    const { data } = await (await createClient()).auth.getClaims();
+    const sid = typeof data?.claims?.session_id === "string" ? data.claims.session_id : null;
+    // Sin huellas, ninguna sesión suya queda con bloqueo; si no, solo esta (las demás siguen en sus dispositivos).
+    await quitarBloqueoSesion(ninguna ? null : sid, sesion.userId);
+    await olvidarDispositivo();
+  }
+  return true;
 }

@@ -198,10 +198,14 @@ Contabilidad, Residente, Ingeniero de Operaciones y RRHH **no entran**. Sus role
   - Lo que se hace con la clave secreta (Admin, Empresas, firma, huella) mira el rol vigente en la base
     (`requireSesionVigente`): un Admin desactivado pierde el panel al instante. Nadie se reactiva a sí mismo.
   - **Login: reintentos y CAPTCHA por IP** (`src/lib/captcha.ts`, tabla `login_ips`):
-    - desde el **3.er intento fallido** desde una IP, esa IP pide **CAPTCHA (Cloudflare Turnstile) para siempre**,
-      y cada nuevo fallo reciente la hace esperar más antes de reintentar (5 s, 10 s, 20 s… hasta 5 min, con la
-      cuenta regresiva en el botón); la auditoría registra «La IP pide CAPTCHA desde ahora»;
-    - además, 10 intentos fallidos por cuenta o 30 por IP en 15 minutos y espera;
+    - desde el **3.er intento fallido** desde una IP, esa IP pide **CAPTCHA (Cloudflare Turnstile) para siempre**;
+      la auditoría registra «La IP pide CAPTCHA desde ahora»;
+    - desde el 3.º fallo de una IP **con una misma cuenta**, cada nuevo fallo reciente hace esperar más antes de
+      reintentar (5 s, 10 s, 20 s… hasta 5 min, con la cuenta regresiva en el botón). Va por IP y cuenta: en una
+      oficina con una sola IP, los fallos de uno no hacen esperar a los demás;
+    - una cuenta con 10 intentos fallidos en 15 minutos (desde cualquier IP) pide CAPTCHA en vez de bloquearse (nadie
+      deja afuera a otro a propósito); sin claves de Turnstile, se bloquea 15 minutos. 30 fallos por IP en 15 minutos:
+      espera;
     - en producción, con `CAPTCHA_EN_SUPABASE=1`, Supabase Auth exige el CAPTCHA en **todo** ingreso con contraseña
       (nadie prueba contraseñas directo contra Supabase): para una IP sin fallos es invisible;
     - sin las claves de Turnstile no hay CAPTCHA: quedan los reintentos con espera y los límites (ver
@@ -217,6 +221,20 @@ Contabilidad, Residente, Ingeniero de Operaciones y RRHH **no entran**. Sus role
     ninguna server action (el envío del proveedor y la contraseña de la demo son rutas: `/cotizar/<token>/enviar`,
     `/acceso/entrar`); el contrato del link va sin la imagen de la firma; huellas solo para el servidor y desafíos
     limitados por IP; los intentos de login ya bloqueados no se registran. Ítems: auditados en todo cambio.
+  - Re-auditoría contra producción (migración `prod1_seguridad_3`):
+    - el bloqueo con huella, también en la base (arriba);
+    - **archivos por rol y carpeta**: facturas (`comprobantes`) Logística; en `documentos`, `pagos/` Tesorería y
+      `guias/`, `proveedores/` y `<obra>/<orden>/` Logística; lo demás (firmas, entregas, demos) solo el servidor;
+    - el **Jefe de Operaciones** no lee lo financiero (facturas, pagos, retenciones, detracciones, contactos y personas):
+      solo lo de su seguimiento;
+    - **contraseñas**: con letras y números (también en Supabase Auth); cambiar la propia pide la actual (la verifica
+      la base, con un tope de 5 intentos en 15 minutos, y queda en la auditoría «Cambio de contraseña fallido»);
+      Supabase exige reautenticarse para cambiarla directo por la API (`secure_password_change`);
+    - la cookie de sesión va solo por HTTPS en producción y `SameSite=Lax`;
+    - el bundle no lleva la lista de usuarios locales ni su contraseña (`NEXT_PUBLIC_USUARIOS_LOCALES` fija al
+      compilar); `/acceso` no existe sin contraseña de demo;
+    - sin `TRUNCATE` / `TRIGGER` / `REFERENCES` para anon y las sesiones; el envío del proveedor no devuelve errores
+      crudos de Postgres.
 - **Login:** sol / luna arriba a la derecha (claro u oscuro, el mismo tema del menú).
 - **Huella (passkey, WebAuthn):** cada usuario la activa por dispositivo desde su menú › Huella (ahí ve y quita
   sus dispositivos). En la app instalada (PWA) se ofrece una vez si el teléfono tiene huella o rostro. Con ella:
@@ -226,12 +244,18 @@ Contabilidad, Residente, Ingeniero de Operaciones y RRHH **no entran**. Sus role
     desbloquea con la huella; «Usar contraseña» cierra la sesión. Se abre apenas el teléfono acepta la huella y
     el servidor la verifica después (si la rechaza, vuelve a bloquear). Mientras carga la app recién abierta, la
     pantalla no se muestra (`BLOQUEO_SCRIPT`, `src/lib/bloqueo.ts`).
-  - **el servidor hace cumplir el bloqueo** (`src/lib/bloqueo-servidor.ts`, proxy): el dispositivo con la huella
-    activada lleva una cookie firmada; sin «desbloqueado» vigente (otra cookie firmada, httpOnly, que se renueva con
-    cada pedido y un latido cada minuto mientras la app está a la vista, y vence a los 3 minutos sin actividad) no
-    se entrega ninguna pantalla: redirige a `/desbloquear` (y un pedido que no es una pantalla recibe 401).
-    Desactivar JavaScript o ver el código de la página no se lo salta. Desbloquear y cerrar sesión van por rutas
-    (`/desbloquear/opciones`, `/desbloquear/verificar`, `/login/salir`) que funcionan con la pantalla bloqueada.
+  - **el servidor y la base hacen cumplir el bloqueo** (`src/lib/bloqueo-servidor.ts`, proxy, tabla
+    `sesiones_bloqueo`): la sesión abierta en un dispositivo con la huella (al activarla, al entrar con ella o con
+    contraseña en ese dispositivo) queda en la base con su «desbloqueado hasta», que se renueva con los pedidos y un
+    latido cada minuto mientras la app está a la vista, y vence a los 3 minutos sin actividad. Vencido:
+    - el proxy no entrega ninguna pantalla: redirige a `/desbloquear` (y un pedido que no es una pantalla recibe 401);
+    - la base trata a la sesión como sin perfil (`rol_actual()` / `rol_en()`): ni tablas, ni RPC, ni archivos, ni
+      realtime, aunque se use su token directo contra la API.
+
+    Desactivar JavaScript, ver el código o borrar las cookies no se lo salta: las cookies firmadas (httpOnly) solo
+    evitan preguntarle a la base en cada pedido. Solo el servidor desbloquea, tras verificar la huella. Desbloquear y
+    cerrar sesión van por rutas (`/desbloquear/opciones`, `/desbloquear/verificar`, `/login/salir`) que funcionan con
+    la pantalla bloqueada; `/desbloquear?volver=` solo vuelve a una ruta de la app (nunca a otro dominio).
 
   Si otra persona entra con contraseña en ese dispositivo, la huella deja de ofrecerse. Una huella quitada desde
   otro dispositivo deja de ofrecerse al fallar. Las credenciales (`huellas`, solo la clave pública) y los

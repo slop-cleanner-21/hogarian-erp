@@ -3,8 +3,8 @@ import { createAdminClient } from "@/lib/supabase/admin";
 
 // CAPTCHA del ingreso (Cloudflare Turnstile) y reintentos por IP.
 //
-// - Desde el 3.er intento fallido desde una IP, esa IP pide CAPTCHA para siempre (login_ips), y cada nuevo fallo
-//   reciente la hace esperar más (5 s, 10 s, 20 s… hasta 5 min).
+// - Desde el 3.er intento fallido desde una IP, esa IP pide CAPTCHA para siempre (login_ips); y desde el 3.º de una
+//   IP con una misma cuenta, cada nuevo fallo reciente hace esperar más (5 s, 10 s, 20 s… hasta 5 min).
 // - Con CAPTCHA_EN_SUPABASE=1 (producción), Supabase Auth exige el token en todo ingreso con contraseña: así nadie
 //   prueba contraseñas directo contra Supabase. La página lo pide siempre (invisible si la IP no está marcada) y
 //   Supabase lo verifica (el token es de un solo uso: la app no lo verifica antes).
@@ -41,11 +41,12 @@ export async function falloIp(ip: string | null): Promise<{ captcha: boolean; nu
   return { captcha: !!r?.captcha, nuevo: !!r?.nuevo_captcha };
 }
 
-/** Segundos que una IP marcada debe esperar tras su último fallo, según sus fallos recientes (15 min). */
-export function espera(estado: EstadoIp, recientes: number): number {
-  if (!estado.captcha || recientes < 3 || !estado.ultimoFallo) return 0;
+/** Segundos que hay que esperar tras el último fallo de una IP con una cuenta, según sus fallos recientes (15 min):
+ *  desde el 3.º, 5 s, 10 s, 20 s… hasta 5 min. */
+export function espera(recientes: number, ultimoFallo: number | null): number {
+  if (recientes < 3 || !ultimoFallo) return 0;
   const segundos = Math.min(5 * 2 ** (recientes - 3), 300);
-  return Math.max(0, Math.ceil((estado.ultimoFallo + segundos * 1000 - Date.now()) / 1000));
+  return Math.max(0, Math.ceil((ultimoFallo + segundos * 1000 - Date.now()) / 1000));
 }
 
 /** Verifica un token de Turnstile (solo cuando lo verifica la app, no Supabase). */
