@@ -73,7 +73,7 @@ Contabilidad, Residente y RRHH **no entran**. Sus roles siguen en la base
   queda registrada. No se retiene si el proveedor tiene **suspensión de 4ta** vigente: Logística la marca en
   su ficha solo subiendo la constancia (Formulario 1609) con su fecha; vale hasta el 31 de diciembre de ese
   año (`src/lib/retencion.ts`).
-- **Detracción** (SPOT): solo la llevan las facturas (OC y OS), desde S/ 700 y en los ítems que marca
+- **Detracción** (SPOT): solo la llevan las facturas (OC y OS) de más de S/ 700 (700 exactos no), en los ítems que marca
   Gerencia; un recibo por honorarios nunca la lleva.
 - **OS de mano de obra:** Logística las crea directo, como una OS de subcontrato (sin avances,
   valorizaciones ni retenciones). El seguimiento de mano de obra usa el mismo recorrido que el de

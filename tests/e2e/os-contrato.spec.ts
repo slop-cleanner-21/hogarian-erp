@@ -158,6 +158,24 @@ test.describe("@prod1 @logistica facturar: guía y retención", () => {
       await page.getByRole("listbox", { name: "Tipo de comprobante" }).getByRole("option", { name: "Recibo por honorarios", exact: true }).click();
       await hoja.getByLabel("Total").fill("2000");
       await expect(hoja.getByLabel(/^Retención 4ta · suspendida/)).toHaveAttribute("placeholder", "0.00");
+
+      // Una suspensión del año pasado ya no vale (vence el 31 de diciembre): vuelve a retener.
+      sql(`update proveedores set suspension_4ta_fecha = (date_trunc('year', now() at time zone 'America/Lima') - interval '1 day')::date where id = ${prov}`);
+      await page.reload();
+      await page.getByRole("button", { name: "Registrar comprobante" }).click();
+      await hoja.getByRole("button", { name: "Tipo de comprobante" }).click();
+      await page.getByRole("listbox", { name: "Tipo de comprobante" }).getByRole("option", { name: "Recibo por honorarios", exact: true }).click();
+      await hoja.getByLabel("Total").fill("2000");
+      await expect(hoja.getByLabel("Retención 4ta (8 %)")).toHaveAttribute("placeholder", "160.00");
+
+      // Con el % propio del proveedor (Logística lo cambia en su ficha): 10 % de S/ 2,000.
+      sql(`update proveedores set retencion_4ta_pct = 10, suspension_4ta_fecha = null, suspension_4ta_path = null where id = ${prov}`);
+      await page.reload();
+      await page.getByRole("button", { name: "Registrar comprobante" }).click();
+      await hoja.getByRole("button", { name: "Tipo de comprobante" }).click();
+      await page.getByRole("listbox", { name: "Tipo de comprobante" }).getByRole("option", { name: "Recibo por honorarios", exact: true }).click();
+      await hoja.getByLabel("Total").fill("2000");
+      await expect(hoja.getByLabel("Retención 4ta (10 %)")).toHaveAttribute("placeholder", "200.00");
     } finally {
       sql(`update proveedores set retencion_4ta_pct = ${pct}, suspension_4ta_fecha = ${fechaS ? `'${fechaS}'` : "null"}, suspension_4ta_path = ${pathS ? `'${pathS}'` : "null"} where id = ${prov};
            update ordenes_compra set comprobante_tipo = ${antes ? `'${antes}'` : "null"} where obra_id = ${obra} and numero = '${numero}'`);
