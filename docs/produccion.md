@@ -80,8 +80,17 @@ Ensayado en local el 04/11/2026 con este mismo orden (base vacía → Admin → 
 
 ## Entorno de pruebas (04/11/2026)
 
-En las cuentas personales, hasta tener permiso en los equipos de la empresa (luego se transfieren: Supabase
-› Project Settings › Transfer project; Vercel › Settings › Transfer; la URL de Supabase no cambia):
+En las cuentas personales hasta sacar el ERP a producción (05/11/2026: se decidió no transferir todavía). Luego se
+transfieren (Supabase › Project Settings › General › Transfer project; Vercel › Settings › General › Transfer
+Project; la URL de Supabase y la de Vercel no cambian, y las huellas siguen valiendo):
+
+- **Costo en Supabase:** la organización `hogariangroup` es de pago y su crédito de cómputo ya lo usa
+  `hogarian-comercial`: el ERP suma **$10/mes**. Tras transferirlo, subirlo a **Micro** (Compute and Disk) sin costo
+  extra (reinicia la base unos 2 minutos).
+- **Costo en Vercel:** el equipo Pro cobra **$20/mes por miembro que despliega**, no por proyecto (Viewer es gratis).
+  El ERP no suma un fijo: sus builds y funciones salen de los $20 de crédito incluido. En un equipo Pro solo se
+  despliegan los commits de autores que son miembros (el correo del commit debe estar en la cuenta de Vercel), y
+  hay que revisar la conexión de Git (Settings › Git) tras el traspaso.
 
 | | |
 |---|---|
