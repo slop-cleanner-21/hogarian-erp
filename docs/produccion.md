@@ -76,7 +76,7 @@ Ensayado en local el 04/11/2026 con este mismo orden (base vacía → Admin → 
 
 | | |
 |---|---|
-| App | https://hogarian-erp-hogarian-group.vercel.app (Vercel, equipo **HOGARIAN GROUP**, proyecto `hogarian-erp`, conectado a `main`) |
+| App | https://hogarian-erp-phi.vercel.app (Vercel, equipo **HOGARIAN GROUP**, proyecto `hogarian-erp`, conectado a `main`) |
 | Supabase | proyecto `fwdhevzbludhehoyfnho` (organización **hogariangroup**, sa-east-1, Micro) |
 | Claves locales | `.env.empresa.local` (no se sube): contraseña de la base, URL, clave pública y secreta |
 
