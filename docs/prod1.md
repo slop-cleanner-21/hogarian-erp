@@ -18,9 +18,10 @@ código del MVP se toca lo mínimo, para que los cherry-picks entren sin conflic
 | **Logística** | OC, OS, proveedores, transportistas e ítems (los consulta y clasifica; no los crea). Sin la pestaña Requerimientos ni nada de residentes. Registra la guía de remisión y crea las OS de mano de obra. |
 | **Gerencia** | Obras: carga y publica presupuestos, con sus detracciones, el mínimo del SPOT y los adicionales. Seguimiento (la misma vista que el del Jefe de Operaciones), órdenes e **ítems**: los crea Gerencia. |
 | **Jefe de Operaciones** | Solo el seguimiento de compras de Logística. |
+| **Ingeniero de Operaciones** | Exactamente lo mismo que el Jefe: solo ver el seguimiento. Para la base es un Jefe (`rol_actual()` / `rol_en()` lo tratan como `JEFE_OPERACIONES`, migración `prod1_ing_operaciones`), así hereda todas sus restricciones; en `perfiles` queda su rol (`OPERACIONES`), para migrar al MVP. |
 | Admin | Todo lo anterior y **Usuarios** (`/admin`, desde su menú). |
 
-Contabilidad, Residente, Ingeniero de Operaciones y RRHH **no entran**. Sus roles siguen en la base
+Contabilidad, Residente y RRHH **no entran**. Sus roles siguen en la base
 (para migrar al MVP), pero `requireSesion` los manda a `/sin-acceso` (`src/lib/prod1.ts`).
 
 ## Decisiones de flujo (propias de prod 1)
@@ -100,13 +101,25 @@ Contabilidad, Residente, Ingeniero de Operaciones y RRHH **no entran**. Sus role
   factura con su archivo, PDF de la orden, contrato, guía de remisión, pagos con voucher, rechazos y entregas.
   Para eso Gerencia lee guías, pagos, rechazos, facturas y vouchers (antes solo Logística, Contabilidad y
   Tesorería). El Jefe de Operaciones no entra a la consulta.
-- **Usuarios (solo el Admin):** crea cuentas (nombre, correo, rol de prod 1 y una contraseña temporal que
-  se ve una vez para pasársela), cambia nombre, correo y rol, restablece la contraseña (genera otra temporal),
+- **Usuarios (solo el Admin):** crea cuentas (nombre, correo, rol de prod 1, DNI y celular), cambia nombre, correo, rol,
+  DNI y celular, restablece la contraseña (genera otra temporal),
   desactiva y reactiva. Lo hace el servidor con la clave secreta (`src/lib/supabase/admin.ts`); el registro
   público sigue apagado. Una cuenta desactivada queda baneada: no entra, no renueva su sesión y la base deja
   de darle datos al instante (`rol_actual` / `rol_en` la tratan como sin perfil). El Admin no puede
   desactivarse ni quitarse el rol. Cada usuario cambia su contraseña desde su menú («Cambiar contraseña»).
   Un cambio de rol rige en la base al instante; en las pantallas, al renovarse su sesión (hasta 1 h).
+  - **Entregar el acceso** (al crear la cuenta, o después desde su ficha), de una de dos formas; se ve una sola vez,
+    para copiarlo o **enviarlo por WhatsApp** (si la cuenta tiene celular: abre WhatsApp con el mensaje escrito, el
+    Admin lo envía):
+    - **Link de acceso** (por defecto; migración `prod1_bienvenida`, `src/lib/bienvenida.ts`): sirve **una sola vez** y
+      vence a los 7 días. Al abrirlo (`/bienvenida/<token>`, sin sesión), el usuario completa sus datos —nombres,
+      apellidos, DNI (obligatorio en Gerencia) y celular, **solo esa vez**; después solo los cambia el Admin— y crea su
+      contraseña; entra directo y, si el teléfono puede, se le ofrece la huella. La base guarda solo el hash del token y
+      lo usa de una vez (`bienvenida_completar`). Generar otro link o una contraseña temporal invalida el anterior;
+      hasta usarlo, la cuenta no tiene contraseña.
+    - **Contraseña temporal**: el mensaje lleva la dirección de la app, el correo y la contraseña.
+  - El celular (como el DNI) va en `perfil_privado`: solo lo lee el servidor. Se guarda con el código del país (un
+    número de 9 dígitos que empieza con 9 lleva el 51).
 - **Presupuesto de la obra (Gerencia):** buscador por ítem y «Filtros» (requerimiento: regular o cada adicional,
   varias etapas, rubro y con o sin P.U.), en la pantalla, sin recargar (`FiltrosHoja` con `local`); las
   partidas nuevas o cambiadas siempre se ven. Las adicionales llevan una franja a la izquierda y dicen

@@ -126,7 +126,7 @@ const cancelada = (e: unknown) => e instanceof WebAuthnError ? e.name === "NotAl
  * Activa la huella de este dispositivo para el usuario de la sesión. Devuelve null si salió bien o si la canceló;
  * si ya estaba activada aquí (una de sus huellas vive en este teléfono), solo la marca.
  */
-async function activarAqui(): Promise<string | null> {
+export async function activarAqui(): Promise<string | null> {
   try {
     const r = await activarHuella(await startRegistration({ optionsJSON: await opcionesActivarHuella() }));
     if (!r) return "No se pudo activar";

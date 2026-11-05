@@ -1,6 +1,6 @@
 "use client";
 
-import { Plus, RefreshCw } from "lucide-react";
+import { MessageCircle, Plus, RefreshCw } from "lucide-react";
 import { useRouter } from "next/navigation";
 import { useState, useTransition } from "react";
 import { Avatar } from "@/components/avatar";
@@ -13,14 +13,15 @@ import { Sheet } from "@/components/ui/sheet";
 import { cn, fecha } from "@/lib/format";
 import { ROLES_PROD1 } from "@/lib/prod1";
 import type { Rol } from "@/lib/types";
-import { contrasenaAlAzar, MIN_CONTRASENA, ROL_LABEL } from "@/lib/usuarios";
-import { cambiarActivo, crearUsuario, editarUsuario, restablecerContrasena } from "./actions";
+import { celularLegible, contrasenaAlAzar, enlaceWhatsapp, mensajeContrasena, mensajeLink, MIN_CONTRASENA, normalizarCelular, ROL_LABEL } from "@/lib/usuarios";
+import { cambiarActivo, crearUsuario, editarUsuario, generarLink, restablecerContrasena, type Acceso } from "./actions";
 
 export type Usuario = {
   id: string;
   nombre: string;
   email: string;
   dni: string;
+  telefono: string;
   rol: Rol | null;
   activo: boolean;
   ultimoIngreso: string | null;
@@ -33,9 +34,7 @@ export function UsuariosLista({ usuarios }: { usuarios: Usuario[] }) {
   const [q, setQ] = useState("");
   const [abierto, setAbierto] = useState<Usuario | "nuevo" | null>(null);
   const filtro = sinTildes(q.trim());
-  const visibles = filtro
-    ? usuarios.filter((u) => sinTildes(`${u.nombre} ${u.email} ${u.rol ? ROL_LABEL[u.rol] : ""}`).includes(filtro))
-    : usuarios;
+  const visibles = filtro ? usuarios.filter((u) => sinTildes(`${u.nombre} ${u.email} ${u.rol ? ROL_LABEL[u.rol] : ""}`).includes(filtro)) : usuarios;
 
   return (
     <>
@@ -90,13 +89,79 @@ function CampoDni({ dni, setDni, rol }: { dni: string; setDni: (v: string) => vo
   );
 }
 
-/** Contraseña recién creada o restablecida: se ve una sola vez, para pasársela al usuario. */
-function Credenciales({ email, contrasena }: { email: string; contrasena: string }) {
+function CampoCelular({ telefono, setTelefono }: { telefono: string; setTelefono: (v: string) => void }) {
   return (
-    <section aria-label="Credenciales" className="rounded-panel border border-line px-4 py-1">
-      <Dato label="Correo" valor={email} />
-      <Dato label="Contraseña" valor={contrasena} />
+    <Field label="Celular (WhatsApp, opcional)">
+      <Input
+        value={telefono}
+        onChange={(e) => setTelefono(e.target.value.replace(/[^\d+ ]/g, "").slice(0, 18))}
+        inputMode="tel"
+        autoComplete="off"
+        className="num"
+        placeholder="987 654 321"
+      />
+    </Field>
+  );
+}
+const celularValido = (t: string) => normalizarCelular(t) !== null;
+
+/**
+ * El acceso recién creado (link de un solo uso o contraseña temporal): se ve una sola vez, para pasárselo al usuario
+ * (copiándolo o por WhatsApp, si tiene celular: abre WhatsApp con el mensaje escrito).
+ */
+function EntregaAcceso({ acceso, nombre, email, telefono }: { acceso: Acceso; nombre: string; email: string; telefono: string }) {
+  const tel = normalizarCelular(telefono) || "";
+  const texto =
+    "link" in acceso ? mensajeLink(nombre, acceso.link.url, acceso.link.vence) : mensajeContrasena(nombre, window.location.origin, email, acceso.contrasena);
+  return (
+    <section aria-label="Credenciales" className="flex flex-col gap-3 rounded-panel border border-line px-4 py-2">
+      {"link" in acceso ? (
+        <>
+          <Dato label="Link de acceso (una sola vez)" valor={acceso.link.url} />
+          <p className="num text-[14px] text-ink-3">Vence el {fecha(acceso.link.vence)}</p>
+        </>
+      ) : (
+        <div>
+          <Dato label="Correo" valor={email} />
+          <Dato label="Contraseña" valor={acceso.contrasena} />
+        </div>
+      )}
+      {tel ? (
+        <a
+          href={enlaceWhatsapp(tel, texto)}
+          target="_blank"
+          rel="noopener noreferrer"
+          className="mb-2 flex h-12 items-center justify-center gap-2 rounded-control bg-[#25D366] font-semibold text-white active:opacity-80"
+        >
+          <MessageCircle size={20} /> Enviar por WhatsApp a {celularLegible(tel)}
+        </a>
+      ) : (
+        <div className="mb-2 flex items-center gap-2">
+          <span className="flex-1 text-[14px] text-ink-3">Mensaje</span>
+          <BotonCopiar valor={texto} label="mensaje" />
+        </div>
+      )}
     </section>
+  );
+}
+
+/** Cómo darle el acceso a una cuenta nueva. */
+function ElegirAcceso({ acceso, setAcceso }: { acceso: "link" | "contrasena"; setAcceso: (a: "link" | "contrasena") => void }) {
+  return (
+    <div role="radiogroup" aria-label="Acceso" className="grid grid-cols-2 gap-1 rounded-control bg-sunken p-1">
+      {(["link", "contrasena"] as const).map((a) => (
+        <button
+          key={a}
+          type="button"
+          role="radio"
+          aria-checked={acceso === a}
+          onClick={() => setAcceso(a)}
+          className={cn("h-11 rounded-field px-2 text-[15px]", acceso === a ? "bg-surface font-semibold" : "text-ink-2")}
+        >
+          {a === "link" ? "Link de acceso" : "Contraseña"}
+        </button>
+      ))}
+    </div>
   );
 }
 
@@ -105,18 +170,28 @@ function NuevoUsuario({ onClose }: { onClose: () => void }) {
   const [nombre, setNombre] = useState("");
   const [email, setEmail] = useState("");
   const [dni, setDni] = useState("");
+  const [telefono, setTelefono] = useState("");
   const [rol, setRol] = useState<string | null>(null);
+  const [modo, setModo] = useState<"link" | "contrasena">("link");
   const [contrasena, setContrasena] = useState(() => contrasenaAlAzar());
-  const [creado, setCreado] = useState(false);
+  const [creado, setCreado] = useState<Acceso | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [pending, startTransition] = useTransition();
 
   const crear = () =>
     startTransition(async () => {
       setError(null);
-      const r = await crearUsuario({ nombre, email, dni, rol: (rol ?? "") as Rol, contrasena });
+      const r = await crearUsuario({
+        nombre,
+        email,
+        dni,
+        telefono,
+        rol: (rol ?? "") as Rol,
+        acceso: modo,
+        contrasena: modo === "contrasena" ? contrasena : "",
+      });
       if (!r.ok) return setError(r.error);
-      setCreado(true);
+      setCreado(r.data.acceso);
       router.refresh();
     });
 
@@ -134,7 +209,15 @@ function NuevoUsuario({ onClose }: { onClose: () => void }) {
           <Button
             size="lg"
             onClick={crear}
-            disabled={pending || !nombre.trim() || !email.trim() || !rol || contrasena.length < MIN_CONTRASENA || !dniValido(dni, rol)}
+            disabled={
+              pending ||
+              !nombre.trim() ||
+              !email.trim() ||
+              !rol ||
+              (modo === "contrasena" && contrasena.length < MIN_CONTRASENA) ||
+              !dniValido(dni, rol) ||
+              !celularValido(telefono)
+            }
           >
             Crear cuenta
           </Button>
@@ -143,7 +226,7 @@ function NuevoUsuario({ onClose }: { onClose: () => void }) {
     >
       <div className="flex flex-col gap-4 p-4">
         {creado ? (
-          <Credenciales email={email.trim().toLowerCase()} contrasena={contrasena} />
+          <EntregaAcceso acceso={creado} nombre={nombre} email={email.trim().toLowerCase()} telefono={telefono} />
         ) : (
           <>
             <Field label="Nombre">
@@ -156,33 +239,41 @@ function NuevoUsuario({ onClose }: { onClose: () => void }) {
               <SearchSelect label="Rol" value={rol} onChange={setRol} options={opcionesRol(null)} placeholder="Elegir rol" />
             </Field>
             <CampoDni dni={dni} setDni={setDni} rol={rol} />
+            <CampoCelular telefono={telefono} setTelefono={setTelefono} />
+            <ElegirAcceso acceso={modo} setAcceso={setModo} />
             {/* Sin <label> envolvente: los botones de al lado no deben tomar su nombre. */}
-            <div className="flex flex-col gap-1.5">
-              <span id="contrasena-nueva" className="text-[15px] font-medium text-ink-2">
-                Contraseña
-              </span>
-              <div className="flex items-center gap-1">
-                <Input
-                  aria-labelledby="contrasena-nueva"
-                  value={contrasena}
-                  onChange={(e) => setContrasena(e.target.value)}
-                  autoComplete="new-password"
-                  className="num flex-1"
-                />
-                <button
-                  type="button"
-                  aria-label="Generar otra contraseña"
-                  onClick={() => setContrasena(contrasenaAlAzar())}
-                  className="flex h-11 w-11 shrink-0 items-center justify-center rounded-control text-ink-3 active:bg-ink/8"
-                >
-                  <RefreshCw size={18} />
-                </button>
-                <BotonCopiar valor={contrasena} label="contraseña" />
+            {modo === "contrasena" && (
+              <div className="flex flex-col gap-1.5">
+                <span id="contrasena-nueva" className="text-[15px] font-medium text-ink-2">
+                  Contraseña
+                </span>
+                <div className="flex items-center gap-1">
+                  <Input
+                    aria-labelledby="contrasena-nueva"
+                    value={contrasena}
+                    onChange={(e) => setContrasena(e.target.value)}
+                    autoComplete="new-password"
+                    className="num flex-1"
+                  />
+                  <button
+                    type="button"
+                    aria-label="Generar otra contraseña"
+                    onClick={() => setContrasena(contrasenaAlAzar())}
+                    className="flex h-11 w-11 shrink-0 items-center justify-center rounded-control text-ink-3 active:bg-ink/8"
+                  >
+                    <RefreshCw size={18} />
+                  </button>
+                  <BotonCopiar valor={contrasena} label="contraseña" />
+                </div>
               </div>
-            </div>
+            )}
           </>
         )}
-        {error && <p role="alert" className="text-danger">{error}</p>}
+        {error && (
+          <p role="alert" className="text-danger">
+            {error}
+          </p>
+        )}
       </div>
     </Sheet>
   );
@@ -193,12 +284,18 @@ function FichaUsuario({ u, onClose }: { u: Usuario; onClose: () => void }) {
   const [nombre, setNombre] = useState(u.nombre);
   const [email, setEmail] = useState(u.email);
   const [dni, setDni] = useState(u.dni);
+  const [telefono, setTelefono] = useState(u.telefono ? celularLegible(u.telefono) : "");
   const [rol, setRol] = useState<string | null>(u.rol);
-  const [nueva, setNueva] = useState<string | null>(null);
-  const [confirmar, setConfirmar] = useState<"contrasena" | "activo" | null>(null);
+  const [nueva, setNueva] = useState<Acceso | null>(null);
+  const [confirmar, setConfirmar] = useState<"contrasena" | "link" | "activo" | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [pending, startTransition] = useTransition();
-  const cambios = nombre.trim() !== u.nombre || email.trim().toLowerCase() !== u.email || rol !== u.rol || dni.trim() !== u.dni;
+  const cambios =
+    nombre.trim() !== u.nombre ||
+    email.trim().toLowerCase() !== u.email ||
+    rol !== u.rol ||
+    dni.trim() !== u.dni ||
+    (normalizarCelular(telefono) ?? "-") !== u.telefono;
 
   const correr = (accion: () => Promise<{ ok: true } | { ok: false; error: string }>, luego?: () => void) =>
     startTransition(async () => {
@@ -210,14 +307,22 @@ function FichaUsuario({ u, onClose }: { u: Usuario; onClose: () => void }) {
       router.refresh();
     });
 
-  const guardar = () => correr(() => editarUsuario({ id: u.id, nombre, email, dni, rol: rol ?? "" }), onClose);
+  const guardar = () => correr(() => editarUsuario({ id: u.id, nombre, email, dni, telefono, rol: rol ?? "" }), onClose);
   const restablecer = () =>
     startTransition(async () => {
       setError(null);
       const r = await restablecerContrasena(u.id);
       setConfirmar(null);
       if (!r.ok) return setError(r.error);
-      setNueva(r.data);
+      setNueva({ contrasena: r.data });
+    });
+  const link = () =>
+    startTransition(async () => {
+      setError(null);
+      const r = await generarLink(u.id);
+      setConfirmar(null);
+      if (!r.ok) return setError(r.error);
+      setNueva({ link: r.data });
     });
   const activar = () => correr(() => cambiarActivo(u.id, !u.activo), onClose);
 
@@ -227,7 +332,11 @@ function FichaUsuario({ u, onClose }: { u: Usuario; onClose: () => void }) {
       onClose={onClose}
       title={u.nombre || u.email}
       footer={
-        <Button size="lg" onClick={guardar} disabled={pending || !cambios || !nombre.trim() || !email.trim() || !rol || !dniValido(dni, rol)}>
+        <Button
+          size="lg"
+          onClick={guardar}
+          disabled={pending || !cambios || !nombre.trim() || !email.trim() || !rol || !dniValido(dni, rol) || !celularValido(telefono)}
+        >
           Guardar
         </Button>
       }
@@ -243,9 +352,13 @@ function FichaUsuario({ u, onClose }: { u: Usuario; onClose: () => void }) {
           <SearchSelect label="Rol" value={rol} onChange={setRol} options={opcionesRol(u.rol)} placeholder="Elegir rol" />
         </Field>
         <CampoDni dni={dni} setDni={setDni} rol={rol} />
+        <CampoCelular telefono={telefono} setTelefono={setTelefono} />
         <p className="num text-[14px] text-ink-3">Último ingreso: {u.ultimoIngreso ? fecha(u.ultimoIngreso) : "nunca"}</p>
-        {nueva && <Credenciales email={u.email} contrasena={nueva} />}
+        {nueva && <EntregaAcceso acceso={nueva} nombre={u.nombre} email={u.email} telefono={u.telefono} />}
         <div className="flex flex-col gap-2 border-t border-line pt-4">
+          <Button variant="secondary" disabled={pending} onClick={() => setConfirmar("link")}>
+            Link de acceso
+          </Button>
           <Button variant="secondary" disabled={pending} onClick={() => setConfirmar("contrasena")}>
             Restablecer contraseña
           </Button>
@@ -255,16 +368,17 @@ function FichaUsuario({ u, onClose }: { u: Usuario; onClose: () => void }) {
             </Button>
           )}
         </div>
-        {error && <p role="alert" className="text-danger">{error}</p>}
+        {error && (
+          <p role="alert" className="text-danger">
+            {error}
+          </p>
+        )}
       </div>
-      <Confirm
-        open={confirmar === "contrasena"}
-        title="¿Restablecer la contraseña?"
-        onYes={restablecer}
-        onNo={() => setConfirmar(null)}
-        pending={pending}
-      >
+      <Confirm open={confirmar === "contrasena"} title="¿Restablecer la contraseña?" onYes={restablecer} onNo={() => setConfirmar(null)} pending={pending}>
         La contraseña actual deja de servir.
+      </Confirm>
+      <Confirm open={confirmar === "link"} title="¿Generar un link de acceso?" onYes={link} onNo={() => setConfirmar(null)} pending={pending}>
+        Sirve una sola vez, durante 7 días: completa sus datos y crea su contraseña. Un link anterior deja de servir.
       </Confirm>
       <Confirm
         open={confirmar === "activo"}

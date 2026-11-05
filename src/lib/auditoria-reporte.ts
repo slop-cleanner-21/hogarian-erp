@@ -55,6 +55,8 @@ export const ACCION_LABEL: Record<string, string> = {
   CAMBIO_CONTRASENA: "Cambió su contraseña",
   CAMBIO_CONTRASENA_FALLIDO: "Cambio de contraseña fallido",
   CREAR_USUARIO: "Creó la cuenta",
+  GENERAR_LINK: "Generó un link de acceso",
+  BIENVENIDA: "Completó sus datos y creó su contraseña (link)",
   EDITAR_USUARIO: "Editó la cuenta",
   RESTABLECER_CONTRASENA: "Restableció la contraseña",
   DESACTIVAR: "Desactivó la cuenta",

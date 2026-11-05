@@ -115,7 +115,7 @@ export async function publicarPresupuesto(obraId: number): Promise<Result> {
 
 /** Quita a un residente de la obra dejando a otro en su lugar (no se puede quitar sin reemplazo). */
 export async function reemplazarResidente(obraId: number, sale: number, entra: number): Promise<Result> {
-  await requireSesion(["JEFE_OPERACIONES", "GERENCIA"]);
+  await requireSesion(["JEFE_OPERACIONES", "OPERACIONES", "GERENCIA"]);
   const supabase = await createClient();
   const { error } = await supabase.rpc("reemplazar_residente", { p_obra_id: obraId, p_sale: sale, p_entra: entra });
   if (error) return { ok: false, error: error.message };
@@ -125,7 +125,7 @@ export async function reemplazarResidente(obraId: number, sale: number, entra: n
 }
 
 export async function asignarPersonaObra(obraId: number, personaId: number, asignar: boolean): Promise<Result> {
-  await requireSesion(["JEFE_OPERACIONES", "GERENCIA"]);
+  await requireSesion(["JEFE_OPERACIONES", "OPERACIONES", "GERENCIA"]);
   const supabase = await createClient();
   const { error } = await supabase.rpc("asignar_persona_obra", { p_obra_id: obraId, p_persona_id: personaId, p_asignar: asignar });
   if (error) return { ok: false, error: error.message };

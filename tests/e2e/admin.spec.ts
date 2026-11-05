@@ -54,6 +54,8 @@ test.describe("@prod1 @admin usuarios", () => {
       await hoja.getByLabel("Correo").fill(email);
       await hoja.getByRole("button", { name: "Rol", exact: true }).click();
       await admin.getByRole("listbox", { name: "Rol" }).getByRole("option", { name: "Tesorería", exact: true }).click();
+      // Con contraseña temporal (por defecto es el link de acceso: bienvenida.spec).
+      await hoja.getByRole("radio", { name: "Contraseña" }).click();
       const temporal = await hoja.getByLabel("Contraseña", { exact: true }).inputValue();
       expect(temporal.length).toBeGreaterThanOrEqual(8);
       await hoja.getByRole("button", { name: "Crear cuenta" }).click();
@@ -91,7 +93,7 @@ test.describe("@prod1 @admin usuarios", () => {
       await admin.getByRole("dialog").filter({ hasText: "¿Restablecer la contraseña?" }).getByRole("button", { name: /^Sí/ }).click();
       const credenciales = ficha.getByRole("region", { name: "Credenciales" });
       await expect(credenciales).toBeVisible();
-      const nueva = (await credenciales.innerText()).split("\n").filter(Boolean).pop()!.trim();
+      const nueva = (await credenciales.innerText()).match(/Contraseña\s+(\S+)/)![1];
       expect(nueva.length).toBeGreaterThanOrEqual(8);
       expect((await entrar(browser, base, email, "propia-e2e-123")).error).toMatch(/incorrectos/);
       expect((await entrar(browser, base, email, nueva)).error).toBeNull();
@@ -143,6 +145,7 @@ test.describe("@prod1 @admin usuarios", () => {
       await hoja.getByLabel("Correo").fill(email);
       await hoja.getByRole("button", { name: "Rol", exact: true }).click();
       await admin.getByRole("listbox", { name: "Rol" }).getByRole("option", { name: "Logística", exact: true }).click();
+      await hoja.getByRole("radio", { name: "Contraseña" }).click();
       const clave = await hoja.getByLabel("Contraseña", { exact: true }).inputValue();
       await hoja.getByRole("button", { name: "Crear cuenta" }).click();
       await expect(admin.getByRole("dialog", { name: "Cuenta creada" })).toBeVisible();

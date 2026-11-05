@@ -7,7 +7,8 @@ import { registrarEvento } from "@/lib/auditoria";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { requireSesionVigente } from "@/lib/supabase/server";
 import type { Rol } from "@/lib/types";
-import { contrasenaAlAzar, contrasenaValida, MIN_CONTRASENA } from "@/lib/usuarios";
+import { crearLink, invalidarLinks } from "@/lib/bienvenida";
+import { contrasenaAlAzar, contrasenaValida, MIN_CONTRASENA, normalizarCelular } from "@/lib/usuarios";
 
 export type Result<T = undefined> = { ok: true; data: T } | { ok: false; error: string };
 
@@ -34,15 +35,27 @@ const Datos = z.object({
     .trim()
     .regex(/^(\d{8})?$/, "El DNI tiene 8 dígitos")
     .default(""),
+  /** Celular (para pasarle el link o la contraseña por WhatsApp): opcional. */
+  telefono: z
+    .string()
+    .default("")
+    .transform((t, ctx) => {
+      const n = normalizarCelular(t);
+      if (n === null) ctx.addIssue({ code: "custom", message: "Celular no válido" });
+      return n ?? "";
+    }),
 });
 const conDni = (d: { rol: string; dni: string }) => d.rol !== "GERENCIA" || d.dni !== "";
 const SIN_DNI = "Ingresa el DNI: va en los contratos que firma Gerencia";
 
-/** El DNI va aparte del perfil (perfil_privado): solo lo lee el servidor. */
-async function guardarDni(db: ReturnType<typeof createAdminClient>, id: string, dni: string) {
-  const { error } = await db.from("perfil_privado").upsert({ user_id: id, dni: dni || null }, { onConflict: "user_id" });
+/** DNI y celular van aparte del perfil (perfil_privado): solo los lee el servidor. */
+async function guardarPrivado(db: ReturnType<typeof createAdminClient>, id: string, dni: string, telefono: string) {
+  const { error } = await db.from("perfil_privado").upsert({ user_id: id, dni: dni || null, telefono: telefono || null }, { onConflict: "user_id" });
   return error;
 }
+
+/** Cómo se le da el acceso: un link de un solo uso (completa sus datos y crea su contraseña) o una contraseña temporal. */
+export type Acceso = { link: { url: string; vence: string } } | { contrasena: string };
 
 function mensaje(e: { message: string; code?: string } | null) {
   if (!e) return "No se pudo guardar";
@@ -53,13 +66,16 @@ function mensaje(e: { message: string; code?: string } | null) {
 
 const Crear = Datos.extend({
   rol: Rol_,
-  contrasena: z.string().superRefine((c, ctx) => {
-    const error = contrasenaValida(c);
+  acceso: z.enum(["link", "contrasena"]),
+  contrasena: z.string().default(""),
+})
+  .refine(conDni, { message: SIN_DNI })
+  .superRefine((d, ctx) => {
+    const error = d.acceso === "contrasena" ? contrasenaValida(d.contrasena) : null;
     if (error) ctx.addIssue({ code: "custom", message: error });
-  }),
-}).refine(conDni, { message: SIN_DNI });
+  });
 
-export async function crearUsuario(input: z.input<typeof Crear>): Promise<Result<string>> {
+export async function crearUsuario(input: z.input<typeof Crear>): Promise<Result<{ id: string; acceso: Acceso }>> {
   const p = Crear.safeParse(input);
   if (!p.success) return fail(p.error.issues[0].message);
   const { sesion, db } = await admin();
@@ -71,25 +87,32 @@ export async function crearUsuario(input: z.input<typeof Crear>): Promise<Result
   });
   if (error || !data.user) return fail(mensaje(error));
   const { error: e2 } = await db.from("perfiles").insert({ user_id: data.user.id, nombre: p.data.nombre, rol: p.data.rol });
-  const e4 = e2 ? null : (await db.rpc("fijar_contrasena", { p_user: data.user.id, p_clave: p.data.contrasena })).error;
+  // Con link, sin contraseña hasta que lo use (no puede entrar antes).
+  const e4 = e2 || p.data.acceso === "link" ? null : (await db.rpc("fijar_contrasena", { p_user: data.user.id, p_clave: p.data.contrasena })).error;
   if (e2 || e4) {
     // Sin perfil o sin contraseña la cuenta no sirve: se deshace.
     await db.auth.admin.deleteUser(data.user.id);
     return fail((e2 ?? e4)!.message);
   }
-  if (p.data.dni) {
-    const e3 = await guardarDni(db, data.user.id, p.data.dni);
+  if (p.data.dni || p.data.telefono) {
+    const e3 = await guardarPrivado(db, data.user.id, p.data.dni, p.data.telefono);
     if (e3) return fail(e3.message);
+  }
+  let acceso: Acceso = { contrasena: p.data.contrasena };
+  if (p.data.acceso === "link") {
+    const l = await crearLink(data.user.id, sesion.userId);
+    if ("error" in l) return fail(l.error);
+    acceso = { link: l };
   }
   await registrarEvento({
     tabla: "usuarios",
     accion: "CREAR_USUARIO",
     registro: data.user.id,
     actor: sesion.userId,
-    detalle: { email: p.data.email, nombre: p.data.nombre, rol: p.data.rol },
+    detalle: { email: p.data.email, nombre: p.data.nombre, rol: p.data.rol, acceso: p.data.acceso },
   });
   revalidatePath("/admin");
-  return { ok: true, data: data.user.id };
+  return { ok: true, data: { id: data.user.id, acceso } };
 }
 
 const Editar = Datos.extend({ id: z.guid(), rol: z.string() }).refine(conDni, { message: SIN_DNI });
@@ -113,7 +136,7 @@ export async function editarUsuario(input: z.input<typeof Editar>): Promise<Resu
   // El perfil pasa el rol y el nombre al token (trigger perfiles_a_token); en la base rigen al instante.
   const { error } = await db.from("perfiles").update({ nombre: p.data.nombre, rol }).eq("user_id", p.data.id);
   if (error) return fail(error.message);
-  const e2 = await guardarDni(db, p.data.id, p.data.dni);
+  const e2 = await guardarPrivado(db, p.data.id, p.data.dni, p.data.telefono);
   if (e2) return fail(e2.message);
   await registrarEvento({
     tabla: "usuarios",
@@ -134,12 +157,23 @@ export async function restablecerContrasena(id: string): Promise<Result<string>>
   if (!z.guid().safeParse(id).success) return fail("Usuario no válido");
   const { sesion, db } = await admin();
   const contrasena = contrasenaAlAzar();
-  // En la base (credenciales), no en Supabase Auth; cierra todas sus sesiones.
+  // En la base (credenciales), no en Supabase Auth; cierra todas sus sesiones. Sus links sin usar dejan de servir.
   const { error } = await db.rpc("fijar_contrasena", { p_user: id, p_clave: contrasena });
   if (error) return fail(error.message);
+  await invalidarLinks(id, sesion.userId);
   // Sin la contraseña: solo que se restableció.
   await registrarEvento({ tabla: "usuarios", accion: "RESTABLECER_CONTRASENA", registro: id, actor: sesion.userId });
   return { ok: true, data: contrasena };
+}
+
+/** Un link de acceso nuevo para la cuenta (de un solo uso, 7 días; el anterior sin usar deja de servir). */
+export async function generarLink(id: string): Promise<Result<{ url: string; vence: string }>> {
+  if (!z.guid().safeParse(id).success) return fail("Usuario no válido");
+  const { sesion } = await admin();
+  const l = await crearLink(id, sesion.userId);
+  if ("error" in l) return fail(l.error);
+  await registrarEvento({ tabla: "usuarios", accion: "GENERAR_LINK", registro: id, actor: sesion.userId });
+  return { ok: true, data: l };
 }
 
 export async function cambiarActivo(id: string, activo: boolean): Promise<Result> {

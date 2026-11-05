@@ -15,17 +15,18 @@ export default async function UsuariosPage() {
   const [cuentas, { data: perfiles, error }, { data: privados }] = await Promise.all([
     todasLasCuentas(db),
     db.from("perfiles").select("user_id, nombre, rol"),
-    db.from("perfil_privado").select("user_id, dni"),
+    db.from("perfil_privado").select("user_id, dni, telefono"),
   ]);
   if (error) throw new Error(error.message);
   const perfil = new Map(perfiles.map((p) => [p.user_id, p]));
-  const dni = new Map((privados ?? []).map((p) => [p.user_id, p.dni]));
+  const privado = new Map((privados ?? []).map((p) => [p.user_id, p]));
   const usuarios: Usuario[] = cuentas
     .map((u) => ({
       id: u.id,
       nombre: perfil.get(u.id)?.nombre ?? "",
       email: u.email ?? "",
-      dni: dni.get(u.id) ?? "",
+      dni: privado.get(u.id)?.dni ?? "",
+      telefono: privado.get(u.id)?.telefono ?? "",
       rol: (perfil.get(u.id)?.rol ?? null) as Rol | null,
       activo: activa(u.banned_until),
       ultimoIngreso: u.last_sign_in_at ?? null,

@@ -1203,6 +1203,37 @@ export type Database = {
         };
         Relationships: [];
       };
+      invitaciones: {
+        Row: {
+          creada_por: string | null;
+          created_at: string;
+          expira_at: string;
+          id: number;
+          token_hash: string;
+          usada_at: string | null;
+          user_id: string;
+        };
+        ComputedFields: never;
+        Insert: {
+          creada_por?: string | null;
+          created_at?: string;
+          expira_at: string;
+          id?: never;
+          token_hash: string;
+          usada_at?: string | null;
+          user_id: string;
+        };
+        Update: {
+          creada_por?: string | null;
+          created_at?: string;
+          expira_at?: string;
+          id?: never;
+          token_hash?: string;
+          usada_at?: string | null;
+          user_id?: string;
+        };
+        Relationships: [];
+      };
       items: {
         Row: {
           cuenta_contable: string | null;
@@ -1928,6 +1959,7 @@ export type Database = {
           dni: string | null;
           firma_at: string | null;
           firma_path: string | null;
+          telefono: string | null;
           user_id: string;
         };
         ComputedFields: never;
@@ -1935,12 +1967,14 @@ export type Database = {
           dni?: string | null;
           firma_at?: string | null;
           firma_path?: string | null;
+          telefono?: string | null;
           user_id: string;
         };
         Update: {
           dni?: string | null;
           firma_at?: string | null;
           firma_path?: string | null;
+          telefono?: string | null;
           user_id?: string;
         };
         Relationships: [];
@@ -3866,6 +3900,16 @@ export type Database = {
       asignar_persona_obra: {
         Args: { p_asignar: boolean; p_obra_id: number; p_persona_id: number };
         Returns: undefined;
+      };
+      bienvenida_completar: {
+        Args: {
+          p_clave: string;
+          p_dni: string;
+          p_hash: string;
+          p_nombre: string;
+          p_telefono: string;
+        };
+        Returns: string;
       };
       bloqueo_activar: { Args: { p_abierta: boolean }; Returns: undefined };
       bloqueo_desbloquear: { Args: { p_session: string }; Returns: undefined };

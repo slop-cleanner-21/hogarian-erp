@@ -68,7 +68,7 @@ const MODULOS: Record<ClaveModulo, { label: string; roles: Rol[]; nav: NavItem[]
   },
   operaciones: {
     label: "Operaciones",
-    roles: ["JEFE_OPERACIONES"],
+    roles: ["JEFE_OPERACIONES", "OPERACIONES"],
     // Solo el seguimiento de compras: una pantalla, sin barra inferior.
     nav: [{ href: "/operaciones", label: "Seguimiento", icon: TrendingUp, match: (p) => p === "/operaciones" }],
   },

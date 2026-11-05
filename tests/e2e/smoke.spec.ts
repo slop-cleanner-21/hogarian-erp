@@ -49,13 +49,14 @@ const RUTAS: Partial<Record<Rol, string[]>> = {
     "/consulta/orden/:oc",
   ],
   jefe: ["/operaciones"],
+  // El Ingeniero de Operaciones: lo mismo que el Jefe.
+  operaciones: ["/operaciones"],
 };
 
 // Roles fuera de prod 1 y rutas de módulos quitados.
 const FUERA: Partial<Record<Rol, string[]>> = {
   contabilidad: ["/", "/contabilidad/op", "/avisos", "/tesoreria"],
   residente: ["/", "/residente", "/avisos"],
-  operaciones: ["/", "/operaciones", "/avisos"],
   rrhh: ["/", "/rrhh", "/avisos"],
 };
 const QUITADAS: [Rol, string][] = [
@@ -65,6 +66,8 @@ const QUITADAS: [Rol, string][] = [
   ["jefe", "/operaciones/solicitudes"],
   ["jefe", "/operaciones/valorizaciones"],
   ["jefe", "/operaciones/obra"],
+  ["operaciones", "/operaciones/requerimientos"],
+  ["operaciones", "/operaciones/valorizaciones"],
 ];
 
 test.describe("@smoke @prod1 fuera de alcance", () => {

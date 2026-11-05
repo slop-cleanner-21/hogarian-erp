@@ -64,6 +64,7 @@ const LECTURA = tabla(`
   huellas                      X   X   X   X   X   X   X   X
   huella_desafios              X   X   X   X   X   X   X   X
   credenciales                 X   X   X   X   X   X   X   X
+  invitaciones                 X   X   X   X   X   X   X   X
   sesiones_bloqueo             X   X   X   X   X   X   X   X
   personas                     0   0   0   0   T   T   0   T
   proveedor_contactos          T   T   T   0   T   T   0   0
@@ -188,19 +189,28 @@ const ARCHIVOS: [string, string, string, string][] = [
   ["avances de obras del residente", "documentos", "name like 'avances/%' and split_part(name, '/', 2) in ({res})", "LOG CON TES RES GER OPS JEF"],
 ];
 
-// Prod 1 (20261105130000_prod1_seguridad), sobre la matriz del MVP: Contabilidad, Residente, Ing. de Operaciones
-// y RRHH no existen para la base (como sin perfil), y el Jefe de Operaciones no pasa ninguna función que escriba
-// ni ve archivos salvo las fotos de las entregas.
-const FUERA = ["CON", "RES", "OPS", "RRHH"];
+// Prod 1 (20261105130000_prod1_seguridad), sobre la matriz del MVP: Contabilidad, Residente y RRHH no existen para
+// la base (como sin perfil), y el Jefe de Operaciones no pasa ninguna función que escriba ni ve archivos salvo las
+// fotos de las entregas. El Ingeniero de Operaciones (OPS) tiene exactamente lo mismo que el Jefe
+// (20261106110000_prod1_ing_operaciones).
+const FUERA = ["CON", "RES", "RRHH"];
 const sin = (s: string, quitar: string[]) => s.split(/\s+/).filter((k) => k && !quitar.includes(k)).join(" ");
-for (const fila of Object.values(LECTURA)) for (const k of FUERA) if (fila[k as Corto] !== "X") fila[k as Corto] = "0";
-for (const e of ESCRITURA) e[1] = sin(e[1], FUERA);
+/** OPS pasa donde pasa el Jefe, y en nada más. */
+const comoJefe = (s: string) => {
+  const r = sin(s, ["OPS"]);
+  return r.split(" ").includes("JEF") ? `${r} OPS`.trim() : r;
+};
+for (const fila of Object.values(LECTURA)) {
+  for (const k of FUERA) if (fila[k as Corto] !== "X") fila[k as Corto] = "0";
+  fila.OPS = fila.JEF;
+}
+for (const e of ESCRITURA) e[1] = comoJefe(sin(e[1], FUERA));
 // Ítems: Logística solo cambia tipo_material (el PATCH de la prueba va sobre la clave); lo prueba seguridad.spec.
 ESCRITURA.find(([t]) => t === "items")![1] = "";
 const RPC_MVP = { ...RPC };
 // mo_partidas solo lee: el Jefe la sigue usando.
-for (const fn of Object.keys(RPC)) RPC[fn] = sin(RPC[fn], fn === "mo_partidas" ? FUERA : [...FUERA, "JEF"]);
-for (const a of ARCHIVOS) a[3] = sin(a[3], a[0].startsWith("entregas") ? FUERA : [...FUERA, "JEF"]);
+for (const fn of Object.keys(RPC)) RPC[fn] = comoJefe(sin(RPC[fn], fn === "mo_partidas" ? FUERA : [...FUERA, "JEF"]));
+for (const a of ARCHIVOS) a[3] = comoJefe(sin(a[3], a[0].startsWith("entregas") ? FUERA : [...FUERA, "JEF"]));
 
 // ---------------------------------------------------------------------------------------------------------
 type Sesion = { token: string; uid: string };
@@ -457,9 +467,9 @@ test.describe("@permisos funciones (RPC)", () => {
       `public.anular_requerimiento(${id}, null)`,
     );
     const pasan = CORTOS.filter((_, i) => !DENEGADO.test(r[i]));
-    // Prod 1: ni el Jefe ni un creador fuera de prod 1.
+    // Prod 1: ni el Jefe (ni el Ingeniero de Operaciones, que es como él) ni un creador fuera de prod 1.
     expect(pasan, CORTOS.map((k, i) => `${k} ${r[i]}`).join("\n")).toEqual(
-      CORTOS.filter((k) => S[k].uid === creador && k !== "JEF" && !FUERA.includes(k)),
+      CORTOS.filter((k) => S[k].uid === creador && k !== "JEF" && k !== "OPS" && !FUERA.includes(k)),
     );
   });
 

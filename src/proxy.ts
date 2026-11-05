@@ -21,7 +21,8 @@ import { COOKIE_SESION } from "@/lib/supabase/config";
 import type { Rol } from "@/lib/types";
 import { COOKIE_VISTAS, vistaGuardada } from "@/lib/vistas";
 
-const PUBLICAS = ["/login", "/cotizar", RUTA_ACCESO];
+// /bienvenida: el link de un solo uso para entrar la primera vez (completa sus datos y crea su contraseña).
+const PUBLICAS = ["/login", "/cotizar", "/bienvenida", RUTA_ACCESO];
 
 /** Rol de un JWT, sin verificarlo (solo para rechazar; Supabase verifica el resto). */
 function rolDelJwt(jwt: string): string | null {

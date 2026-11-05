@@ -8,7 +8,8 @@ export const HOME_BY_ROL: Record<Rol, string> = {
   ADMIN: "/logistica",
   RESIDENTE: "/sin-acceso",
   GERENCIA: "/gerencia/obras",
-  OPERACIONES: "/sin-acceso",
+  // Prod 1: lo mismo que el Jefe (el seguimiento).
+  OPERACIONES: "/operaciones",
   JEFE_OPERACIONES: "/operaciones",
   // Rol en desuso (lo reemplazó Operaciones): sin módulo propio.
   OBRAS: "/sin-acceso",

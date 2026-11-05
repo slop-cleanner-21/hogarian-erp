@@ -7,7 +7,7 @@ export const CLAVE_HUELLA = "prod1_huella";
 export const CLAVE_ABIERTA = "prod1_huella_abierta";
 
 /** Rutas sin sesión o que no se bloquean (/desbloquear es la pantalla del bloqueo). */
-export const RUTAS_LIBRES = ["/login", "/cotizar", "/acceso", "/sin-acceso", "/voucher-simulado", "/desbloquear"];
+export const RUTAS_LIBRES = ["/login", "/cotizar", "/bienvenida", "/acceso", "/sin-acceso", "/voucher-simulado", "/desbloquear"];
 
 /**
  * Antes del primer pintado: si toca pedir la huella (activada aquí y la app recién abierta), la pantalla no se
