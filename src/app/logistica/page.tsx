@@ -113,6 +113,10 @@ export default async function OrdenesPage({ searchParams }: PageProps<"/logistic
       .select("obra_id, numero, obra, proveedor, empresa, fecha, estado, total, has_alertas")
       .order(orden.columna, { ascending: orden.asc, nullsFirst: false })
       .order("created_at", { ascending: false })
+      // Desempate único (las del Excel se cargaron a la vez: comparten fecha y alta): sin él, las empatadas salían en
+      // cualquier orden y cambiaban de lugar entre cargas y con «Ver más».
+      .order("obra_id")
+      .order("numero")
       .limit(limite),
   );
   const [{ data: ordenes, error }, { data: obras }, { data: proveedores }, { data: etapas }, { data: tipos }, grupos] = await Promise.all([

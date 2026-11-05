@@ -36,3 +36,4 @@ npx playwright show-report                                      # capturas y tra
 2. Para lo nuevo, agregar la prueba que lo verifica en la spec del área.
 3. El `ui-auditor` solo revisa a mano lo que una prueba no puede juzgar (diseño, si algo sobra o se entiende) y deja como prueba lo que encuentre.
 - `ingreso.spec.ts` simula IPs con X-Forwarded-For y usa cuentas propias (3 fallidos por IP y cuenta, 10 por IP y 20 por cuenta desde dispositivos nuevos, en 10 minutos). En local la IP no cuenta: no fallar a propósito 20 veces con las cuentas compartidas; si se hace, borrar esos LOGIN_FALLIDO.
+- `orden-listas.spec.ts`: cada «Ordenar por» y los filtros, con más de 100 resultados (y al cargar 100 más), dan las mismas filas y en el mismo orden que la base. Solo usa órdenes de hace más de una semana, para que las que crean otras pruebas no cambien el resultado.

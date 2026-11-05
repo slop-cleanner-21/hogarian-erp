@@ -198,7 +198,9 @@ export default async function PagosPage({ searchParams }: PageProps<"/tesoreria"
         .eq("estado", pagado ? "PAGADO" : "PENDIENTE")
         .in("doc", docs)
         .order(orden.columna === "monto" ? columnaMonto : orden.columna, { ascending: orden.asc, nullsFirst: false })
+        // Desempate único: el N° se repite entre obras (sin la obra, las empatadas cambiaban de lugar con «Ver más»).
         .order("numero")
+        .order("obra_id")
         .limit(limite),
     );
     const { data, error } = await query;
@@ -231,6 +233,8 @@ export default async function PagosPage({ searchParams }: PageProps<"/tesoreria"
         .select("*")
         .in("doc", docs)
         .order(orden.columna === "numero" || orden.columna === "proveedor" ? orden.columna : "created_at", { ascending: orden.asc })
+        .order("created_at", { ascending: false })
+        .order("id")
         .limit(limite),
     );
     const { data, error } = await query;

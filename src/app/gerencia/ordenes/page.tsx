@@ -28,7 +28,9 @@ export default async function OrdenesGerenciaPage({ searchParams }: PageProps<"/
     .from("v_ordenes")
     .select("obra_id, numero, tipo, obra, proveedor, fecha, estado, total")
     .order(orden.columna, { ascending: orden.asc, nullsFirst: false })
+    // Desempate único: el N° se repite entre obras.
     .order("numero")
+    .order("obra_id")
     .limit(limite);
   if (fObra) query = query.eq("obra_id", Number(fObra));
   if (fEstado) query = query.eq("estado", fEstado);
