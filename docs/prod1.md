@@ -166,6 +166,19 @@ Contabilidad, Residente y RRHH **no entran**. Sus roles siguen en la base
   proveedor, varias etapas, varios tipos de material y sobreprecio. El buscador va bajo las pestañas.
 - **Nueva OC / OS:** sin desplegables de «Ordenar por» ni de «Regular o adicional» (siempre por etapa);
   las partidas adicionales llevan la etiqueta «Adicional N».
+- **Avisos** (campana; `notificar`, solo a las cuentas activas del rol):
+  - Logística: cotización recibida (a la orden), rechazo de Tesorería (a la orden), adicional (a Nueva OC / OS);
+  - Tesorería: **orden nueva por pagar** («Nueva OC N por pagar · obra», con el proveedor) y orden reenviada corregida
+    (al pago); OS con precios distintos al presupuesto;
+  - Jefe e Ingeniero de Operaciones: presupuesto publicado (a su seguimiento).
+
+  La campana cuenta los sin leer sin recargar (Realtime); al abrir Avisos quedan leídos. Cada aviso sale también como
+  notificación push si el teléfono la activó.
+- **Varias personas a la vez:** lo resuelve la base. Pagar, rechazar, enviar a Tesorería, registrar la factura, confirmar
+  precios y anular bloquean la orden y revisan su estado: si dos actúan a la vez, la segunda espera y, si la orden ya
+  cambió, recibe el error (un solo pago; o el pago o el rechazo; la cotización del proveedor, una vez). Las pantallas no
+  se actualizan solas (salvo el detalle de una orden en Logística): lo de otro se ve al recargar o al intentar actuar.
+  Las listas ordenan con un desempate único (obra y N°, o el id): lo del Excel comparte fecha y hora de carga.
 - **Rendimiento:** las filas de las listas (Pagos, OC / OS) no precargan su detalle (`prefetch={false}`):
   al abrir una lista eran decenas de peticiones que en el celular competían con lo que se ve; el
   detalle se pide al tocarlo. En Pagos, la lista y los totales se consultan a la vez.

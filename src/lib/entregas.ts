@@ -37,7 +37,8 @@ export async function cargarEntregas(obraId: number, numero: string) {
       .select("id, oc_item_id, cantidad, rol, lat, lng, created_at, observacion, entrega_fotos(path)")
       .eq("obra_id", obraId)
       .eq("numero_oc", numero)
-      .order("created_at", { ascending: false }),
+      .order("created_at", { ascending: false })
+      .order("id", { ascending: false }),
   ]);
   if (e1 || e2 || e3) throw new Error((e1 ?? e2 ?? e3)!.message);
 

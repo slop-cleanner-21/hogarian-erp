@@ -15,6 +15,7 @@ export default async function AvisosPage() {
     .select("id, titulo, cuerpo, href, leida_at, created_at")
     .eq("user_id", sesion.userId)
     .order("created_at", { ascending: false })
+    .order("id", { ascending: false })
     .limit(100);
   const hayNuevos = (avisos ?? []).some((a) => !a.leida_at);
 

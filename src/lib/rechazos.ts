@@ -13,7 +13,8 @@ export async function rechazosDeOrden(obraId: number, numero: string): Promise<R
     .select("id, motivo, created_at, created_by, comprobantes_anulados, correccion, reenviado_at, reenviado_by, nota_reenvio")
     .eq("obra_id", obraId)
     .eq("numero", numero)
-    .order("created_at", { ascending: false });
+    .order("created_at", { ascending: false })
+    .order("id", { ascending: false });
   const ids = [...new Set((data ?? []).flatMap((r) => [r.created_by, r.reenviado_by]).filter((u): u is string => !!u))];
   const { data: perfiles } = ids.length ? await supabase.from("perfiles").select("user_id, nombre").in("user_id", ids) : { data: [] };
   const nombre = new Map((perfiles ?? []).map((p) => [p.user_id, p.nombre]));

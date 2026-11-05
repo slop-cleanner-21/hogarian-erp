@@ -18,6 +18,9 @@ export async function entregasPorPartida(obraId: number): Promise<Record<number,
       .select("id, cantidad, created_at, rol, observacion, oc_items(partida_id), entrega_fotos(path)")
       .eq("obra_id", obraId)
       .order("created_at")
+      // Desempate único: las del Excel comparten la hora de carga; sin él cambiaban de orden entre cargas (y, por
+      // páginas de 1000, una podía repetirse o saltarse).
+      .order("id")
       .range(desde, desde + 999);
     if (error) throw new Error(error.message);
     filas.push(...data);

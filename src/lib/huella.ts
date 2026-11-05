@@ -85,7 +85,8 @@ export async function huellasDe(userId: string): Promise<Huella[]> {
     .from("huellas")
     .select("id, credential_id, dispositivo, created_at, usada_at")
     .eq("user_id", userId)
-    .order("created_at");
+    .order("created_at")
+    .order("id");
   return (data ?? []).map((h) => ({
     id: h.id,
     credentialId: h.credential_id,

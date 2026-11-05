@@ -18,7 +18,7 @@ const UNA_HORA = 3600;
 /** Adjuntos de una orden y/o de pagos, con URL firmada lista para ver o descargar. */
 export async function listarAdjuntos(filtro: { obraId: number; numeroOc: string } | { pagoIds: number[] }) {
   const supabase = await createClient();
-  let q = supabase.from("adjuntos").select("id, tipo, nombre, mime, pago_id, path").order("created_at");
+  let q = supabase.from("adjuntos").select("id, tipo, nombre, mime, pago_id, path").order("created_at").order("id");
   q = "pagoIds" in filtro
     ? q.in("pago_id", filtro.pagoIds.length ? filtro.pagoIds : [-1])
     : q.eq("obra_id", filtro.obraId).eq("numero_oc", filtro.numeroOc);
