@@ -128,10 +128,19 @@ test.describe("@admin @bienvenida link de acceso de un solo uso", () => {
     const email = `e2e-bienvenida-g-${Date.now()}@erp.local`;
     try {
       const admin = await abrir("admin", "/admin");
+      // El menú de compartir del teléfono (en la prueba, simulado: guarda lo que se compartió).
+      await admin.addInitScript(() => {
+        Object.defineProperty(navigator, "share", { value: async (d: ShareData) => ((window as unknown as { compartido: ShareData }).compartido = d), configurable: true });
+      });
+      await admin.reload();
       const creada = await crearCuenta(admin, { nombre: "Gerente E2E", email, rol: "Gerencia", dni: "11223344", acceso: "Link de acceso" });
       const primero = (await creada.getByRole("region", { name: "Credenciales" }).innerText()).match(/\/bienvenida\/[A-Za-z0-9_-]+/)![0];
-      // Sin celular: el mensaje para copiarlo.
+      // Sin celular: compartirlo por donde se quiera (el menú del teléfono) o copiarlo.
       await expect(creada.getByRole("button", { name: "Copiar mensaje" })).toBeVisible();
+      await creada.getByRole("button", { name: "Compartir" }).click();
+      const compartido = await admin.evaluate(() => (window as unknown as { compartido?: ShareData }).compartido);
+      expect(compartido?.text).toContain(primero);
+      expect(compartido?.text).toContain("Hola Gerente");
       await creada.getByRole("button", { name: "Listo" }).click();
 
       // Otro link desde su ficha: el primero deja de servir.

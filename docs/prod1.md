@@ -109,8 +109,8 @@ Contabilidad, Residente y RRHH **no entran**. Sus roles siguen en la base
   desactivarse ni quitarse el rol. Cada usuario cambia su contraseña desde su menú («Cambiar contraseña»).
   Un cambio de rol rige en la base al instante; en las pantallas, al renovarse su sesión (hasta 1 h).
   - **Entregar el acceso** (al crear la cuenta, o después desde su ficha), de una de dos formas; se ve una sola vez,
-    para copiarlo o **enviarlo por WhatsApp** (si la cuenta tiene celular: abre WhatsApp con el mensaje escrito, el
-    Admin lo envía):
+    para **enviarlo por WhatsApp** a su celular (abre WhatsApp con el mensaje escrito, el Admin lo envía),
+    **compartirlo** con el menú del teléfono (WhatsApp, Telegram, correo, SMS…) o copiarlo:
     - **Link de acceso** (por defecto; migración `prod1_bienvenida`, `src/lib/bienvenida.ts`): sirve **una sola vez** y
       vence a los 7 días. Al abrirlo (`/bienvenida/<token>`, sin sesión), el usuario completa sus datos —nombres,
       apellidos, DNI (obligatorio en Gerencia) y celular, **solo esa vez**; después solo los cambia el Admin— y crea su

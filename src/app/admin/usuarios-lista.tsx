@@ -1,8 +1,8 @@
 "use client";
 
-import { MessageCircle, Plus, RefreshCw } from "lucide-react";
+import { MessageCircle, Plus, RefreshCw, Share2 } from "lucide-react";
 import { useRouter } from "next/navigation";
-import { useState, useTransition } from "react";
+import { useState, useSyncExternalStore, useTransition } from "react";
 import { Avatar } from "@/components/avatar";
 import { BotonCopiar, Dato } from "@/components/copiar";
 import { Button } from "@/components/ui/button";
@@ -107,12 +107,17 @@ function CampoCelular({ telefono, setTelefono }: { telefono: string; setTelefono
 }
 const celularValido = (t: string) => normalizarCelular(t) !== null;
 
+/** Si el navegador tiene el menú de compartir del sistema (los teléfonos sí). */
+const hayCompartir = () => typeof navigator !== "undefined" && typeof navigator.share === "function";
+const sinSuscripcion = () => () => {};
+
 /**
  * El acceso recién creado (link de un solo uso o contraseña temporal): se ve una sola vez, para pasárselo al usuario
- * (copiándolo o por WhatsApp, si tiene celular: abre WhatsApp con el mensaje escrito).
+ * (por WhatsApp a su celular, con el menú de compartir del teléfono —WhatsApp, Telegram, correo…— o copiándolo).
  */
 function EntregaAcceso({ acceso, nombre, email, telefono }: { acceso: Acceso; nombre: string; email: string; telefono: string }) {
   const tel = normalizarCelular(telefono) || "";
+  const puedeCompartir = useSyncExternalStore(sinSuscripcion, hayCompartir, () => false);
   const texto =
     "link" in acceso ? mensajeLink(nombre, acceso.link.url, acceso.link.vence) : mensajeContrasena(nombre, window.location.origin, email, acceso.contrasena);
   return (
@@ -128,21 +133,30 @@ function EntregaAcceso({ acceso, nombre, email, telefono }: { acceso: Acceso; no
           <Dato label="Contraseña" valor={acceso.contrasena} />
         </div>
       )}
-      {tel ? (
-        <a
-          href={enlaceWhatsapp(tel, texto)}
-          target="_blank"
-          rel="noopener noreferrer"
-          className="mb-2 flex h-12 items-center justify-center gap-2 rounded-control bg-[#25D366] font-semibold text-white active:opacity-80"
-        >
-          <MessageCircle size={20} /> Enviar por WhatsApp a {celularLegible(tel)}
-        </a>
-      ) : (
-        <div className="mb-2 flex items-center gap-2">
-          <span className="flex-1 text-[14px] text-ink-3">Mensaje</span>
+      <div className="mb-2 flex flex-col gap-2">
+        {tel && (
+          <a
+            href={enlaceWhatsapp(tel, texto)}
+            target="_blank"
+            rel="noopener noreferrer"
+            aria-label={`Enviar por WhatsApp a ${celularLegible(tel)}`}
+            className="flex h-12 items-center justify-center gap-2 whitespace-nowrap rounded-control bg-[#25D366] font-semibold text-white active:opacity-80"
+          >
+            <MessageCircle size={20} /> WhatsApp · <span className="num">{celularLegible(tel)}</span>
+          </a>
+        )}
+        <div className="flex items-center gap-2">
+          {/* El menú de compartir del teléfono: WhatsApp, Telegram, correo, SMS… (donde no lo hay, se copia). */}
+          {puedeCompartir ? (
+            <Button variant="secondary" className="flex-1" onClick={() => navigator.share({ title: "Acceso al ERP de Hogarian", text: texto }).catch(() => {})}>
+              <Share2 size={18} /> Compartir
+            </Button>
+          ) : (
+            <span className="flex-1 text-[14px] text-ink-3">Mensaje</span>
+          )}
           <BotonCopiar valor={texto} label="mensaje" />
         </div>
-      )}
+      </div>
     </section>
   );
 }
