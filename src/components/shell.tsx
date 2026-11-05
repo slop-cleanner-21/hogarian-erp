@@ -183,7 +183,7 @@ export function TopBar({
         ) : (
           <span className="w-4" />
         )}
-        <h1 className="rotulo flex-1 truncate text-[27px] font-semibold leading-none">{title}</h1>
+        <h1 className="rotulo flex-1 truncate text-[27px] font-semibold leading-[1.2]">{title}</h1>
         {right}
       </div>
     </header>

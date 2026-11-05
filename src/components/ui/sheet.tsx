@@ -55,7 +55,7 @@ export function Sheet({
         )}
       >
         <header className="flex h-14 shrink-0 items-center gap-2 border-b border-line pl-4 pr-1">
-          <h2 className="rotulo flex-1 truncate text-[22px] font-semibold leading-none">{title}</h2>
+          <h2 className="rotulo flex-1 truncate text-[22px] font-semibold leading-[1.2]">{title}</h2>
           <button
             type="button"
             onClick={onClose}
