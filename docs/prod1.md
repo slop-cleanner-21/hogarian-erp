@@ -101,8 +101,8 @@ Contabilidad, Residente y RRHH **no entran**. Sus roles siguen en la base
   factura con su archivo, PDF de la orden, contrato, guía de remisión, pagos con voucher, rechazos y entregas.
   Para eso Gerencia lee guías, pagos, rechazos, facturas y vouchers (antes solo Logística, Contabilidad y
   Tesorería). El Jefe de Operaciones no entra a la consulta.
-- **Usuarios (solo el Admin):** crea cuentas (nombre, correo, rol de prod 1, DNI y celular), cambia nombre, correo, rol,
-  DNI y celular, restablece la contraseña (genera otra temporal),
+- **Usuarios (solo el Admin):** crea cuentas (nombres y apellidos, correo, rol de prod 1, DNI y celular), cambia nombres,
+  apellidos, correo, rol, DNI y celular, restablece la contraseña (genera otra temporal),
   desactiva y reactiva. Lo hace el servidor con la clave secreta (`src/lib/supabase/admin.ts`); el registro
   público sigue apagado. Una cuenta desactivada queda baneada: no entra, no renueva su sesión y la base deja
   de darle datos al instante (`rol_actual` / `rol_en` la tratan como sin perfil). El Admin no puede
@@ -118,6 +118,9 @@ Contabilidad, Residente y RRHH **no entran**. Sus roles siguen en la base
       lo usa de una vez (`bienvenida_completar`). Generar otro link o una contraseña temporal invalida el anterior;
       hasta usarlo, la cuenta no tiene contraseña.
     - **Contraseña temporal**: el mensaje lleva la dirección de la app, el correo y la contraseña.
+  - **Nombres y apellidos van por separado** (`perfiles.nombres`, `perfiles.apellidos`; migración
+    `prod1_nombres_apellidos`); `perfiles.nombre` es el completo, que muestra la app, y lo arma la base (trigger). Los
+    apellidos son opcionales al crear la cuenta: con el link los completa el usuario.
   - El celular (como el DNI) va en `perfil_privado`: solo lo lee el servidor. Se guarda con el código del país (un
     número de 9 dígitos que empieza con 9 lleva el 51).
 - **Presupuesto de la obra (Gerencia):** buscador por ítem y «Filtros» (requerimiento: regular o cada adicional,

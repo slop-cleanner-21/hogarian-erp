@@ -33,7 +33,8 @@ export async function completarBienvenida(token: string, d: DatosBienvenida): Pr
   // A nombre del propio usuario en la auditoría (x-actor).
   const { data: userId, error } = await createAdminClient(inv.userId).rpc("bienvenida_completar", {
     p_hash: hashToken(token),
-    p_nombre: `${nombres} ${apellidos}`,
+    p_nombres: nombres,
+    p_apellidos: apellidos,
     p_dni: dni,
     p_telefono: telefono,
     p_clave: String(d.clave),

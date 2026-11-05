@@ -25,13 +25,13 @@ export function FormularioBienvenida({
   token: string;
   email: string;
   dniObligatorio: boolean;
-  inicial: { nombres: string; dni: string; telefono: string };
+  inicial: { nombres: string; apellidos: string; dni: string; telefono: string };
   /** El link ya se usó (en esta misma sesión, recién): queda el paso de la huella. */
   usado?: boolean;
 }) {
   const router = useRouter();
   const [nombres, setNombres] = useState(inicial.nombres);
-  const [apellidos, setApellidos] = useState("");
+  const [apellidos, setApellidos] = useState(inicial.apellidos);
   const [dni, setDni] = useState(inicial.dni);
   const [telefono, setTelefono] = useState(inicial.telefono);
   const [clave, setClave] = useState("");

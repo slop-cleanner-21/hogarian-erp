@@ -27,7 +27,9 @@ const BANEO = "876000h";
 
 const Rol_ = z.enum(ROLES_PROD1 as [Rol, ...Rol[]], { error: "Elige el rol" });
 const Datos = z.object({
-  nombre: z.string().trim().min(2, "Ingresa el nombre").max(80),
+  nombres: z.string().trim().min(2, "Ingresa los nombres").max(80),
+  /** Opcionales al crear la cuenta: con el link de bienvenida los completa el usuario. */
+  apellidos: z.string().trim().max(80).default(""),
   email: z.email({ error: "Correo no válido" }).trim().toLowerCase(),
   /** DNI: obligatorio en Gerencia (va con su firma en los contratos de las OS). */
   dni: z
@@ -45,6 +47,8 @@ const Datos = z.object({
       return n ?? "";
     }),
 });
+/** El nombre completo (como lo arma la base). */
+const completo = (d: { nombres: string; apellidos: string }) => [d.nombres, d.apellidos].map((x) => x.trim()).filter(Boolean).join(" ");
 const conDni = (d: { rol: string; dni: string }) => d.rol !== "GERENCIA" || d.dni !== "";
 const SIN_DNI = "Ingresa el DNI: va en los contratos que firma Gerencia";
 
@@ -83,10 +87,13 @@ export async function crearUsuario(input: z.input<typeof Crear>): Promise<Result
   const { data, error } = await db.auth.admin.createUser({
     email: p.data.email,
     email_confirm: true,
-    app_metadata: { rol: p.data.rol, nombre: p.data.nombre },
+    app_metadata: { rol: p.data.rol, nombre: completo(p.data) },
   });
   if (error || !data.user) return fail(mensaje(error));
-  const { error: e2 } = await db.from("perfiles").insert({ user_id: data.user.id, nombre: p.data.nombre, rol: p.data.rol });
+  // `nombre` (el completo) lo arma la base con nombres y apellidos.
+  const { error: e2 } = await db
+    .from("perfiles")
+    .insert({ user_id: data.user.id, nombre: completo(p.data), nombres: p.data.nombres, apellidos: p.data.apellidos || null, rol: p.data.rol });
   // Con link, sin contraseña hasta que lo use (no puede entrar antes).
   const e4 = e2 || p.data.acceso === "link" ? null : (await db.rpc("fijar_contrasena", { p_user: data.user.id, p_clave: p.data.contrasena })).error;
   if (e2 || e4) {
@@ -109,7 +116,7 @@ export async function crearUsuario(input: z.input<typeof Crear>): Promise<Result
     accion: "CREAR_USUARIO",
     registro: data.user.id,
     actor: sesion.userId,
-    detalle: { email: p.data.email, nombre: p.data.nombre, rol: p.data.rol, acceso: p.data.acceso },
+    detalle: { email: p.data.email, nombre: completo(p.data), rol: p.data.rol, acceso: p.data.acceso },
   });
   revalidatePath("/admin");
   return { ok: true, data: { id: data.user.id, acceso } };
@@ -134,7 +141,7 @@ export async function editarUsuario(input: z.input<typeof Editar>): Promise<Resu
     if (error) return fail(mensaje(error));
   }
   // El perfil pasa el rol y el nombre al token (trigger perfiles_a_token); en la base rigen al instante.
-  const { error } = await db.from("perfiles").update({ nombre: p.data.nombre, rol }).eq("user_id", p.data.id);
+  const { error } = await db.from("perfiles").update({ nombres: p.data.nombres, apellidos: p.data.apellidos || null, rol }).eq("user_id", p.data.id);
   if (error) return fail(error.message);
   const e2 = await guardarPrivado(db, p.data.id, p.data.dni, p.data.telefono);
   if (e2) return fail(e2.message);
@@ -145,7 +152,7 @@ export async function editarUsuario(input: z.input<typeof Editar>): Promise<Resu
     actor: sesion.userId,
     detalle: {
       antes: { email: u.user?.email ?? null, nombre: actual.nombre, rol: actual.rol },
-      despues: { email: p.data.email, nombre: p.data.nombre, rol },
+      despues: { email: p.data.email, nombre: completo(p.data), rol },
     },
   });
   revalidatePath("/admin");

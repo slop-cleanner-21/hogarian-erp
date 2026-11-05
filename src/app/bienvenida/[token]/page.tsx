@@ -21,13 +21,13 @@ export default async function BienvenidaPage({ params }: PageProps<"/bienvenida/
     <main className="mx-auto flex min-h-dvh max-w-sm flex-col justify-center gap-8 px-4 py-10">
       <Logo />
       {usado ? (
-        <FormularioBienvenida token={token} email="" dniObligatorio={false} inicial={{ nombres: "", dni: "", telefono: "" }} usado />
+        <FormularioBienvenida token={token} email="" dniObligatorio={false} inicial={{ nombres: "", apellidos: "", dni: "", telefono: "" }} usado />
       ) : inv ? (
         <FormularioBienvenida
           token={token}
           email={inv.email}
           dniObligatorio={inv.rol === "GERENCIA"}
-          inicial={{ nombres: inv.nombre, dni: inv.dni, telefono: inv.telefono ? celularLegible(inv.telefono) : "" }}
+          inicial={{ nombres: inv.nombres, apellidos: inv.apellidos, dni: inv.dni, telefono: inv.telefono ? celularLegible(inv.telefono) : "" }}
         />
       ) : (
         <div className="flex flex-col gap-6">

@@ -90,8 +90,10 @@ test.describe("@admin @bienvenida link de acceso de un solo uso", () => {
       await page.getByRole("button", { name: "Activar huella" }).click();
       await page.waitForURL((u) => u.pathname.startsWith("/tesoreria"), { timeout: 20_000 });
       const id = sql1(`select id from auth.users where email = '${email}'`);
-      expect(sql(`select p.nombre, pp.dni, pp.telefono from perfiles p join perfil_privado pp on pp.user_id = p.user_id where p.user_id = '${id}'`)).toEqual([
-        ["Rosa María Quispe Huamán", "45678912", "51912345678"],
+      // Nombres y apellidos por separado; el nombre completo lo arma la base (y pasa al token).
+      expect(sql(`select p.nombres, p.apellidos, p.nombre, pp.dni, pp.telefono, u.raw_app_meta_data->>'nombre' from perfiles p join perfil_privado pp on pp.user_id = p.user_id
+                   join auth.users u on u.id = p.user_id where p.user_id = '${id}'`)).toEqual([
+        ["Rosa María", "Quispe Huamán", "Rosa María Quispe Huamán", "45678912", "51912345678", "Rosa María Quispe Huamán"],
       ]);
       expect(sql1(`select count(*) from huellas where user_id = '${id}'`)).toBe("1");
       expect(sql1(`select count(*) from invitaciones where user_id = '${id}' and usada_at is not null`)).toBe("1");
@@ -102,6 +104,12 @@ test.describe("@admin @bienvenida link de acceso de un solo uso", () => {
       const otra = await abrirLink(browser, info, new URL(url).pathname);
       await expect(otra.page.getByRole("heading", { name: "Este link ya no sirve" })).toBeVisible();
       await expect(otra.page.getByLabel("Nombres")).toHaveCount(0);
+      // En su ficha, el Admin los ve por separado.
+      await admin.reload();
+      await admin.locator("main").getByRole("button", { name: /Rosa María Quispe Huamán/ }).click();
+      const ficha = admin.getByRole("dialog", { name: "Rosa María Quispe Huamán", exact: true });
+      await expect(ficha.getByLabel("Nombres")).toHaveValue("Rosa María");
+      await expect(ficha.getByLabel("Apellidos")).toHaveValue("Quispe Huamán");
       // Y entra con la contraseña que creó.
       await otra.page.goto("/login");
       await otra.page.locator('input[name="email"]').fill(email);
@@ -180,6 +188,6 @@ test.describe("@admin @bienvenida link de acceso de un solo uso", () => {
     await expect(page.getByRole("heading", { name: "Este link ya no sirve" })).toBeVisible();
     await ctx.close();
     expect(sql1(`select has_table_privilege('authenticated', 'public.invitaciones', 'select') or has_table_privilege('anon', 'public.invitaciones', 'select')`)).toBe("f");
-    expect(sql1(`select has_function_privilege('authenticated', 'public.bienvenida_completar(text, text, text, text, text)', 'execute')`)).toBe("f");
+    expect(sql1(`select has_function_privilege('authenticated', 'public.bienvenida_completar(text, text, text, text, text, text)', 'execute')`)).toBe("f");
   });
 });

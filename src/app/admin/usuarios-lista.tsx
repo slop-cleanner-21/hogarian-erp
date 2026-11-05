@@ -19,6 +19,8 @@ import { cambiarActivo, crearUsuario, editarUsuario, generarLink, restablecerCon
 export type Usuario = {
   id: string;
   nombre: string;
+  nombres: string;
+  apellidos: string;
   email: string;
   dni: string;
   telefono: string;
@@ -165,9 +167,26 @@ function ElegirAcceso({ acceso, setAcceso }: { acceso: "link" | "contrasena"; se
   );
 }
 
+/** Nombres y apellidos, por separado. */
+function CamposNombre({ nombres, setNombres, apellidos, setApellidos }: { nombres: string; setNombres: (v: string) => void; apellidos: string; setApellidos: (v: string) => void }) {
+  return (
+    <>
+      <Field label="Nombres">
+        <Input value={nombres} onChange={(e) => setNombres(e.target.value)} autoComplete="off" />
+      </Field>
+      <Field label="Apellidos">
+        <Input value={apellidos} onChange={(e) => setApellidos(e.target.value)} autoComplete="off" />
+      </Field>
+    </>
+  );
+}
+const unir = (n: string, a: string) => [n, a].map((x) => x.trim()).filter(Boolean).join(" ");
+
 function NuevoUsuario({ onClose }: { onClose: () => void }) {
   const router = useRouter();
-  const [nombre, setNombre] = useState("");
+  const [nombres, setNombres] = useState("");
+  const [apellidos, setApellidos] = useState("");
+  const nombre = unir(nombres, apellidos);
   const [email, setEmail] = useState("");
   const [dni, setDni] = useState("");
   const [telefono, setTelefono] = useState("");
@@ -182,7 +201,8 @@ function NuevoUsuario({ onClose }: { onClose: () => void }) {
     startTransition(async () => {
       setError(null);
       const r = await crearUsuario({
-        nombre,
+        nombres,
+        apellidos,
         email,
         dni,
         telefono,
@@ -211,7 +231,7 @@ function NuevoUsuario({ onClose }: { onClose: () => void }) {
             onClick={crear}
             disabled={
               pending ||
-              !nombre.trim() ||
+              nombres.trim().length < 2 ||
               !email.trim() ||
               !rol ||
               (modo === "contrasena" && contrasena.length < MIN_CONTRASENA) ||
@@ -229,9 +249,7 @@ function NuevoUsuario({ onClose }: { onClose: () => void }) {
           <EntregaAcceso acceso={creado} nombre={nombre} email={email.trim().toLowerCase()} telefono={telefono} />
         ) : (
           <>
-            <Field label="Nombre">
-              <Input value={nombre} onChange={(e) => setNombre(e.target.value)} autoComplete="off" />
-            </Field>
+            <CamposNombre nombres={nombres} setNombres={setNombres} apellidos={apellidos} setApellidos={setApellidos} />
             <Field label="Correo">
               <Input type="email" value={email} onChange={(e) => setEmail(e.target.value)} autoComplete="off" autoCapitalize="none" inputMode="email" />
             </Field>
@@ -281,7 +299,8 @@ function NuevoUsuario({ onClose }: { onClose: () => void }) {
 
 function FichaUsuario({ u, onClose }: { u: Usuario; onClose: () => void }) {
   const router = useRouter();
-  const [nombre, setNombre] = useState(u.nombre);
+  const [nombres, setNombres] = useState(u.nombres);
+  const [apellidos, setApellidos] = useState(u.apellidos);
   const [email, setEmail] = useState(u.email);
   const [dni, setDni] = useState(u.dni);
   const [telefono, setTelefono] = useState(u.telefono ? celularLegible(u.telefono) : "");
@@ -291,7 +310,8 @@ function FichaUsuario({ u, onClose }: { u: Usuario; onClose: () => void }) {
   const [error, setError] = useState<string | null>(null);
   const [pending, startTransition] = useTransition();
   const cambios =
-    nombre.trim() !== u.nombre ||
+    nombres.trim() !== u.nombres ||
+    apellidos.trim() !== u.apellidos ||
     email.trim().toLowerCase() !== u.email ||
     rol !== u.rol ||
     dni.trim() !== u.dni ||
@@ -307,7 +327,7 @@ function FichaUsuario({ u, onClose }: { u: Usuario; onClose: () => void }) {
       router.refresh();
     });
 
-  const guardar = () => correr(() => editarUsuario({ id: u.id, nombre, email, dni, telefono, rol: rol ?? "" }), onClose);
+  const guardar = () => correr(() => editarUsuario({ id: u.id, nombres, apellidos, email, dni, telefono, rol: rol ?? "" }), onClose);
   const restablecer = () =>
     startTransition(async () => {
       setError(null);
@@ -335,16 +355,14 @@ function FichaUsuario({ u, onClose }: { u: Usuario; onClose: () => void }) {
         <Button
           size="lg"
           onClick={guardar}
-          disabled={pending || !cambios || !nombre.trim() || !email.trim() || !rol || !dniValido(dni, rol) || !celularValido(telefono)}
+          disabled={pending || !cambios || nombres.trim().length < 2 || !email.trim() || !rol || !dniValido(dni, rol) || !celularValido(telefono)}
         >
           Guardar
         </Button>
       }
     >
       <div className="flex flex-col gap-4 p-4">
-        <Field label="Nombre">
-          <Input value={nombre} onChange={(e) => setNombre(e.target.value)} autoComplete="off" />
-        </Field>
+        <CamposNombre nombres={nombres} setNombres={setNombres} apellidos={apellidos} setApellidos={setApellidos} />
         <Field label="Correo">
           <Input type="email" value={email} onChange={(e) => setEmail(e.target.value)} autoComplete="off" autoCapitalize="none" inputMode="email" />
         </Field>

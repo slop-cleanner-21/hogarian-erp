@@ -14,7 +14,7 @@ export default async function UsuariosPage() {
   const db = createAdminClient();
   const [cuentas, { data: perfiles, error }, { data: privados }] = await Promise.all([
     todasLasCuentas(db),
-    db.from("perfiles").select("user_id, nombre, rol"),
+    db.from("perfiles").select("user_id, nombre, nombres, apellidos, rol"),
     db.from("perfil_privado").select("user_id, dni, telefono"),
   ]);
   if (error) throw new Error(error.message);
@@ -24,6 +24,8 @@ export default async function UsuariosPage() {
     .map((u) => ({
       id: u.id,
       nombre: perfil.get(u.id)?.nombre ?? "",
+      nombres: perfil.get(u.id)?.nombres ?? perfil.get(u.id)?.nombre ?? "",
+      apellidos: perfil.get(u.id)?.apellidos ?? "",
       email: u.email ?? "",
       dni: privado.get(u.id)?.dni ?? "",
       telefono: privado.get(u.id)?.telefono ?? "",

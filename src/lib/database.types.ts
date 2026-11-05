@@ -1981,18 +1981,24 @@ export type Database = {
       };
       perfiles: {
         Row: {
+          apellidos: string | null;
           nombre: string;
+          nombres: string | null;
           rol: Database["public"]["Enums"]["rol"];
           user_id: string;
         };
         ComputedFields: never;
         Insert: {
+          apellidos?: string | null;
           nombre: string;
+          nombres?: string | null;
           rol?: Database["public"]["Enums"]["rol"];
           user_id: string;
         };
         Update: {
+          apellidos?: string | null;
           nombre?: string;
+          nombres?: string | null;
           rol?: Database["public"]["Enums"]["rol"];
           user_id?: string;
         };
@@ -3903,10 +3909,11 @@ export type Database = {
       };
       bienvenida_completar: {
         Args: {
+          p_apellidos: string;
           p_clave: string;
           p_dni: string;
           p_hash: string;
-          p_nombre: string;
+          p_nombres: string;
           p_telefono: string;
         };
         Returns: string;
