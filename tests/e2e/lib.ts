@@ -42,6 +42,34 @@ export function sqlScript(script: string): string[][] {
     .map((l) => l.split("|"));
 }
 
+/**
+ * Una sesión por la API (sin la app): las contraseñas no están en Supabase Auth (credenciales), así que se abre como
+ * lo hace el servidor, con un enlace mágico de un solo uso (necesita la clave secreta).
+ */
+export async function sesionApi(sb: string, anon: string, secreta: string, email: string, intento = 0): Promise<{ access_token: string; user: { id: string } }> {
+  const l = await fetch(`${sb}/auth/v1/admin/generate_link`, {
+    method: "POST",
+    headers: { apikey: secreta, Authorization: `Bearer ${secreta}`, "Content-Type": "application/json" },
+    body: JSON.stringify({ type: "magiclink", email }),
+  });
+  const link = (await l.json()) as { hashed_token?: string; properties?: { hashed_token?: string }; msg?: string };
+  const hash = link.hashed_token ?? link.properties?.hashed_token;
+  if (!hash) throw new Error(`Sin enlace para ${email}: ${l.status} ${link.msg ?? ""}`);
+  const v = await fetch(`${sb}/auth/v1/verify`, {
+    method: "POST",
+    headers: { apikey: anon, "Content-Type": "application/json" },
+    body: JSON.stringify({ type: "magiclink", token_hash: hash }),
+  });
+  const s = await v.json();
+  // Un solo enlace por usuario: si otro worker abrió la misma cuenta a la vez, este quedó reemplazado. Otra vez.
+  if (!s.access_token && s.error_code === "otp_expired" && intento < 6) {
+    await new Promise((r) => setTimeout(r, 100 + Math.random() * 400));
+    return sesionApi(sb, anon, secreta, email, intento + 1);
+  }
+  if (!s.access_token) throw new Error(`No pude abrir la sesión de ${email}: ${v.status} ${s.msg ?? ""}`);
+  return s;
+}
+
 /** Un solo valor. */
 export const sql1 = (consulta: string) => sql(consulta)[0]?.[0] ?? "";
 

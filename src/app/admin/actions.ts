@@ -63,18 +63,19 @@ export async function crearUsuario(input: z.input<typeof Crear>): Promise<Result
   const p = Crear.safeParse(input);
   if (!p.success) return fail(p.error.issues[0].message);
   const { sesion, db } = await admin();
+  // La contraseña no va a Supabase Auth (ahí queda una al azar): la guarda la base (credenciales).
   const { data, error } = await db.auth.admin.createUser({
     email: p.data.email,
-    password: p.data.contrasena,
     email_confirm: true,
     app_metadata: { rol: p.data.rol, nombre: p.data.nombre },
   });
   if (error || !data.user) return fail(mensaje(error));
   const { error: e2 } = await db.from("perfiles").insert({ user_id: data.user.id, nombre: p.data.nombre, rol: p.data.rol });
-  if (e2) {
-    // Sin perfil la cuenta no sirve: se deshace.
+  const e4 = e2 ? null : (await db.rpc("fijar_contrasena", { p_user: data.user.id, p_clave: p.data.contrasena })).error;
+  if (e2 || e4) {
+    // Sin perfil o sin contraseña la cuenta no sirve: se deshace.
     await db.auth.admin.deleteUser(data.user.id);
-    return fail(e2.message);
+    return fail((e2 ?? e4)!.message);
   }
   if (p.data.dni) {
     const e3 = await guardarDni(db, data.user.id, p.data.dni);
@@ -133,8 +134,9 @@ export async function restablecerContrasena(id: string): Promise<Result<string>>
   if (!z.guid().safeParse(id).success) return fail("Usuario no válido");
   const { sesion, db } = await admin();
   const contrasena = contrasenaAlAzar();
-  const { error } = await db.auth.admin.updateUserById(id, { password: contrasena });
-  if (error) return fail(mensaje(error));
+  // En la base (credenciales), no en Supabase Auth; cierra todas sus sesiones.
+  const { error } = await db.rpc("fijar_contrasena", { p_user: id, p_clave: contrasena });
+  if (error) return fail(error.message);
   // Sin la contraseña: solo que se restableció.
   await registrarEvento({ tabla: "usuarios", accion: "RESTABLECER_CONTRASENA", registro: id, actor: sesion.userId });
   return { ok: true, data: contrasena };

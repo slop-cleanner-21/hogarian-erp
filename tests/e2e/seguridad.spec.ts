@@ -2,7 +2,7 @@ import crypto from "node:crypto";
 import fs from "node:fs";
 import type { Browser, Page } from "@playwright/test";
 import { expect, test } from "./fixtures";
-import { ROLES, sesion, sql, sql1, sqlScript } from "./lib";
+import { ROLES, sesion, sesionApi, sql, sql1, sqlScript } from "./lib";
 
 // Auditoría de seguridad (05/11/2026): un caso por hallazgo corregido, para que no vuelva.
 // Migración 20261105130000_prod1_seguridad, src/proxy.ts (/sb), next.config.ts (cabeceras), login (intentos),
@@ -19,14 +19,7 @@ const env = Object.fromEntries(
 const ANON = env.NEXT_PUBLIC_SUPABASE_ANON_KEY;
 const SECRETA = env.SUPABASE_SECRET_KEY;
 
-async function token(email: string) {
-  const r = await fetch(`${SB}/auth/v1/token?grant_type=password`, {
-    method: "POST",
-    headers: { apikey: ANON, "Content-Type": "application/json" },
-    body: JSON.stringify({ email, password: process.env.ERP_PASS }),
-  });
-  return (await r.json()).access_token as string;
-}
+const token = async (email: string) => (await sesionApi(SB, ANON, SECRETA, email)).access_token;
 const rest = (jwt: string | null, ruta: string, init: RequestInit = {}) =>
   fetch(`${SB}/rest/v1/${ruta}`, {
     ...init,
@@ -128,22 +121,15 @@ test.describe("@seguridad", () => {
     expect(r.headers.get("content-security-policy")).toMatch(/frame-ancestors 'none'/);
   });
 
-  // Con CAPTCHA (en local, las claves de prueba de Turnstile) la cuenta no se bloquea: pide CAPTCHA (así nadie deja
-  // afuera a otro a propósito). Sin claves, se bloquea 15 minutos.
-  test("login: tras 10 intentos fallidos la cuenta pide CAPTCHA (o queda en espera sin CAPTCHA)", async ({ browser }, info) => {
+  test("login: tras 3 intentos fallidos la cuenta queda en espera", async ({ browser }, info) => {
     const email = `e2e-fuerza-${crypto.randomUUID().slice(0, 8)}@erp.local`;
     sql(`insert into audit_log (tabla, accion, detalle)
-         select 'sesion', 'LOGIN_FALLIDO', jsonb_build_object('email', '${email}', 'motivo', 'invalid_credentials') from generate_series(1, 10)`);
+         select 'sesion', 'LOGIN_FALLIDO', jsonb_build_object('email', '${email}', 'motivo', 'invalid_credentials') from generate_series(1, 3)`);
     const page = await alLogin(browser, info);
     await page.locator('input[name="email"]').fill(email);
     await page.locator('input[name="password"]').fill("cualquiera1");
     await page.getByRole("button", { name: "Ingresar", exact: true }).click();
-    if (process.env.NEXT_PUBLIC_TURNSTILE_SITE_KEY ?? env.NEXT_PUBLIC_TURNSTILE_SITE_KEY) {
-      await expect(page.locator('p[role="alert"]')).toHaveText("Completa la verificación");
-      await expect(page.locator('[data-captcha="visible"]')).toHaveCount(1);
-    } else {
-      await expect(page.getByText(/Demasiados intentos/)).toBeVisible();
-    }
+    await expect(page.getByText(/Demasiados intentos/)).toBeVisible();
     sql(`delete from audit_log where tabla = 'sesion' and detalle->>'email' = '${email}'`);
     await page.context().close();
   });
@@ -152,10 +138,11 @@ test.describe("@seguridad", () => {
     const email = `e2e-admin-${crypto.randomUUID().slice(0, 8)}@erp.local`;
     const auth = (ruta: string, init: RequestInit) =>
       fetch(`${SB}/auth/v1/admin/${ruta}`, { ...init, headers: { apikey: SECRETA, Authorization: `Bearer ${SECRETA}`, "Content-Type": "application/json" } });
-    const u = await (await auth("users", { method: "POST", body: JSON.stringify({ email, password: process.env.ERP_PASS, email_confirm: true }) })).json();
+    const u = await (await auth("users", { method: "POST", body: JSON.stringify({ email, email_confirm: true }) })).json();
     try {
       sql(`insert into perfiles (user_id, nombre, rol) values ('${u.id}', 'E2E Admin', 'ADMIN')
-           on conflict (user_id) do update set rol = 'ADMIN'`);
+           on conflict (user_id) do update set rol = 'ADMIN';
+           select fijar_contrasena('${u.id}', '${process.env.ERP_PASS}')`);
       const page = await alLogin(browser, info);
       await page.locator('input[name="email"]').fill(email);
       await page.locator('input[name="password"]').fill(process.env.ERP_PASS!);

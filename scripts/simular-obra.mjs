@@ -41,7 +41,10 @@ const anon = createClient(URL_SB, ANON, { auth: { persistSession: false } });
 
 async function como(email) {
   const c = createClient(URL_SB, ANON, { auth: { persistSession: false, autoRefreshToken: false } });
-  const { error } = await c.auth.signInWithPassword({ email, password: "erp12345" });
+  // Las contraseñas no están en Supabase Auth (credenciales): la sesión se abre con un enlace mágico de un solo uso.
+  const { data: link, error: e1 } = await admin.auth.admin.generateLink({ type: "magiclink", email });
+  if (e1) throw new Error(`${email}: ${e1.message}`);
+  const { error } = await c.auth.verifyOtp({ type: "magiclink", token_hash: link.properties.hashed_token });
   if (error) throw new Error(`${email}: ${error.message}`);
   return c;
 }

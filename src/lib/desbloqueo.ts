@@ -3,7 +3,7 @@ import type { AuthenticationResponseJSON } from "@simplewebauthn/server";
 import { after } from "next/server";
 import { registrarEvento } from "@/lib/auditoria";
 import { desbloquearSesion, marcarDesbloqueo, olvidarDispositivo, quitarBloqueoSesion } from "@/lib/bloqueo-cookies";
-import { huellasAqui, opcionesFirmar, verificarFirma } from "@/lib/huella";
+import { huellasAqui, huellasDe, opcionesFirmar, verificarFirma } from "@/lib/huella";
 import { createClient } from "@/lib/supabase/server";
 
 // Desbloquear con huella (la pantalla /desbloquear y el bloqueo dentro de la app). Va por rutas bajo /desbloquear,
@@ -18,11 +18,13 @@ export async function usuarioDeSesion(): Promise<{ userId: string; sesionId: str
 }
 
 /**
- * Opciones para firmar con la huella. Sin ninguna huella en este dominio (se quitaron desde otro dispositivo, o la
- * marca es de otra persona) no hay nada que pedir: el dispositivo deja de pedirla y queda desbloqueado.
+ * Opciones para firmar con la huella. Si al usuario no le queda ninguna huella (las quitó desde otro dispositivo) no
+ * hay nada que pedir: sus sesiones dejan de bloquearse y el dispositivo deja de pedirla. Si tiene, pero ninguna de
+ * este dominio, no se desbloquea (`sinHuellaAqui`): queda «Usar contraseña».
  */
 export async function opcionesParaDesbloquear({ userId }: { userId: string }) {
   if ((await huellasAqui(userId)) === 0) {
+    if ((await huellasDe(userId)).length > 0) return { sinHuellaAqui: true as const };
     await quitarBloqueoSesion(null, userId);
     await olvidarDispositivo();
     await marcarDesbloqueo(userId);

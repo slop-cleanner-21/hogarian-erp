@@ -20,12 +20,17 @@ if (!email || !nombre || !url || !clave) {
 
 // Sin caracteres que se confunden (0/O, 1/l/I), como las contraseñas temporales de la app.
 const LETRAS = "abcdefghijkmnpqrstuvwxyzABCDEFGHJKLMNPQRSTUVWXYZ23456789";
-const contrasena = Array.from(crypto.randomBytes(14), (n) => LETRAS[n % LETRAS.length]).join("");
+let contrasena = "";
+// Con letras y números (lo que exige la base).
+while (!/[a-zA-Z]/.test(contrasena) || !/[0-9]/.test(contrasena)) {
+  contrasena = Array.from(crypto.randomBytes(14), (n) => LETRAS[n % LETRAS.length]).join("");
+}
 
 const db = createClient(url, clave, { auth: { persistSession: false, autoRefreshToken: false } });
+// La contraseña no va a Supabase Auth (ahí queda una al azar): la guarda la base (credenciales, migración
+// prod1_credenciales).
 const { data, error } = await db.auth.admin.createUser({
   email: email.trim().toLowerCase(),
-  password: contrasena,
   email_confirm: true,
   app_metadata: { rol: "ADMIN", nombre },
 });
@@ -33,7 +38,8 @@ if (error) {
   console.error(`No se pudo crear la cuenta: ${error.message}`);
   process.exit(1);
 }
-const { error: e2 } = await db.from("perfiles").insert({ user_id: data.user.id, nombre, rol: "ADMIN" });
+const { error: e1 } = await db.from("perfiles").insert({ user_id: data.user.id, nombre, rol: "ADMIN" });
+const e2 = e1 ?? (await db.rpc("fijar_contrasena", { p_user: data.user.id, p_clave: contrasena })).error;
 if (e2) {
   await db.auth.admin.deleteUser(data.user.id);
   console.error(`No se pudo crear el perfil (se deshizo la cuenta): ${e2.message}`);

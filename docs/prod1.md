@@ -197,19 +197,19 @@ Contabilidad, Residente, Ingeniero de Operaciones y RRHH **no entran**. Sus role
   - Logística solo cambia `tipo_material` de un ítem (no su tolerancia de sobreprecio).
   - Lo que se hace con la clave secreta (Admin, Empresas, firma, huella) mira el rol vigente en la base
     (`requireSesionVigente`): un Admin desactivado pierde el panel al instante. Nadie se reactiva a sí mismo.
-  - **Login: reintentos y CAPTCHA por IP** (`src/lib/captcha.ts`, tabla `login_ips`):
-    - desde el **3.er intento fallido** desde una IP, esa IP pide **CAPTCHA (Cloudflare Turnstile) para siempre**;
-      la auditoría registra «La IP pide CAPTCHA desde ahora»;
-    - desde el 3.º fallo de una IP **con una misma cuenta**, cada nuevo fallo reciente hace esperar más antes de
-      reintentar (5 s, 10 s, 20 s… hasta 5 min, con la cuenta regresiva en el botón). Va por IP y cuenta: en una
-      oficina con una sola IP, los fallos de uno no hacen esperar a los demás;
-    - una cuenta con 10 intentos fallidos en 15 minutos (desde cualquier IP) pide CAPTCHA en vez de bloquearse (nadie
-      deja afuera a otro a propósito); sin claves de Turnstile, se bloquea 15 minutos. 30 fallos por IP en 15 minutos:
-      espera;
-    - en producción, con `CAPTCHA_EN_SUPABASE=1`, Supabase Auth exige el CAPTCHA en **todo** ingreso con contraseña
-      (nadie prueba contraseñas directo contra Supabase): para una IP sin fallos es invisible;
-    - sin las claves de Turnstile no hay CAPTCHA: quedan los reintentos con espera y los límites (ver
-      `docs/produccion.md`). En local, claves de prueba de Cloudflare.
+  - **Contraseñas fuera de Supabase Auth** (migración `prod1_credenciales`): cada una vive en `credenciales` (bcrypt),
+    que solo lee el servidor; en `auth.users` queda siempre una al azar (un trigger reemplaza toda contraseña que le
+    llegue a Auth). Así no sirve probar contraseñas directo contra la API de Supabase (con la clave pública, sin pasar
+    por los límites de la app), ni cambiarla con un token robado (`PUT /auth/v1/user`: Auth lo acepta, pero no es la
+    que vale). El servidor verifica la contraseña (`ingreso_valido`, que tarda lo mismo exista o no la cuenta) y abre
+    la sesión con un enlace mágico de un solo uso, generado y canjeado ahí mismo, como la huella
+    (`src/lib/sesion-servidor.ts`). Alta, restablecimiento y cambio: `fijar_contrasena` (cierra las demás sesiones).
+  - **Login: intentos** (`src/app/login/actions.ts`): 3 fallidos por cuenta (desde cualquier IP) o 10 por IP en
+    10 minutos y espera hasta que el más viejo cumpla los 10 minutos, aun con la contraseña correcta (la cuenta
+    regresiva en el botón). Por IP es más alto para no dejar afuera a toda una oficina por los errores de uno. Sin
+    CAPTCHA (se retiró: con las contraseñas fuera de Auth no hace falta). Contra el que deja una cuenta en espera a
+    propósito: la huella sigue entrando.
+  - «Cerrar sesión» cierra solo la de ese dispositivo. Una sesión cerrada no da nada aunque su token siga vigente.
   - `/sb` (local) pide la contraseña de la demo y solo deja pasar la clave pública; sin esa contraseña no pasa ningún
     POST salvo las dos rutas públicas (`/cotizar/<token>/enviar`, `/acceso/entrar`).
   - **Túnel: dado de baja** (04/11/2026). No se vuelve a abrir: para probar en el celular, la URL de Vercel.
@@ -227,9 +227,8 @@ Contabilidad, Residente, Ingeniero de Operaciones y RRHH **no entran**. Sus role
       `guias/`, `proveedores/` y `<obra>/<orden>/` Logística; lo demás (firmas, entregas, demos) solo el servidor;
     - el **Jefe de Operaciones** no lee lo financiero (facturas, pagos, retenciones, detracciones, contactos y personas):
       solo lo de su seguimiento;
-    - **contraseñas**: con letras y números (también en Supabase Auth); cambiar la propia pide la actual (la verifica
-      la base, con un tope de 5 intentos en 15 minutos, y queda en la auditoría «Cambio de contraseña fallido»);
-      Supabase exige reautenticarse para cambiarla directo por la API (`secure_password_change`);
+    - **contraseñas**: con letras y números; cambiar la propia pide la actual (con un tope de 5 intentos en 10 minutos, y
+      queda en la auditoría «Cambio de contraseña fallido»);
     - la cookie de sesión va solo por HTTPS en producción y `SameSite=Lax`;
     - el bundle no lleva la lista de usuarios locales ni su contraseña (`NEXT_PUBLIC_USUARIOS_LOCALES` fija al
       compilar); `/acceso` no existe sin contraseña de demo;
@@ -252,7 +251,8 @@ Contabilidad, Residente, Ingeniero de Operaciones y RRHH **no entran**. Sus role
     - la base trata a la sesión como sin perfil (`rol_actual()` / `rol_en()`): ni tablas, ni RPC, ni archivos, ni
       realtime, aunque se use su token directo contra la API.
 
-    Desactivar JavaScript, ver el código o borrar las cookies no se lo salta: las cookies firmadas (httpOnly) solo
+    Desactivar JavaScript, ver el código, borrar las cookies, inventar el `Origin` (la huella se busca en el dominio
+    al que llegó el pedido) o cerrar la sesión en Auth no se lo salta: las cookies firmadas (httpOnly) solo
     evitan preguntarle a la base en cada pedido. Solo el servidor desbloquea, tras verificar la huella. Desbloquear y
     cerrar sesión van por rutas (`/desbloquear/opciones`, `/desbloquear/verificar`, `/login/salir`) que funcionan con
     la pantalla bloqueada; `/desbloquear?volver=` solo vuelve a una ruta de la app (nunca a otro dominio).

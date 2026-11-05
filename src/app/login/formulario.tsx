@@ -4,7 +4,6 @@ import { useActionState, useEffect, useRef, useState } from "react";
 import { EntrarConHuella, entroConContrasena } from "@/components/huella";
 import { Logo } from "@/components/logo";
 import { TemaBoton } from "@/components/theme-switch";
-import { Turnstile } from "@/components/turnstile";
 import { Button } from "@/components/ui/button";
 import { Field, Input } from "@/components/ui/field";
 import { PasswordInput } from "@/components/ui/password-input";
@@ -24,29 +23,21 @@ const USUARIOS_LOCALES = LOCAL
   : [];
 const CLAVE_LOCAL = LOCAL ? "erp12345" : "";
 
-/**
- * El ingreso. CAPTCHA (Turnstile): visible si la IP ya falló 3 veces (para siempre); invisible si Supabase lo exige
- * en todo ingreso (`siempre`); si no, nada. Tras un fallo desde una IP marcada, espera antes del siguiente intento.
- */
-export function FormularioLogin({ sitekey, marcada, siempre }: { sitekey: string | null; marcada: boolean; siempre: boolean }) {
+/** Cuánto falta, en minutos o segundos. */
+const falta = (s: number) => (s >= 60 ? `${Math.ceil(s / 60)} min` : `${s} s`);
+
+/** El ingreso. Tras demasiados intentos fallidos, espera (con la cuenta regresiva en el botón). */
+export function FormularioLogin() {
   const [estado, action, pending] = useActionState<EstadoLogin, FormData>(login, null);
   const form = useRef<HTMLFormElement>(null);
-  const [token, setToken] = useState<string | null>(null);
-  const [reinicio, setReinicio] = useState(0);
   const [restante, setRestante] = useState(0);
 
-  const visible = !!sitekey && (marcada || !!estado?.captcha);
-  const conCaptcha = !!sitekey && (visible || siempre);
-
-  // Tras cada intento: el token ya se usó (se pide otro) y, si hay que esperar, la cuenta regresiva. (Se ajusta al
-  // cambiar la respuesta, durante el render: https://react.dev/learn/you-might-not-need-an-effect)
+  // Tras cada intento, si hay que esperar, la cuenta regresiva. (Se ajusta al cambiar la respuesta, durante el render:
+  // https://react.dev/learn/you-might-not-need-an-effect)
   const [visto, setVisto] = useState<EstadoLogin>(null);
   if (estado !== visto) {
     setVisto(estado);
-    if (estado) {
-      setReinicio((n) => n + 1);
-      setRestante(estado.espera);
-    }
+    if (estado) setRestante(estado.espera);
   }
   useEffect(() => {
     if (restante <= 0) return;
@@ -61,7 +52,7 @@ export function FormularioLogin({ sitekey, marcada, siempre }: { sitekey: string
     f.requestSubmit();
   };
 
-  const bloqueado = pending || restante > 0 || (conCaptcha && !token);
+  const bloqueado = pending || restante > 0;
   return (
     <main className="relative mx-auto flex min-h-dvh max-w-sm flex-col justify-center gap-8 px-4 py-10">
       <div className="absolute right-1 top-[max(0.25rem,env(safe-area-inset-top))]">
@@ -84,14 +75,13 @@ export function FormularioLogin({ sitekey, marcada, siempre }: { sitekey: string
         <Field label="Contraseña">
           <PasswordInput name="password" autoComplete="current-password" required />
         </Field>
-        {conCaptcha && <Turnstile sitekey={sitekey!} visible={visible} onToken={setToken} reinicio={reinicio} />}
         {estado?.error && (
           <p role="alert" className="text-sm text-danger">
-            {restante > 0 ? `Espera ${restante} s para volver a intentarlo` : estado.error}
+            {restante > 0 ? `Demasiados intentos. Vuelve a intentarlo en ${falta(restante)}` : estado.error}
           </p>
         )}
         <Button type="submit" size="lg" disabled={bloqueado}>
-          {restante > 0 ? `Ingresar (${restante})` : "Ingresar"}
+          {restante > 0 ? `Ingresar (${falta(restante)})` : "Ingresar"}
         </Button>
       </form>
       {USUARIOS_LOCALES.length > 0 && (

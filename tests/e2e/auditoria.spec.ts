@@ -6,7 +6,7 @@ import { ROLES, sql, sql1, sqlScript, uidDe } from "./lib";
 // cierre) quedan con IP y dispositivo; lo que el Admin hace con la clave secreta queda a su nombre; y el Admin
 // lo ve en Auditoría (y en CSV).
 
-const SIN_AUDITORIA = ["audit_log", "notificaciones", "push_suscripciones", "cotizacion_accesos", "datos_demo", "huella_desafios", "login_ips", "sesiones_bloqueo"];
+const SIN_AUDITORIA = ["audit_log", "notificaciones", "push_suscripciones", "cotizacion_accesos", "datos_demo", "huella_desafios", "credenciales", "sesiones_bloqueo"];
 
 async function entrar(browser: Browser, baseURL: string, email: string, pass: string): Promise<Page> {
   const ctx = await browser.newContext({ baseURL });
@@ -89,6 +89,8 @@ test.describe("@auditoria", () => {
       ["LOGIN", uid, ROLES.tesoreria, "t", "t"],
       ["LOGOUT", uid, ROLES.tesoreria, "t", "t"],
     ]);
+    // El intento fallido no se queda contando para la cuenta (3 en 10 minutos la hacen esperar: frenaría las demás).
+    sql(`delete from audit_log where id > ${desde} and tabla = 'sesion' and accion = 'LOGIN_FALLIDO' and detalle->>'email' = '${ROLES.tesoreria}'`);
   });
 
   test("lo que el Admin hace con la clave secreta queda a su nombre; Auditoría lo muestra y lo descarga en CSV", async ({ abrir }, info) => {

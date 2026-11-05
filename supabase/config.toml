@@ -208,7 +208,9 @@ token_refresh = 150
 # Number of sign up and sign-in requests that can be made in a 5 minute interval per IP address (excludes anonymous users).
 sign_in_sign_ups = 30
 # Number of OTP / Magic link verifications that can be made in a 5 minute interval per IP address.
-token_verifications = 30
+# Prod 1: todo ingreso (contraseña o huella) canjea un enlace mágico desde el servidor (una sola IP para todos):
+# en la nube 300; aquí más, por las pruebas en paralelo. El enlace no se puede adivinar (solo lo genera el servidor).
+token_verifications = 5000
 # Number of Web3 logins that can be made in a 5 minute interval per IP address.
 web3 = 30
 

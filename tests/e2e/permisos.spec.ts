@@ -1,7 +1,7 @@
 import { execSync } from "node:child_process";
 import crypto from "node:crypto";
 import { test, expect } from "@playwright/test";
-import { ROLES, sql, sql1, type Rol } from "./lib";
+import { ROLES, sql, sql1, type Rol, sesionApi } from "./lib";
 
 // Matriz de permisos por la API de Supabase, sin navegador: lectura por rol, escritura directa en tablas,
 // funciones (RPC), archivos, registro cerrado, anon y un usuario sin perfil.
@@ -63,7 +63,7 @@ const LECTURA = tabla(`
   perfil_privado               0   0   0   0   0   0   0   0
   huellas                      X   X   X   X   X   X   X   X
   huella_desafios              X   X   X   X   X   X   X   X
-  login_ips                    X   X   X   X   X   X   X   X
+  credenciales                 X   X   X   X   X   X   X   X
   sesiones_bloqueo             X   X   X   X   X   X   X   X
   personas                     0   0   0   0   T   T   0   T
   proveedor_contactos          T   T   T   0   T   T   0   0
@@ -224,6 +224,7 @@ type Base = {
   partida: number;
 };
 let ANON = "";
+let SECRETA = "";
 let B: Base;
 const S = {} as Record<Corto, Sesion>;
 const SUJETOS = [...CORTOS, "anon"] as const;
@@ -276,10 +277,9 @@ async function api(token: string | null, metodo: string, ruta: string, cuerpo?: 
   return { status: r.status, datos, msg: String(datos?.message ?? datos?.msg ?? datos?.error ?? texto), headers: r.headers };
 }
 
-async function entrar(email: string, password: string): Promise<Sesion> {
-  const r = await api(null, "POST", "/auth/v1/token?grant_type=password", { email, password });
-  if (!r.datos?.access_token) throw new Error(`No pude iniciar sesión con ${email}: ${r.status} ${r.msg}`);
-  return { token: r.datos.access_token, uid: r.datos.user.id };
+async function entrar(email: string): Promise<Sesion> {
+  const s = await sesionApi(SB, ANON, SECRETA, email);
+  return { token: s.access_token, uid: s.user.id };
 }
 const salir = (token: string) => api(token, "POST", "/auth/v1/logout?scope=local").catch(() => {});
 
@@ -359,9 +359,10 @@ test.beforeAll(async ({}, info) => {
   expect(process.env.ERP_PASS, "Define ERP_PASS").toBeTruthy();
   const env = execSync("npx supabase status -o env", { encoding: "utf8", stdio: ["ignore", "pipe", "ignore"] });
   ANON = /^ANON_KEY="?([^"\r\n]+)"?/m.exec(env)?.[1] ?? "";
+  SECRETA = /^SERVICE_ROLE_KEY="?([^"\r\n]+)"?/m.exec(env)?.[1] ?? "";
   expect(ANON, "ANON_KEY de `supabase status`").not.toBe("");
   B = cargarBase();
-  const sesiones = await Promise.all(CORTOS.map((k) => entrar(ROLES[CORTO[k]], process.env.ERP_PASS!)));
+  const sesiones = await Promise.all(CORTOS.map((k) => entrar(ROLES[CORTO[k]])));
   CORTOS.forEach((k, i) => (S[k] = sesiones[i]));
 });
 test.afterAll(async () => {
@@ -515,7 +516,7 @@ test.describe("@permisos usuario sin perfil", () => {
         `insert into auth.identities (id, user_id, provider_id, identity_data, provider, last_sign_in_at, created_at, updated_at) ` +
         `values (gen_random_uuid(), '${id}', '${id}', jsonb_build_object('sub', '${id}', 'email', '${email}', 'email_verified', true), 'email', now(), now(), now());`,
     );
-    sp = await entrar(email, clave);
+    sp = await entrar(email);
   });
   test.afterAll(async () => {
     if (sp) await salir(sp.token);

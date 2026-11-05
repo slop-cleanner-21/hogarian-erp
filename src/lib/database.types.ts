@@ -740,6 +740,25 @@ export type Database = {
         };
         Relationships: [];
       };
+      credenciales: {
+        Row: {
+          cambiada_at: string;
+          hash: string;
+          user_id: string;
+        };
+        ComputedFields: never;
+        Insert: {
+          cambiada_at?: string;
+          hash: string;
+          user_id: string;
+        };
+        Update: {
+          cambiada_at?: string;
+          hash?: string;
+          user_id?: string;
+        };
+        Relationships: [];
+      };
       cuentas_contables: {
         Row: {
           amarre_debe: string | null;
@@ -1232,28 +1251,6 @@ export type Database = {
             referencedColumns: ["codigo"];
           },
         ];
-      };
-      login_ips: {
-        Row: {
-          captcha_desde: string | null;
-          fallos: number;
-          ip: string;
-          ultimo_fallo_at: string | null;
-        };
-        ComputedFields: never;
-        Insert: {
-          captcha_desde?: string | null;
-          fallos?: number;
-          ip: string;
-          ultimo_fallo_at?: string | null;
-        };
-        Update: {
-          captcha_desde?: string | null;
-          fallos?: number;
-          ip?: string;
-          ultimo_fallo_at?: string | null;
-        };
-        Relationships: [];
       };
       notificaciones: {
         Row: {
@@ -3987,6 +3984,10 @@ export type Database = {
         };
         Returns: number;
       };
+      fijar_contrasena: {
+        Args: { p_clave: string; p_conservar?: string; p_user: string };
+        Returns: undefined;
+      };
       fn_comprometido_ordenes_mo: {
         Args: { p_partida_id: number };
         Returns: number;
@@ -4062,6 +4063,11 @@ export type Database = {
         Args: { p_obra_id: number; p_retenciones: Json };
         Returns: number;
       };
+      hash_relleno: { Args: Record<PropertyKey, never>; Returns: string };
+      ingreso_valido: {
+        Args: { p_clave: string; p_email: string };
+        Returns: string;
+      };
       link_pagada_at: {
         Args: { p_numero: string; p_obra: number };
         Returns: string;
@@ -4104,14 +4110,6 @@ export type Database = {
           isOneToOne: true;
           isSetofReturn: false;
         };
-      };
-      login_fallo_ip: {
-        Args: { p_ip: string };
-        Returns: {
-          captcha: boolean;
-          fallos: number;
-          nuevo_captcha: boolean;
-        }[];
       };
       marcar_cotizacion_enviada: {
         Args: { p_numero: string; p_obra_id: number };

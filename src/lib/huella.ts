@@ -26,11 +26,19 @@ const COOKIE_DESAFIO = "prod1_huella_desafio";
 const MAX_DESAFIOS_POR_IP = 20;
 const MAX_DESAFIOS_ANONIMOS = 2000;
 
-/** Origen de la petición y su dominio (RP ID): Vercel, el túnel o localhost. Next ya validó el origen. */
+/**
+ * Origen de la petición y su dominio (RP ID): el de la app (Vercel o localhost). El `Origin` lo manda el navegador
+ * (y un script puede inventarlo): tiene que ser el mismo host al que llegó el pedido (`Host`, que en Vercel es el
+ * dominio real). Las server actions ya lo validan; las rutas de /desbloquear, no: con otro Origin, la huella se buscaba
+ * en otro dominio, no había ninguna y el dispositivo quedaba desbloqueado.
+ */
 async function sitio() {
-  const origin = (await headers()).get("origin");
-  if (!origin) throw new Error("Petición sin origen");
+  const h = await headers();
+  const origin = h.get("origin");
+  const host = h.get("host");
+  if (!origin || !host) throw new Error("Petición sin origen");
   const u = new URL(origin);
+  if (u.host !== host) throw new Error("Origen distinto del de la app");
   return { origin: u.origin, rpID: u.hostname };
 }
 

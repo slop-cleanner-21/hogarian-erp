@@ -118,7 +118,9 @@ test.describe("@prod1 @admin usuarios", () => {
       expect(comoUsuario("select '[' || rol_actual() || ']'")).toBe("[]");
       expect(comoUsuario("select count(*) from ordenes_compra")).toBe("0");
 
-      // Reactivada: vuelve a entrar.
+      // Reactivada: vuelve a entrar. (Los intentos fallidos a propósito de esta prueba ya son 3: sin borrarlos, la cuenta
+      // esperaría 10 minutos.)
+      sql(`delete from audit_log where tabla = 'sesion' and accion = 'LOGIN_FALLIDO' and detalle->>'email' = '${email}'`);
       await admin.locator("main").getByRole("button", { name: new RegExp(email) }).click();
       await ficha.getByRole("button", { name: "Reactivar cuenta" }).click();
       await admin.getByRole("dialog").filter({ hasText: "¿Reactivar" }).getByRole("button", { name: /^Sí/ }).click();

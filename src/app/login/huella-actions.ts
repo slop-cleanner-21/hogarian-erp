@@ -6,6 +6,7 @@ import { dispositivo } from "@/lib/auditoria-reporte";
 import { origen, registrarEvento } from "@/lib/auditoria";
 import { activarBloqueoSesion, marcarDispositivo, olvidarDispositivo, quitarBloqueoSesion, soloMarcarDispositivo } from "@/lib/bloqueo-cookies";
 import { huellasDe, opcionesActivar, opcionesFirmar, verificarActivacion, verificarFirma, type Huella } from "@/lib/huella";
+import { abrirSesion } from "@/lib/sesion-servidor";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { createClient, requireSesionVigente } from "@/lib/supabase/server";
 
@@ -31,22 +32,13 @@ export async function entrarConHuella(respuesta: AuthenticationResponseJSON): Pr
     return { error: FALLO, desconocida: f.desconocida };
   }
   const userId = f.userId;
-  const admin = createAdminClient(userId);
-  const { data: u } = await admin.auth.admin.getUserById(userId);
-  const email = u.user?.email;
-  const baneado = u.user?.banned_until && new Date(u.user.banned_until) > new Date();
-  if (!email || baneado) {
-    await registrarEvento({ tabla: "sesion", accion: "LOGIN_FALLIDO", actor: userId, detalle: { email, metodo: "huella", motivo: "desactivada" } });
-    return { error: "La cuenta está desactivada" };
-  }
-  const { data: link, error } = await admin.auth.admin.generateLink({ type: "magiclink", email });
-  if (error || !link.properties?.hashed_token) return { error: FALLO };
   const supabase = await createClient();
-  const { error: e2 } = await supabase.auth.verifyOtp({ type: "magiclink", token_hash: link.properties.hashed_token });
-  if (e2) {
-    await registrarEvento({ tabla: "sesion", accion: "LOGIN_FALLIDO", actor: userId, detalle: { email, metodo: "huella", motivo: e2.code ?? e2.message } });
-    return { error: FALLO };
+  const abierta = await abrirSesion(supabase, userId);
+  if ("error" in abierta) {
+    await registrarEvento({ tabla: "sesion", accion: "LOGIN_FALLIDO", actor: userId, detalle: { metodo: "huella", motivo: abierta.motivo } });
+    return { error: abierta.motivo === "desactivada" ? abierta.error : FALLO };
   }
+  const email = abierta.email;
   await registrarEvento({ tabla: "sesion", accion: "LOGIN", registro: userId, actor: userId, detalle: { email, metodo: "huella" } });
   // Este dispositivo tiene su huella y queda desbloqueado (la sesión nueva, con bloqueo en la base).
   await activarBloqueoSesion(supabase, true);
