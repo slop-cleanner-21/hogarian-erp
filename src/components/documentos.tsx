@@ -7,6 +7,7 @@ import { registrarAdjunto } from "@/app/documentos/actions";
 import type { AdjuntoFirmado, TipoAdjunto } from "@/lib/adjuntos";
 import { cn } from "@/lib/format";
 import { createClient } from "@/lib/supabase/client";
+import { ImagenFirmada } from "./imagen-firmada";
 import { EnlaceArchivo, useVisor } from "./visor";
 
 export const ADJUNTO_LABEL: Record<TipoAdjunto, string> = {
@@ -168,8 +169,7 @@ function GrupoDocumentos({
           {archivos.map((a, i) => (
             <li key={a.id}>
               <button type="button" onClick={() => visor.abrir(archivos.map((x) => ({ url: x.url, alt: x.nombre })), i)} aria-label={`Ver ${a.nombre}`} className="block w-full">
-                {/* eslint-disable-next-line @next/next/no-img-element -- URL firmada de storage local */}
-                <img src={a.url} alt={a.nombre} loading="lazy" className="aspect-square w-full rounded-field object-cover" />
+                <ImagenFirmada src={a.url} alt={a.nombre} className="aspect-square w-full rounded-field object-cover" />
               </button>
             </li>
           ))}

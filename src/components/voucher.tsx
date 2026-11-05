@@ -1,6 +1,7 @@
 "use client";
 
 import { FileText } from "lucide-react";
+import { ImagenFirmada } from "./imagen-firmada";
 import { EnlaceArchivo, useVisor } from "./visor";
 
 const ES_IMAGEN = /\.(jpe?g|png|webp|gif|heic)(\?|$)/i;
@@ -37,8 +38,7 @@ export function VistaArchivo({
     return (
       <>
         <button type="button" onClick={() => visor.abrir([{ url: href, alt }])} aria-label={`Ampliar ${alt}`} className="block w-full">
-          {/* eslint-disable-next-line @next/next/no-img-element -- URL firmada de storage o imagen generada por la app */}
-          <img src={href} alt={alt} loading="lazy" className="w-full rounded-field border border-line" />
+          <ImagenFirmada src={href} alt={alt} className="w-full rounded-field border border-line" />
         </button>
         {visor.elemento}
       </>
