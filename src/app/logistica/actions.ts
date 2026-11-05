@@ -133,7 +133,7 @@ export async function registrarComprobante(input: z.input<typeof Comprobante>): 
   const c = p.data;
   const { data: o } = await supabase
     .from("ordenes_compra")
-    .select("tipo, requiere_guia, comprobante_tipo, historico")
+    .select("tipo, requiere_guia, historico")
     .eq("obra_id", c.obraId)
     .eq("numero", c.numero)
     .maybeSingle();
@@ -144,16 +144,7 @@ export async function registrarComprobante(input: z.input<typeof Comprobante>): 
     const { error: eg } = await supabase.rpc("set_requiere_guia", { p_obra_id: c.obraId, p_numero: c.numero, p_requiere: c.requiereGuia });
     if (eg) return fail(eg.message);
   }
-  // OS: si llega el otro comprobante, el contrato se regenera (el firmado deja de servir).
-  if (o.tipo === "OS" && (c.tipo === "RXH" || c.tipo === "FACTURA") && c.tipo !== o.comprobante_tipo) {
-    const { error: eo } = await supabase.rpc("set_datos_os", {
-      p_obra_id: c.obraId,
-      p_numero: c.numero,
-      p_comprobante: c.tipo,
-      p_fecha_inicio: null as unknown as string,
-    });
-    if (eo) return fail(eo.message);
-  }
+  // OS: si llega el otro comprobante, la base regenera el contrato al registrarlo (el firmado deja de servir).
   const { error } = await supabase.rpc("registrar_comprobante", {
     p_proveedor_id: c.proveedorId,
     p_tipo: c.tipo,

@@ -1014,15 +1014,10 @@ function ComprobanteSheet({
     .reduce((a, i) => a + Number(i.parcial ?? 0), 0);
   const [total, setTotal] = useState<string>("");
   const totalNum = total === "" ? sugerido : Number(total);
-  const [retencion, setRetencion] = useState<string>("");
-  // Retención de 4ta: RHE de más de S/ 1,500, por el % del proveedor, salvo suspensión vigente.
+  // Retención de 4ta: RHE de más de S/ 1,500, por el % del proveedor, salvo suspensión vigente. La calcula (y la exige)
+  // la base: aquí solo se muestra.
   const suspendida = tipo === "RXH" && suspensionVigente(retencionProveedor.suspension, fechaEmision);
-  const retencionNum =
-    tipo === "RXH"
-      ? retencion === ""
-        ? retencion4ta(totalNum, fechaEmision, retencionProveedor)
-        : Number(retencion)
-      : 0;
+  const retencionNum = tipo === "RXH" ? retencion4ta(totalNum, fechaEmision, retencionProveedor) : 0;
   // Detracción de una factura: total × (Σ parcial × % ÷ Σ parcial) de las líneas elegidas que la llevan.
   const elegidas = items.filter((i) => sel.has(i.id));
   const conDetraccion =
@@ -1173,11 +1168,7 @@ function ComprobanteSheet({
         )}
         {tipo === "RXH" && (
           <Field label={suspendida ? `Retención 4ta · suspendida ${retencionProveedor.suspension!.slice(0, 4)}` : `Retención 4ta (${retencionProveedor.pct} %)`}>
-            <NumberInput
-              value={retencion}
-              placeholder={money(retencionNum)}
-              onChange={(e) => con(setRetencion)(e.target.value)}
-            />
+            <Input value={soles(retencionNum)} readOnly tabIndex={-1} className="num bg-ink/5 text-right text-ink-2" />
           </Field>
         )}
         {regenera && (

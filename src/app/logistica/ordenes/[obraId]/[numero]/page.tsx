@@ -179,6 +179,8 @@ export default async function OrdenPage({ params }: PageProps<"/logistica/ordene
           numero={numero}
           empresaId={orden.empresa_id!}
           proveedorRuc={orden.proveedor_ruc ?? ""}
+          esOS={orden.tipo === "OS"}
+          retencionProveedor={{ pct: Number(prov?.retencion_4ta_pct ?? 8), suspension: prov?.suspension_4ta_fecha ?? null }}
           comprobantes={(comps ?? []).map((c) => ({
             id: c.id!,
             tipo: c.tipo!,

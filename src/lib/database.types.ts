@@ -4082,6 +4082,14 @@ export type Database = {
         Args: { p_etapa: string; p_obra_id: number };
         Returns: number;
       };
+      fn_os_comprobante: {
+        Args: {
+          p_numero: string;
+          p_obra_id: number;
+          p_tipo: Database["public"]["Enums"]["tipo_comprobante"];
+        };
+        Returns: undefined;
+      };
       fn_presupuesto_efectivo: {
         Args: { p_partida_id: number };
         Returns: number;
@@ -4101,6 +4109,16 @@ export type Database = {
         Args: { p_item_id: number; p_obra_id: number };
         Returns: number;
       };
+      fn_retencion_4ta: {
+        Args: {
+          p_fecha: string;
+          p_proveedor_id: number;
+          p_tipo: Database["public"]["Enums"]["tipo_comprobante"];
+          p_total: number;
+        };
+        Returns: number;
+      };
+      fn_soles: { Args: { p: number }; Returns: string };
       get_cotizacion: { Args: { p_token: string }; Returns: Json };
       glosa_rhe_defecto: {
         Args: { p_numero: string; p_obra_id: number };

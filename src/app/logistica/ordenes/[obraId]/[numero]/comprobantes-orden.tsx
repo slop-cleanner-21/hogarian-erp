@@ -8,7 +8,8 @@ import { Button } from "@/components/ui/button";
 import { Field, Input, NumberInput, inputClass } from "@/components/ui/field";
 import { SearchSelect } from "@/components/ui/search-select";
 import { Sheet } from "@/components/ui/sheet";
-import { cn, fecha, money } from "@/lib/format";
+import { cn, fecha, money, soles } from "@/lib/format";
+import { retencion4ta, suspensionVigente } from "@/lib/retencion";
 import { createClient } from "@/lib/supabase/client";
 import { TIPO_COMPROBANTE_LABEL, type TipoComprobante } from "@/lib/types";
 import { editarComprobante } from "../../../actions";
@@ -34,12 +35,18 @@ export function ComprobantesOrden({
   numero,
   empresaId,
   proveedorRuc,
+  esOS,
+  retencionProveedor,
 }: {
   comprobantes: ComprobanteOrden[];
   obraId: number;
   numero: string;
   empresaId: number;
   proveedorRuc: string;
+  /** Una OS solo lleva factura o recibo por honorarios. */
+  esOS: boolean;
+  /** % de retención de 4ta del proveedor y fecha de su suspensión (si tiene). */
+  retencionProveedor: { pct: number; suspension: string | null };
 }) {
   const [editando, setEditando] = useState<ComprobanteOrden | null>(null);
   const [historial, setHistorial] = useState<number | null>(null);
@@ -116,6 +123,8 @@ export function ComprobantesOrden({
           obraId={obraId}
           numero={numero}
           carpeta={`${empresaId}/${proveedorRuc}`}
+          esOS={esOS}
+          retencionProveedor={retencionProveedor}
           onClose={() => setEditando(null)}
         />
       )}
@@ -123,19 +132,42 @@ export function ComprobantesOrden({
   );
 }
 
-function EditarComprobante({ c, obraId, numero, carpeta, onClose }: { c: ComprobanteOrden; obraId: number; numero: string; carpeta: string; onClose: () => void }) {
+function EditarComprobante({
+  c,
+  obraId,
+  numero,
+  carpeta,
+  esOS,
+  retencionProveedor,
+  onClose,
+}: {
+  c: ComprobanteOrden;
+  obraId: number;
+  numero: string;
+  carpeta: string;
+  esOS: boolean;
+  retencionProveedor: { pct: number; suspension: string | null };
+  onClose: () => void;
+}) {
   const router = useRouter();
   const [tipo, setTipo] = useState<TipoComprobante>(c.tipo);
   const [serie, setSerie] = useState(c.serie);
   const [num, setNum] = useState(c.numero);
   const [fechaEmision, setFechaEmision] = useState(c.fecha_emision);
   const [total, setTotal] = useState(String(c.total));
-  const [retencion, setRetencion] = useState(String(c.retencion));
   const [archivo, setArchivo] = useState<File | null>(null);
   const [motivo, setMotivo] = useState("");
   const [error, setError] = useState<string | null>(null);
   const [pending, startTransition] = useTransition();
   const fileRef = useRef<HTMLInputElement>(null);
+  // Retención de 4ta (la exige la base): sin cambiar tipo, fecha ni total, la que tenía; si no, la que corresponde.
+  const totalNum = Number(total) || 0;
+  const sinCambio = tipo === c.tipo && fechaEmision === c.fecha_emision && Math.round(totalNum * 100) === Math.round(c.total * 100);
+  const retencion = sinCambio ? c.retencion : tipo === "RXH" ? retencion4ta(totalNum, fechaEmision, retencionProveedor) : 0;
+  const suspendida = tipo === "RXH" && suspensionVigente(retencionProveedor.suspension, fechaEmision);
+  const tipos = Object.entries(TIPO_COMPROBANTE_LABEL)
+    .filter(([value]) => !esOS || value === "FACTURA" || value === "RXH" || value === c.tipo)
+    .map(([value, label]) => ({ value, label }));
   // Un error del servidor deja de valer en cuanto se corrige un dato.
   const con =
     <T,>(set: (v: T) => void) =>
@@ -165,7 +197,7 @@ function EditarComprobante({ c, obraId, numero, carpeta, onClose }: { c: Comprob
         numeroComprobante: num,
         fecha: fechaEmision,
         total: Number(total),
-        retencion: Number(retencion) || 0,
+        retencion,
         archivoPath,
         motivo,
       });
@@ -198,7 +230,7 @@ function EditarComprobante({ c, obraId, numero, carpeta, onClose }: { c: Comprob
             label="Tipo"
             value={tipo}
             onChange={(v) => con(setTipo)(v as TipoComprobante)}
-            options={Object.entries(TIPO_COMPROBANTE_LABEL).map(([value, label]) => ({ value, label }))}
+            options={tipos}
           />
         </Field>
         <div className="grid grid-cols-2 gap-3">
@@ -216,9 +248,19 @@ function EditarComprobante({ c, obraId, numero, carpeta, onClose }: { c: Comprob
           <Field label="Total">
             <NumberInput value={total} onChange={(e) => con(setTotal)(e.target.value)} />
           </Field>
-          <Field label="Retención">
-            <NumberInput value={retencion} onChange={(e) => con(setRetencion)(e.target.value)} />
-          </Field>
+          {(tipo === "RXH" || retencion > 0) && (
+            <Field
+              label={
+                sinCambio
+                  ? "Retención 4ta"
+                  : suspendida
+                    ? `Retención 4ta · suspendida ${retencionProveedor.suspension!.slice(0, 4)}`
+                    : `Retención 4ta (${retencionProveedor.pct} %)`
+              }
+            >
+              <Input value={soles(retencion)} readOnly tabIndex={-1} className="num bg-ink/5 text-right text-ink-2" />
+            </Field>
+          )}
         </div>
         <input ref={fileRef} type="file" hidden accept="application/pdf,image/*,text/xml" onChange={(e) => con(setArchivo)(e.target.files?.[0] ?? null)} />
         <button

@@ -48,8 +48,10 @@ Contabilidad, Residente y RRHH **no entran**. Sus roles siguen en la base
   - RHE → **contrato de locación de servicios**, con el concepto del recibo.
   - Factura → **contrato comercial** de prestación de servicios, sin concepto (plantilla provisional, hasta
     que llegue la definitiva).
-  - Si al facturar llega el otro comprobante, el contrato se **regenera**: el firmado se quita de la orden (el
-    archivo queda) y hay que enviarlo y firmarlo de nuevo (RPC `set_datos_os`).
+  - Si al facturar (o al corregir el comprobante) llega el otro, el contrato se **regenera**: el firmado se quita de
+    la orden (el archivo queda) y hay que enviarlo y firmarlo de nuevo. Lo hace la base en la misma transacción que
+    el registro (`fn_os_comprobante`); una OS ya en Tesorería no cambia de comprobante sin un rechazo. Una OS solo
+    acepta factura o recibo por honorarios.
   - El contrato lleva la **firma de Gerencia** (imagen que sube el gerente en «Mi firma», su menú), con su
     nombre y DNI (lo pone el Admin al crear su usuario; obligatorio en Gerencia). Firma y DNI están en
     `perfil_privado` y en `documentos/firmas/`: solo los lee el servidor. Si hay varios gerentes, firma el de
@@ -72,9 +74,15 @@ Contabilidad, Residente y RRHH **no entran**. Sus roles siguen en la base
   del proveedor (8 % por defecto; Logística lo cambia en su ficha). Tesorería paga el neto y la retención
   queda registrada. No se retiene si el proveedor tiene **suspensión de 4ta** vigente: Logística la marca en
   su ficha solo subiendo la constancia (Formulario 1609) con su fecha; vale hasta el 31 de diciembre de ese
-  año (`src/lib/retencion.ts`).
+  año (`src/lib/retencion.ts`). **La calcula la base** (`fn_retencion_4ta`, migración `prod1_impuestos_base`): al
+  registrar o corregir un comprobante rechaza cualquier otra («La retención de 4ta de este recibo es S/ …»), y en la
+  pantalla se muestra calculada, sin editar. Corregir un comprobante sin cambiar tipo, fecha ni total la deja como
+  estaba. La suspensión solo se guarda con la constancia de verdad subida (`documentos/proveedores/`) y sin fecha
+  futura, también por la API.
 - **Detracción** (SPOT): solo la llevan las facturas (OC y OS) de más de S/ 700 (700 exactos no), en los ítems que marca
-  Gerencia; un recibo por honorarios nunca la lleva.
+  Gerencia; un recibo por honorarios nunca la lleva. La base la hace cumplir: si no corresponde (otro comprobante, bajo el mínimo o sin ítems que la lleven) no
+  acepta ninguna; si corresponde, no puede ser 0 (Logística puede ajustar el monto al de la factura). Al corregir el
+  comprobante, se quita o se calcula según el nuevo tipo y total.
 - **OS de mano de obra:** Logística las crea directo, como una OS de subcontrato (sin avances,
   valorizaciones ni retenciones). El seguimiento de mano de obra usa el mismo recorrido que el de
   los subcontratos.

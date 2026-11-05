@@ -506,7 +506,7 @@ test.describe("@flujo flujo completo por las pantallas", () => {
       await hoja.getByLabel("Serie").fill("E001");
       await hoja.getByLabel("Número").fill(sufijo);
       await hoja.getByLabel("Total").fill(String(PU_SERVICIO));
-      await expect(hoja.getByLabel("Retención 4ta (8 %)")).toHaveAttribute("placeholder", RETENCION.toFixed(2));
+      await expect(hoja.getByLabel("Retención 4ta (8 %)")).toHaveValue(sol(RETENCION));
       await hoja.locator('input[type="file"]').setInputFiles(ARCHIVO);
       await hoja.getByRole("button", { name: /^Registrar/ }).click();
       await expect(hoja).toBeHidden();
