@@ -18,6 +18,9 @@ const nextConfig: NextConfig = {
     },
   },
   experimental: {
+    // Volver a una pantalla ya vista en los últimos 30 s (p. ej. «Volver» de una orden a la lista) la muestra al
+    // instante, sin pedirla de nuevo. Lo que cambia con una acción del servidor se revalida igual (revalidatePath).
+    staleTimes: { dynamic: 30 },
     // Server actions desde otros dominios (no se usa: el túnel se dio de baja). Lista separada por comas
     // (SERVER_ACTIONS_ORIGENES, separados por coma; en .env.local). En producción no se define.
     serverActions: {

@@ -1,7 +1,6 @@
 "use client";
 
 import { MarcaAdicional } from "@/components/marca-adicional";
-import { ChevronDown } from "lucide-react";
 import Link from "next/link";
 import { useEffect, useState, useSyncExternalStore } from "react";
 import { historialPartida, type FilaHistorial } from "@/app/presupuesto/actions";
@@ -106,7 +105,7 @@ export function PresupuestoObra({
                         <span className="leading-snug">
                           {p.descripcion} <MarcaAdicional requerimiento={p.requerimiento} />
                         </span>
-                        <ChevronDown size={18} className={cn("mt-0.5 shrink-0 text-ink-3 transition-transform", abiertaEsta && "rotate-180")} />
+                        <span aria-hidden className={cn("flecha-abajo mt-0.5 size-[18px] shrink-0 text-ink-3 transition-transform", abiertaEsta && "rotate-180")} />
                       </div>
                       <div className="relative mt-2 h-2 overflow-hidden rounded-full bg-sunken" aria-hidden>
                         <div className="absolute inset-y-0 left-0 rounded-full bg-primary/35" style={{ width: `${pct(compra, base)}%` }} />

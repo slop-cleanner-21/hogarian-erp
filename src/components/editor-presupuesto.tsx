@@ -3,7 +3,7 @@
 import { MarcaAdicional, nombreAdicional } from "@/components/marca-adicional";
 import { Plus, Search, Trash2 } from "lucide-react";
 import { useRouter } from "next/navigation";
-import { useMemo, useState, useSyncExternalStore, useTransition, type KeyboardEvent } from "react";
+import { useDeferredValue, useMemo, useState, useSyncExternalStore, useTransition, type KeyboardEvent } from "react";
 import { guardarPartidas, type PartidaEdicion } from "@/app/presupuesto/actions";
 import { TODOS } from "@/lib/filtros";
 import { cn, matches, money, qty } from "@/lib/format";
@@ -107,6 +107,9 @@ export function EditorPresupuesto({
 
   // Filtros (en la pantalla: las partidas ya están cargadas). Las nuevas o cambiadas siempre se ven.
   const [q, setQ] = useState("");
+  // La lista (cientos de filas) se filtra con el texto «diferido»: el campo responde al instante al escribir y la
+  // lista se actualiza después, sin trabar el teclado en el celular.
+  const qLista = useDeferredValue(q);
   const [filtros, setFiltros] = useState<Record<string, string>>({});
   const conAdicionales = [...new Set(partidas.map((p) => p.requerimiento))]
     .filter(esAdicional)
@@ -172,7 +175,7 @@ export function EditorPresupuesto({
   const pasa = (f: Fila) => {
     if (f.id == null || !igual(f, originales.get(f.id)!)) return true;
     const it = f.itemId ? item.get(f.itemId) : null;
-    if (q && !matches(it?.descripcion ?? "", q)) return false;
+    if (qLista && !matches(it?.descripcion ?? "", qLista)) return false;
     if (reqSel.size && !reqSel.has(nombreReq(f.requerimiento))) return false;
     if (etapasSel.size && !etapasSel.has(f.etapa)) return false;
     if (rubro !== TODOS) {

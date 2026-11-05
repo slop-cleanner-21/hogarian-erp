@@ -44,6 +44,9 @@ export async function PaginaObra({ obraId, volver }: { obraId: number; volver: s
     .map((i) => ({ itemId: i.id, descripcion: i.descripcion }))
     .sort((a, b) => a.descripcion.localeCompare(b.descripcion));
 
+  // El catálogo de ítems (cientos): el mismo arreglo para los adicionales y el editor, así viaja una sola vez al
+  // navegador (antes iba dos veces en el HTML).
+  const catalogo = items.map((i) => ({ id: i.id, descripcion: i.descripcion, unidad: i.unidad ?? "", rubro: i.rubro }));
   return (
     <>
       <TopBar title={obra.nombre} back={volver} />
@@ -76,7 +79,7 @@ export async function PaginaObra({ obraId, volver }: { obraId: number; volver: s
           <AdicionalesObra
             obraId={obraId}
             partidas={filas.map((f) => ({ id: f.id!, etapa: f.etapa, requerimiento: f.requerimiento, itemId: f.itemId!, cantidad: f.cantidad, pu: f.pu }))}
-            items={items.map((i) => ({ id: i.id, descripcion: i.descripcion, unidad: i.unidad ?? "" }))}
+            items={catalogo}
             etapas={(etapas ?? []).map((e) => e.codigo)}
             editable={obra.estado !== "CERRADA"}
           />
@@ -88,7 +91,7 @@ export async function PaginaObra({ obraId, volver }: { obraId: number; volver: s
           key={filas.map((f) => `${f.id}:${f.etapa}:${f.requerimiento}:${f.itemId}:${f.cantidad}:${f.pu}`).join("|")}
           obraId={obraId}
           partidas={filas}
-          items={items.map((i) => ({ id: i.id, descripcion: i.descripcion, unidad: i.unidad ?? "", rubro: i.rubro }))}
+          items={catalogo}
           etapas={(etapas ?? []).map((e) => e.codigo)}
           requerimientos={(reqs ?? []).map((r) => r.codigo)}
           editable={obra.estado !== "CERRADA"}

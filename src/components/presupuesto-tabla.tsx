@@ -1,7 +1,6 @@
 "use client";
 
 import { MarcaAdicional } from "@/components/marca-adicional";
-import { ChevronDown } from "lucide-react";
 import Link from "next/link";
 import { Fragment, useEffect, useState, useSyncExternalStore } from "react";
 import { guardar, leer } from "@/lib/recordar";
@@ -74,11 +73,7 @@ export function PresupuestoTabla({ partidas }: { partidas: PartidaAvance[] }) {
                     className={cn(COLUMNAS, "w-full border-b border-line px-2.5 py-2.5 text-left last:border-0 active:bg-ink/8")}
                   >
                     <span className="flex min-w-0 items-start gap-1 leading-snug hyphens-auto [overflow-wrap:anywhere]">
-                      <ChevronDown
-                        size={16}
-                        aria-hidden
-                        className={cn("mt-0.5 shrink-0 text-ink-3 transition-transform", abiertaEsta && "rotate-180")}
-                      />
+                      <span aria-hidden className={cn("flecha-abajo mt-0.5 shrink-0 text-ink-3 transition-transform", abiertaEsta && "rotate-180")} />
                       <span className="min-w-0">
                         {p.descripcion} <MarcaAdicional requerimiento={p.requerimiento} />
                       </span>

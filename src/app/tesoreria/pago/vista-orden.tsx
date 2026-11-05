@@ -1,7 +1,7 @@
 import "server-only";
 import { cookies } from "next/headers";
 import type { ComponentProps, ReactNode } from "react";
-import { ContextoCompraVista } from "@/components/contexto-compra";
+import { ContextoCompraDiferido } from "@/components/contexto-compra";
 import { Entregas } from "@/components/entregas";
 import { listarAdjuntos, urlsComprobantes } from "@/lib/adjuntos";
 import { contextoCompra } from "@/lib/contexto-compra";
@@ -41,12 +41,44 @@ export async function vistaOrden(
   if (eItems) throw new Error(eItems.message);
   if (!orden) return null;
 
-  // La orden dentro del presupuesto de la obra (en paralelo con lo demás).
+  // La orden dentro del presupuesto de la obra: llega aparte (streaming), sin hacer esperar a la pantalla.
   const contextoP = contextoCompra(obraId, numero);
+  contextoP.catch(() => {});
   const itemIds = [...new Set(items.map((i) => i.item_id!))];
   const comprobanteIds = [...new Set(items.map((i) => i.comprobante_id).filter((c): c is number => c != null))];
 
-  const [hist, { data: comprobantes }, { data: prov }, pagos, adjuntos, rechazos, { data: guia }, { data: compHist }] = await Promise.all([
+  // Todo lo demás en una sola tanda (antes eran 5 en serie): lo que depende de otra consulta de esta tanda (las URL
+  // firmadas) se encadena a ella, sin esperar a las demás.
+  const ids = comprobanteIds.length ? comprobanteIds : [-1];
+  const comprobantesP = supabase
+    .from("v_comprobantes")
+    .select("id, tipo, serie, numero, archivo_path, fecha_emision, total, retencion, detraccion, pagado, asiento_id")
+    .in("id", ids);
+  // La guía de remisión registrada (con su archivo).
+  const guiaP = supabase
+    .from("guias")
+    .select("numero_guia, archivo_path, estado")
+    .eq("obra_id", obraId)
+    .eq("numero_oc", numero)
+    .in("estado", ["EMITIDA", "ANULACION_PENDIENTE", "ANULADA"])
+    .order("solicitado_at", { ascending: false })
+    .limit(1)
+    .maybeSingle();
+  const [
+    hist,
+    { data: comprobantes },
+    { data: prov },
+    pagos,
+    adjuntos,
+    rechazos,
+    { data: guia },
+    { data: compHist },
+    urls,
+    urlGuia,
+    { data: avance },
+    entregas,
+    { data: otrasLineas },
+  ] = await Promise.all([
     todas((a, b) =>
       supabase
         .from("v_oc_items_calc")
@@ -58,23 +90,33 @@ export async function vistaOrden(
         .order("id", { ascending: false })
         .range(a, b),
     ),
-    supabase.from("v_comprobantes").select("id, tipo, serie, numero, archivo_path, fecha_emision, total, retencion, detraccion, pagado, asiento_id").in("id", comprobanteIds.length ? comprobanteIds : [-1]),
+    comprobantesP,
     supabase.from("proveedor_cuentas").select("banco, cuenta_bancaria").eq("proveedor_id", orden.proveedor_id!).maybeSingle(),
     pagosDeOrden(obraId, numero, comprobanteIds),
     listarAdjuntos({ obraId, numeroOc: numero }),
     rechazosDeOrden(obraId, numero),
-    // La guía de remisión registrada (con su archivo).
-    supabase
-      .from("guias")
-      .select("numero_guia, archivo_path, estado")
-      .eq("obra_id", obraId)
-      .eq("numero_oc", numero)
-      .in("estado", ["EMITIDA", "ANULACION_PENDIENTE", "ANULADA"])
-      .order("solicitado_at", { ascending: false })
-      .limit(1)
-      .maybeSingle(),
+    guiaP,
     // Comprobantes del Excel (pueden no tener archivo).
-    supabase.from("comprobantes").select("id").eq("historico", true).in("id", comprobanteIds.length ? comprobanteIds : [-1]),
+    supabase.from("comprobantes").select("id").eq("historico", true).in("id", ids),
+    comprobantesP.then(({ data }) => urlsComprobantes((data ?? []).map((c) => c.archivo_path).filter((p): p is string => !!p))),
+    guiaP.then(({ data: g }) =>
+      g?.archivo_path
+        ? supabase.storage
+            .from("documentos")
+            .createSignedUrl(g.archivo_path, 3600)
+            .then((r) => (r.data?.signedUrl ? urlPublica(r.data.signedUrl) : null))
+        : null,
+    ),
+    // Avance de cada partida del presupuesto (ejecutado / presupuestado).
+    supabase
+      .from("v_avance_partida")
+      .select("partida_id, presupuestado, comprado, parcial, monto_comprado")
+      .in("partida_id", [...new Set(items.map((i) => i.partida_id!))]),
+    orden.estado === "EN_ENTREGA" || orden.estado === "RECIBIDA" ? cargarEntregas(obraId, numero) : null,
+    // Al rechazar, la factura se anula para que el proveedor emita otra, salvo que ya no se pueda.
+    modo === "tesoreria" && comprobanteIds.length
+      ? supabase.from("oc_items").select("obra_id, numero_oc").in("comprobante_id", comprobanteIds)
+      : { data: [] as { obra_id: number; numero_oc: string }[] },
   ]);
   const historicos = new Set((compHist ?? []).map((c) => c.id));
 
@@ -87,30 +129,9 @@ export async function vistaOrden(
     if (!prev) h.set(x.item_id!, { min: pu, max: pu, ultimo: pu });
     else h.set(x.item_id!, { ...prev, min: Math.min(prev.min, pu), max: Math.max(prev.max, pu) });
   }
-  const [urls, urlGuia] = await Promise.all([
-    urlsComprobantes((comprobantes ?? []).map((c) => c.archivo_path).filter((p): p is string => !!p)),
-    guia?.archivo_path
-      ? supabase.storage
-          .from("documentos")
-          .createSignedUrl(guia.archivo_path, 3600)
-          .then((r) => (r.data?.signedUrl ? urlPublica(r.data.signedUrl) : null))
-      : null,
-  ]);
-
-  // Avance de cada partida del presupuesto (ejecutado / presupuestado).
-  const { data: avance } = await supabase
-    .from("v_avance_partida")
-    .select("partida_id, presupuestado, comprado, parcial, monto_comprado")
-    .in("partida_id", [...new Set(items.map((i) => i.partida_id!))]);
   const avancePorPartida = new Map((avance ?? []).map((a) => [a.partida_id, a]));
-  const entregas = orden.estado === "EN_ENTREGA" || orden.estado === "RECIBIDA" ? await cargarEntregas(obraId, numero) : null;
   const contrato = adjuntos.filter((a) => a.tipo === "CONTRATO");
   const total = Number(doc?.total ?? orden.total ?? 0);
-  // Al rechazar, la factura se anula para que el proveedor emita otra, salvo que ya no se pueda.
-  const { data: otrasLineas } =
-    modo === "tesoreria" && comprobanteIds.length
-      ? await supabase.from("oc_items").select("obra_id, numero_oc").in("comprobante_id", comprobanteIds)
-      : { data: [] };
   const otraOrden = (otrasLineas ?? []).find((l) => l.obra_id !== obraId || l.numero_oc !== numero);
   const sinAnular = (comprobantes ?? []).some((c) => Number(c.pagado) > 0)
     ? "La factura ya tiene pagos"
@@ -188,7 +209,7 @@ export async function vistaOrden(
         {extraEntregas}
       </>
     ),
-    contexto: <ContextoCompraVista contexto={await contextoP} pantalla={modo} />,
+    contexto: <ContextoCompraDiferido contexto={contextoP} pantalla={modo} />,
     rechazos,
     sinAnular,
     destino: { obraId, numero, ordenPagoId: null },

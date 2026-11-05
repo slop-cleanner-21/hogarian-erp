@@ -227,3 +227,14 @@ html[data-cargando] main {
 html[data-bloqueo] body > :not([data-bloqueo-pantalla]) {
   visibility: hidden;
 }
+
+/* Flecha de las filas desplegables de las tablas largas (presupuesto): un solo dibujo en el CSS en vez de un SVG por
+   fila (eran 383 SVG, 125 KB de HTML). Toma el color del texto. */
+.flecha-abajo {
+  display: inline-block;
+  width: 16px;
+  height: 16px;
+  background-color: currentColor;
+  -webkit-mask: url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='black' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'><path d='m6 9 6 6 6-6'/></svg>") center / contain no-repeat;
+  mask: url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='black' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'><path d='m6 9 6 6 6-6'/></svg>") center / contain no-repeat;
+}

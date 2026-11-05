@@ -1,4 +1,5 @@
 import { cookies } from "next/headers";
+import { Suspense } from "react";
 import type { Avance, ContextoCompra } from "@/lib/contexto-compra";
 import { cn, qty } from "@/lib/format";
 import { Plegable } from "./plegable";
@@ -103,4 +104,19 @@ export async function ContextoCompraVista({ contexto, pantalla }: { contexto: Co
       )}
     </PlegableRecordado>
   );
+}
+
+/**
+ * El bloque, cuando llega su consulta (dos vistas de la obra entera): la orden se pinta sin esperarlo (streaming). El
+ * bloque arranca plegado, así que casi nunca se nota que llega después.
+ */
+export function ContextoCompraDiferido({ contexto, pantalla }: { contexto: Promise<ContextoCompra>; pantalla: "logistica" | "tesoreria" | "consulta" }) {
+  return (
+    <Suspense fallback={null}>
+      <ContextoEsperado contexto={contexto} pantalla={pantalla} />
+    </Suspense>
+  );
+}
+async function ContextoEsperado({ contexto, pantalla }: { contexto: Promise<ContextoCompra>; pantalla: "logistica" | "tesoreria" | "consulta" }) {
+  return <ContextoCompraVista contexto={await contexto} pantalla={pantalla} />;
 }

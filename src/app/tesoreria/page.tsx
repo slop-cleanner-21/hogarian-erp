@@ -59,7 +59,7 @@ export default async function PagosPage({ searchParams }: PageProps<"/tesoreria"
   const columnaMonto = pagado ? "pagado" : "saldo";
   const supabase = await createClient();
 
-  const [{ data: empresas }, { data: obras }, { data: proveedores }, { data: etapas }] = await Promise.all([
+  const catalogosP = Promise.all([
     supabase.from("empresas").select("id, nombre").order("nombre"),
     supabase.from("obras").select("id, nombre, empresa_id").order("nombre"),
     supabase.from("proveedores").select("id, ruc_o_cod, razon_social").order("razon_social"),
@@ -67,6 +67,21 @@ export default async function PagosPage({ searchParams }: PageProps<"/tesoreria"
   ]);
   const empresaId = typeof sp.empresa === "string" ? sp.empresa : "";
   const todasEmpresas = empresaId === TODAS;
+  const docs = area === "log" ? [doc] : area === "con" ? ["OP"] : ["OC", "OS", "OP"];
+  const like = `%${q.replace(/[%,()]/g, " ")}%`;
+  // La lista, sus totales y las reenviadas, a la vez que los catálogos (no dependen de ellos; antes iban después). La
+  // obra de la URL se valida al llegar las obras: si no es de la empresa (un enlace viejo), se piden de nuevo sin ella.
+  // Los rechazos (pestaña aparte) filtran por el RUC del proveedor: esperan a los catálogos.
+  let fObra: string | null = fObraUrl;
+  const pedirLista = () =>
+    Promise.all([Promise.all(docs.map((d) => (rechazos ? historialRechazos([d]) : documentos([d])))), totalesPorDoc()]);
+  let listaP = empresaId && !rechazos ? pedirLista() : null;
+  listaP?.catch(() => {});
+  // Por pagar: las que volvieron corregidas de un rechazo (Tesorería revisa primero lo que pidió corregir).
+  const reenviadasP =
+    empresaId && est === "pend" ? supabase.from("rechazos").select("obra_id, numero").not("reenviado_at", "is", null) : null;
+
+  const [{ data: empresas }, { data: obras }, { data: proveedores }, { data: etapas }] = await catalogosP;
   const empresa = todasEmpresas
     ? { id: TODAS, nombre: "Todas" }
     : (empresas ?? []).map((e) => ({ id: String(e.id), nombre: e.nombre })).find((e) => e.id === empresaId);
@@ -81,15 +96,17 @@ export default async function PagosPage({ searchParams }: PageProps<"/tesoreria"
       />
     );
   }
-  const docs = area === "log" ? [doc] : area === "con" ? ["OP"] : ["OC", "OS", "OP"];
   const obrasEmpresa = (obras ?? []).filter((o) => todasEmpresas || String(o.empresa_id) === empresaId);
   // Una obra de otra empresa (enlace viejo, vista guardada) no filtra.
-  const fObra = obrasEmpresa.some((o) => String(o.id) === fObraUrl) ? fObraUrl : null;
+  const obraValida = obrasEmpresa.some((o) => String(o.id) === fObraUrl) ? fObraUrl : null;
+  if (obraValida !== fObra) {
+    fObra = obraValida;
+    listaP = null;
+  }
   const galletas = await cookies();
   const diseno = leerDiseno(galletas.get(cookieDiseno("pagos"))?.value);
   const fijo = leerFijar(galletas.get(cookieFijar("pagos"))?.value);
 
-  const like = `%${q.replace(/[%,()]/g, " ")}%`;
   // Con varias secciones (área «Todas»), cada una trae su propia página: así ninguna queda vacía al
   // fondo ni salta al cargar más.
   // Nombre de la empresa de cada orden (los rechazos solo traen su id).
@@ -98,10 +115,7 @@ export default async function PagosPage({ searchParams }: PageProps<"/tesoreria"
   // Totales: cantidad y suma de cada sección con los mismos filtros, no solo de lo cargado; también por
   // grupo, para los diseños agrupados (por obra, proveedor, fecha, empresa o monto).
   // `filtrados`: todos los documentos filtrados (no solo los cargados), para «Por etapa».
-  const [porDoc, { t: totales, filas: filtrados }] = await Promise.all([
-    Promise.all(docs.map((d) => (rechazos ? historialRechazos([d]) : documentos([d])))),
-    totalesPorDoc(),
-  ]);
+  const [porDoc, { t: totales, filas: filtrados }] = await (listaP ?? pedirLista());
   const data = porDoc.flat();
   const visibles = Math.max(0, ...porDoc.map((f) => f.length));
 
@@ -157,6 +171,9 @@ export default async function PagosPage({ searchParams }: PageProps<"/tesoreria"
             ).range(a, b),
           )
         ).map((f) => ({ ...f, monto: Number(pagado ? f.pagado : f.saldo) || 0 }));
+    // Los nombres de las empresas (para agrupar «Por empresa»), cuando lleguen los catálogos.
+    const [{ data: emps }] = await catalogosP;
+    const nombres = new Map((emps ?? []).map((e) => [e.id, e.nombre]));
     const t = new Map<string, { n: number; suma: number }>();
     for (const f of filas) {
       const x = t.get(f.doc ?? "") ?? { n: 0, suma: 0 };
@@ -166,7 +183,7 @@ export default async function PagosPage({ searchParams }: PageProps<"/tesoreria"
     }
     for (const doc of docs)
       for (const [k, v] of totalesPorGrupo(
-        filas.filter((f) => f.doc === doc).map((f) => ({ ...f, empresa: nombreEmpresa.get(f.empresa_id ?? -1) ?? null })),
+        filas.filter((f) => f.doc === doc).map((f) => ({ ...f, empresa: nombres.get(f.empresa_id ?? -1) ?? null })),
         `${doc}-`,
       ))
         t.set(k, v);
@@ -250,18 +267,9 @@ export default async function PagosPage({ searchParams }: PageProps<"/tesoreria"
   }
 
   type Fila = (typeof data)[number];
-  // Por pagar: las que volvieron corregidas de un rechazo (Tesorería revisa primero lo que pidió corregir).
+  // Por pagar: las que volvieron corregidas de un rechazo (pedidas al principio, con lo demás).
   const reenviadas = new Set<string>();
-  const ocos = data.filter((d) => d.doc !== "OP" && d.obra_id != null);
-  if (est === "pend" && ocos.length) {
-    const { data: r } = await supabase
-      .from("rechazos")
-      .select("obra_id, numero")
-      .not("reenviado_at", "is", null)
-      .in("obra_id", [...new Set(ocos.map((d) => d.obra_id!))])
-      .in("numero", [...new Set(ocos.map((d) => d.numero!))]);
-    for (const x of r ?? []) reenviadas.add(`${x.obra_id}-${x.numero}`);
-  }
+  for (const x of (reenviadasP ? (await reenviadasP).data : null) ?? []) reenviadas.add(`${x.obra_id}-${x.numero}`);
   const reenviada = (f: { doc: string | null; obra_id: number | null; numero: string | null }) =>
     f.doc !== "OP" && reenviadas.has(`${f.obra_id}-${f.numero}`);
   const MarcaReenviada = ({ f }: { f: Fila }) =>

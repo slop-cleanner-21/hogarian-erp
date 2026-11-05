@@ -48,6 +48,8 @@ export function Campana({ userId }: { userId: string }) {
 
   return (
     <Link
+      // Sin precargar /avisos en cada pantalla (se abre poco): se pide al tocar la campana.
+      prefetch={false}
       href="/avisos"
       aria-label={pendientes ? `Avisos (${pendientes} sin leer)` : "Avisos"}
       className="relative flex h-12 w-12 items-center justify-center rounded-control active:bg-ink/8"

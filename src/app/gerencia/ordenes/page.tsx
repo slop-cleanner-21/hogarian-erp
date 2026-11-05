@@ -78,6 +78,8 @@ export default async function OrdenesGerenciaPage({ searchParams }: PageProps<"/
           {data.map((o) => (
             <li key={`${o.obra_id}-${o.numero}`} className="border-b border-line last:border-0">
               <Link
+                // Sin precargar cada fila (eran unas 20 peticiones al abrir la lista): el detalle se pide al tocarlo.
+                prefetch={false}
                 href={`/consulta/orden/${o.obra_id}/${encodeURIComponent(o.numero ?? "")}`}
                 className="grid grid-cols-[1fr_auto] gap-x-4 px-4 py-3 active:bg-ink/8"
               >

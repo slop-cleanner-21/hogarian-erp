@@ -15,7 +15,7 @@ import { GuiaRemision, type GuiaOrden } from "./guia";
 import { createClient } from "@/lib/supabase/server";
 import type { VOcItem, VOrden } from "@/lib/types";
 import { DetalleOrden } from "./detalle-orden";
-import { ContextoCompraVista } from "@/components/contexto-compra";
+import { ContextoCompraDiferido } from "@/components/contexto-compra";
 import { cookieDiseno, leerDisenoItems } from "@/lib/diseno";
 import { contextoCompra } from "@/lib/contexto-compra";
 import { urlsComprobantes } from "@/lib/adjuntos";
@@ -35,6 +35,7 @@ export default async function OrdenPage({ params }: PageProps<"/logistica/ordene
   const supabase = await createClient();
   // La orden dentro del presupuesto de la obra (en paralelo con lo demás).
   const contextoP = contextoCompra(Number(obraId), numero);
+  contextoP.catch(() => {});
   // Lo ejecutado de cada partida de la orden (diseño de ítems «Con avance»).
   const avanceP = (async () => {
     const { data: partidas } = await supabase.from("oc_items").select("partida_id").eq("obra_id", Number(obraId)).eq("numero_oc", numero);
@@ -216,7 +217,7 @@ export default async function OrdenPage({ params }: PageProps<"/logistica/ordene
           />
         )
       }
-      contexto={<ContextoCompraVista contexto={await contextoP} pantalla="logistica" />}
+      contexto={<ContextoCompraDiferido contexto={contextoP} pantalla="logistica" />}
       entregas={
         entregas && (
           <Entregas
