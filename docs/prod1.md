@@ -40,13 +40,14 @@ Contabilidad, Residente y RRHH **no entran**. Sus roles siguen en la base
   SUNAT». Como la registra la misma Logística, una OC que requiere guía **no se envía a Tesorería**
   sin ella (`enviar_a_tesoreria` la rechaza y el botón pasa a «Falta la guía de remisión»). El aviso
   de Tesorería («Falta la guía…») queda solo para datos viejos o del MVP.
-  «Requiere guía» se marca al crear la OC y se decide por última vez al **registrar la factura**: sin guía,
+  «Requiere guía» se marca al crear la OC, se puede cambiar en Cotizando y Facturar y se decide por última vez al
+  **registrar la factura**; desde ahí queda fijo, también en la base (`set_requiere_guia`): sin guía,
   la OC pasa **directo a Tesorería** en cuanto queda facturada («Registrar y enviar a Tesorería»); con guía,
   espera en la pestaña «Guía» y se envía sola al registrarla.
 - **Envío automático a Tesorería:** una orden facturada que ya tiene lo que le toca (la guía registrada si la
   requiere, el contrato firmado si es OS) se envía sola. La base lo resuelve en `enviar_si_lista`, que la app
   llama tras registrar el comprobante, la guía o el contrato firmado, confirmar los precios (tras un rechazo
-  con la factura conservada) o quitar «Requiere guía». Ya no quedan órdenes «Por enviar»; el botón «Enviar a
+  con la factura conservada). Ya no quedan órdenes «Por enviar»; el botón «Enviar a
   Tesorería» solo aparece en datos viejos. Las del Excel que ya están completas pasan a Tesorería con el último
   seed (`supabase/seed/prod1_envio.sql`), salvo las rechazadas.
 - **N° de orden:** lo pone la base (el siguiente de la obra, contando las anuladas); en Nueva OC / OS no se
@@ -193,6 +194,10 @@ Contabilidad, Residente y RRHH **no entran**. Sus roles siguen en la base
 - **Logística › OC / OS:** arriba, como en Tesorería, el selector de obra (sin empresa) y «Filtros»
   con cuántos hay activos; la hoja (`FiltrosHoja`, la misma de Pagos) tiene orden, estado, fecha, monto,
   proveedor, varias etapas, varios tipos de material y sobreprecio. El buscador va bajo las pestañas.
+- **Buscador de OC / OS:** por N°, proveedor, obra o **ítem** (sin importar tildes ni mayúsculas; «cemento sol» halla «CEMENTO
+  PORTLAND SOL»). El ítem es la columna `items_busqueda` de `v_ordenes`, una subconsulta que solo se calcula si el filtro la usa:
+  medido por la API, pasa de 4-6 ms a 11-16 ms. No usar una función por fila: era 15 a 40 veces más lenta. Al rehacer una vista,
+  repetir `with (security_invoker = true)`: `create or replace` lo quita y la vista deja de aplicar las reglas de cada rol.
 - **Nueva OC / OS:** sin desplegables de «Ordenar por» ni de «Regular o adicional» (siempre por etapa);
   las partidas adicionales llevan la etiqueta «Adicional N».
 - **Avisos** (campana; `notificar`, solo a las cuentas activas del rol):

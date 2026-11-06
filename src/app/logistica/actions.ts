@@ -363,8 +363,6 @@ export async function setRequiereGuia(obraId: number, numero: string, requiere: 
   const supabase = await db();
   const { error } = await supabase.rpc("set_requiere_guia", { p_obra_id: obraId, p_numero: numero, p_requiere: requiere });
   if (error) return fail(error.message);
-  const e2 = await enviarSiLista(supabase, obraId, numero);
-  if (e2) return fail(e2);
   revalidatePath(ordenPath(obraId, numero));
   return { ok: true, data: undefined };
 }

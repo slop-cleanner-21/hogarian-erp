@@ -549,3 +549,40 @@ test.describe("@prod1 @gerencia presupuesto de la obra: filtros y adicionales", 
     for (const t of await filas.allInnerTexts()) expect(t).toContain(desc);
   });
 });
+
+test.describe("@prod1 @logistica «Requiere guía» queda fijo al facturar", () => {
+  const orden = (estado: string) =>
+    sql(`select obra_id, numero from ordenes_compra where tipo = 'OC' and estado = '${estado}' and historico order by obra_id, numero limit 1`)[0];
+  /** La RPC como Logística, en una transacción que se deshace. */
+  const cambiar = ([obra, numero]: string[], requiere: boolean) =>
+    sqlScript(`begin;
+      select set_config('request.jwt.claims', '{"sub":"${uidDe("LOGISTICA")}","role":"authenticated"}', true) is null;
+      set local role authenticated;
+      select set_requiere_guia(${obra}, '${numero}', ${requiere});
+      rollback;`);
+
+  test("la base: se cambia en Cotizando y Facturar; desde que está facturada, no", () => {
+    for (const estado of ["PRECIOS_CONFIRMADOS"]) expect(() => cambiar(orden(estado), true), estado).not.toThrow();
+    const cotizando = sql(`select obra_id, numero from ordenes_compra where tipo = 'OC' and estado = 'EMITIDA' order by obra_id, numero limit 1`)[0];
+    expect(() => cambiar(cotizando, true), "EMITIDA").not.toThrow();
+    for (const estado of ["EN_TESORERIA", "RECIBIDA"]) {
+      expect(() => cambiar(orden(estado), true), estado).toThrow(/Después de facturar/);
+      expect(() => cambiar(orden(estado), false), estado).toThrow(/Después de facturar/);
+    }
+    const facturada = sql(`select obra_id, numero from ordenes_compra where tipo = 'OC' and estado = 'FACTURADA' order by obra_id, numero limit 1`)[0];
+    expect(() => cambiar(facturada, false), "FACTURADA").toThrow(/Después de facturar/);
+  });
+
+  test("la pantalla: en una orden recibida o facturada el casillero está bloqueado; por facturar, no", async ({ abrir }) => {
+    const casilla = (page: Awaited<ReturnType<typeof abrir>>) => page.locator("#guia").getByLabel("Requiere guía de remisión");
+    const [ro, rn] = orden("RECIBIDA");
+    const page = await abrir("logistica", `/logistica/ordenes/${ro}/${rn}?tipo=OC`);
+    await expect(casilla(page), "recibida").toBeDisabled();
+    const [fo, fn] = sql(`select obra_id, numero from ordenes_compra where tipo = 'OC' and estado = 'FACTURADA' order by obra_id, numero limit 1`)[0];
+    await page.goto(`/logistica/ordenes/${fo}/${fn}?tipo=OC`);
+    await expect(casilla(page), "facturada").toBeDisabled();
+    const [po, pn] = orden("PRECIOS_CONFIRMADOS");
+    await page.goto(`/logistica/ordenes/${po}/${pn}?tipo=OC`);
+    await expect(casilla(page), "por facturar").toBeEnabled();
+  });
+});

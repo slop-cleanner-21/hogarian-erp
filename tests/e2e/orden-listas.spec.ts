@@ -119,3 +119,42 @@ test.describe("@listas ordenar y filtrar con más de 100", () => {
     }
   });
 });
+
+test.describe("@logistica buscar órdenes por ítem", () => {
+  test("halla las órdenes que llevan el ítem, sin importar tildes, mayúsculas ni palabras de por medio", async ({ abrir }, info) => {
+    test.skip(info.project.name !== "m390", "basta con un tamaño");
+    // Un ítem con tilde o eñe, de preferencia con más de dos palabras.
+    const [descripcion] = sql(
+      `select i.descripcion from items i join partidas p on p.item_id = i.id join oc_items l on l.partida_id = p.id
+         join ordenes_compra o on o.obra_id = l.obra_id and o.numero = l.numero_oc
+        where o.tipo = 'OC' and i.descripcion ~ '[ÁÉÍÓÚÑáéíóúñ]'
+        group by 1 order by (i.descripcion ~ '^\S+ \S+ \S+') desc, count(distinct (o.obra_id, o.numero)) desc, 1 limit 1`,
+    )[0];
+    const esperadas = claves(
+      `select distinct l.obra_id || '/' || l.numero_oc from oc_items l join partidas p on p.id = l.partida_id join items i on i.id = p.item_id
+         join ordenes_compra o on o.obra_id = l.obra_id and o.numero = l.numero_oc
+        where o.tipo = 'OC' and i.descripcion = '${descripcion.replace(/'/g, "''")}'`,
+    ).sort();
+    expect(esperadas.length).toBeGreaterThan(0);
+    const sinTildes = descripcion.normalize("NFD").replace(/\p{M}/gu, "");
+    const [primera, , tercera] = sinTildes.split(" ");
+    const page = await abrir("logistica", "/logistica?tipo=OC&tab=todas");
+
+    for (const busqueda of [descripcion, sinTildes.toLowerCase()]) {
+      await page.goto(`/logistica?tipo=OC&tab=todas&n=200&q=${encodeURIComponent(busqueda)}`);
+      await expect.poll(async () => (await filas(page, "/logistica/ordenes/")).sort(), { message: busqueda }).toEqual(esperadas);
+    }
+    // Dos palabras con otra en medio: al menos las mismas órdenes.
+    if (tercera) {
+      await page.goto(`/logistica?tipo=OC&tab=todas&n=200&q=${encodeURIComponent(`${primera} ${tercera}`.toLowerCase())}`);
+      await expect.poll(async () => (await filas(page, "/logistica/ordenes/")).filter((f) => esperadas.includes(f)).sort()).toEqual(esperadas);
+    }
+
+    // Lo de antes sigue: por N° de orden y sin resultados.
+    const [obra, numero] = esperadas[0].split("/");
+    await page.goto(`/logistica?tipo=OC&tab=todas&q=${encodeURIComponent(numero)}`);
+    await expect.poll(() => filas(page, "/logistica/ordenes/")).toContain(`${obra}/${numero}`);
+    await page.goto("/logistica?tipo=OC&tab=todas&q=zzzz-no-existe");
+    await expect.poll(() => filas(page, "/logistica/ordenes/")).toEqual([]);
+  });
+});

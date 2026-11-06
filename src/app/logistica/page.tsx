@@ -102,8 +102,11 @@ export default async function OrdenesPage({ searchParams }: PageProps<"/logistic
     }
     if (rangoFecha) query = query.gte("fecha", rangoFecha[0]).lt("fecha", rangoFecha[1]);
     if (q) {
-      const like = `%${q.replace(/[%,()]/g, " ")}%`;
-      query = query.or(`numero.ilike.${like},proveedor.ilike.${like},obra.ilike.${like}`);
+      const limpio = q.replace(/[%,()]/g, " ");
+      const like = `%${limpio}%`;
+      // Los ítems, sin tildes y con las palabras en orden pero no seguidas: «cemento sol» halla «CEMENTO PORTLAND SOL».
+      const item = `%${limpio.normalize("NFD").replace(/\p{M}/gu, "").trim().replace(/\s+/g, "%")}%`;
+      query = query.or(`numero.ilike.${like},proveedor.ilike.${like},obra.ilike.${like},items_busqueda.ilike.${item}`);
     }
     return query;
   };
@@ -475,7 +478,7 @@ export default async function OrdenesPage({ searchParams }: PageProps<"/logistic
             label: value === "fact" && tipo === "OS" ? "Contrato" : PESTANAS[value],
           }))}
         />
-        <SearchBox placeholder="N°, proveedor u obra" />
+        <SearchBox placeholder="N°, proveedor, obra o ítem" />
         </div>
         {error && <p role="alert" className="text-danger">{error.message}</p>}
         {porEtapa ? (

@@ -3401,6 +3401,7 @@ export type Database = {
           fecha: string;
           glosa_rhe: string | null;
           has_alertas: boolean | null;
+          items_busqueda: string | null;
           motivo_anulacion: string | null;
           n_items: number | null;
           numero: string;

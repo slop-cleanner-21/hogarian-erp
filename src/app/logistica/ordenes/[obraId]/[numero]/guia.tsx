@@ -70,6 +70,8 @@ export function GuiaRemision({
   const emitida = vigente?.estado === "EMITIDA" || vigente?.estado === "ANULACION_PENDIENTE";
   // Se pide con la orden cotizada; antes solo se marca si la lleva.
   const puedePedir = requiere && !emitida && estadoOrden !== "EMITIDA" && estadoOrden !== "ANULADA";
+  // Se decide hasta facturar; después queda fijo (también en la base).
+  const editable = (estadoOrden === "EMITIDA" || estadoOrden === "PRECIOS_CONFIRMADOS") && !emitida;
 
   const anulada = () =>
     startTransition(async () => {
@@ -89,13 +91,13 @@ export function GuiaRemision({
 
   return (
     <section id="guia" className="flex scroll-mt-20 flex-col gap-2 rounded-panel bg-surface p-3">
-      <label className="flex min-h-11 cursor-pointer items-center justify-between gap-3 px-1">
+      <label className={cn("flex min-h-11 items-center justify-between gap-3 px-1", editable && "cursor-pointer")}>
         <span className="rotulo text-[17px] font-semibold">Guía de remisión</span>
         <input
           type="checkbox"
           aria-label="Requiere guía de remisión"
           checked={requiere}
-          disabled={pending || emitida || estadoOrden === "ANULADA"}
+          disabled={pending || !editable}
           onChange={(e) => cambiar(e.target.checked)}
           className="h-6 w-6 shrink-0 accent-primary"
         />
