@@ -57,6 +57,7 @@ import { faltaSuspension, retencion4ta, suspensionVigente } from "@/lib/retencio
 import { ItemsOrden } from "@/components/items-orden";
 import { SelectorDiseno } from "@/components/selector-diseno";
 import type { DisenoItems } from "@/lib/diseno";
+import { Faltan } from "@/components/ui/faltan";
 
 type Precio = { pu: string; aprobado: boolean };
 
@@ -182,13 +183,15 @@ export function DetalleOrden({
       router.refresh();
     });
 
-  // Constancia de pago al proveedor: el voucher (o el simulado si no hay archivo) por la hoja de compartir,
-  // o los datos del pago por WhatsApp. Cualquiera de las dos deja la orden «Enviada» (EN_ENTREGA).
+  // Constancia de pago al proveedor: el voucher (o el simulado si no hay archivo) por la hoja de compartir, o los datos del pago por
+  // WhatsApp. Abrirlos no prueba que se envió: la orden pasa a «Enviada» (EN_ENTREGA) cuando Logística lo confirma. El mensaje nombra
+  // la factura, no la orden: su N° es de control interno.
+  const facturasPagadas = [...new Set(items.map((i) => i.comprobante).filter((c): c is string => !!c))].map((c) => c.replace("-", " - "));
   const textoConstancia = () =>
     [
-      `${orden.empresa}: pagamos la ${orden.tipo} ${orden.numero}, obra ${orden.obra}.`,
-      ...pagos.map((p) => `Operación ${p.numero_operacion ?? "—"} ${p.banco ?? ""}, ${fecha(p.fecha)}, S/ ${money(p.monto)}`),
-    ].join("\n");
+      `${orden.empresa}: pagamos ${facturasPagadas.length ? `la ${facturasPagadas.join(", ")}` : "tu comprobante"}, obra ${orden.obra}.`,
+      ...pagos.map((p) => `Operación ${p.numero_operacion ?? "—"} ${p.banco ?? ""}, ${fecha(p.fecha)}, S/ ${money(p.monto)}.`),
+    ].join(" ");
 
   const constanciaEnviada = () =>
     startTransition(async () => {
@@ -209,20 +212,14 @@ export function DetalleOrden({
           return new File([b], u.nombre, { type: b.type });
         }),
       );
-      const datos = { files: archivos, text: textoConstancia(), title: `Pago ${orden.tipo} ${orden.numero}` };
-      if (navigator.canShare?.(datos)) {
-        const ok = await navigator.share(datos).then(() => true, () => false);
-        if (ok) constanciaEnviada();
-      } else {
-        archivos.forEach((f) => descargar(f, f.name));
-        constanciaEnviada();
-      }
+      const datos = { files: archivos, text: textoConstancia(), title: `Pago ${facturasPagadas.join(", ")}` };
+      if (navigator.canShare?.(datos)) await navigator.share(datos).catch(() => {});
+      else archivos.forEach((f) => descargar(f, f.name));
     });
 
   const whatsappConstancia = () => {
     const destino = contactoWa ? telefonoIntl(contactoWa.telefono) : "";
     window.open(`https://wa.me/${destino}?text=${encodeURIComponent(textoConstancia())}`, "_blank");
-    constanciaEnviada();
   };
   const [pending, startTransition] = useTransition();
   const [error, setError] = useState<string | null>(null);
@@ -508,6 +505,11 @@ export function DetalleOrden({
                 <Share2 size={20} /> Compartir
               </Button>
             </div>
+            {orden.estado === "PAGADA" && (
+              <Button onClick={constanciaEnviada} disabled={pending}>
+                <Check size={18} /> Confirmar envío
+              </Button>
+            )}
           </Plegable>
         )}
 
@@ -797,7 +799,16 @@ export function DetalleOrden({
       </main>
 
       {editable && (
-        <ActionBar>
+        <ActionBar
+          arriba={
+            <Faltan
+              items={[
+                faltanPrecios && "precios",
+                sinAprobar > 0 && `aprobar ${sinAprobar === 1 ? "1 sobreprecio" : `${sinAprobar} sobreprecios`}`,
+              ]}
+            />
+          }
+        >
           <Button
             variant="secondary"
             onClick={() => guardar(false)}
@@ -964,6 +975,8 @@ function AnularSheet({
       onClose={onClose}
       title={`Anular ${orden.tipo} ${orden.numero}`}
       footer={
+        <div className="flex flex-col gap-2">
+        <Faltan items={[!motivo.trim() && "motivo"]} />
         <Button
           variant="danger"
           size="lg"
@@ -983,6 +996,7 @@ function AnularSheet({
         >
           Anular
         </Button>
+        </div>
       }
     >
       <div className="flex flex-col gap-3 p-4">
@@ -1133,6 +1147,15 @@ function ComprobanteSheet({
               {error}
             </p>
           )}
+          <Faltan
+            items={[
+              !serie && "serie",
+              !numero && "número",
+              sel.size === 0 && "ítems",
+              !(totalNum > 0) && "total",
+              !archivo && !historico && "archivo de la factura",
+            ]}
+          />
           <Button
             size="lg"
             onClick={guardar}
@@ -1167,7 +1190,6 @@ function ComprobanteSheet({
               value={serie}
               onChange={(e) => con(setSerie)(e.target.value.toUpperCase())}
               maxLength={10}
-              placeholder="F001"
             />
           </Field>
           <Field label="Número">

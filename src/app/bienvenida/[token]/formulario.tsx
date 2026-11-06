@@ -9,6 +9,7 @@ import { Field, Input } from "@/components/ui/field";
 import { PasswordInput } from "@/components/ui/password-input";
 import { MIN_CONTRASENA, normalizarCelular } from "@/lib/usuarios";
 import { completarBienvenida } from "../actions";
+import { Faltan } from "@/components/ui/faltan";
 
 /** Si el navegador tiene huella o rostro (passkeys). */
 const conHuella = () => typeof window !== "undefined" && "PublicKeyCredential" in window;
@@ -127,6 +128,16 @@ export function FormularioBienvenida({
           {error}
         </p>
       )}
+      <Faltan
+        items={[
+          nombres.trim().length < 2 && "nombres",
+          apellidos.trim().length < 2 && "apellidos",
+          !(dniObligatorio ? /^\d{8}$/.test(dni) : /^(\d{8})?$/.test(dni)) && "DNI de 8 dígitos",
+          normalizarCelular(telefono) === null && "celular válido",
+          clave.length < MIN_CONTRASENA && `contraseña de ${MIN_CONTRASENA} caracteres`,
+          clave !== repetida && "repetir la contraseña",
+        ]}
+      />
       <Button type="submit" size="lg" disabled={pending || !listo}>
         Guardar y entrar
       </Button>

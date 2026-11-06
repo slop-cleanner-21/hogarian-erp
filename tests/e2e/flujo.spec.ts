@@ -349,9 +349,19 @@ test.describe("@flujo flujo completo por las pantallas", () => {
 
     await test.step("Logística le manda la constancia de pago", async () => {
       const page = await abrir("logistica", `/logistica/ordenes/${obraId}/${numero}?tipo=OC`);
-      // WhatsApp se abre en otra ventana: se cierra.
-      page.context().on("page", (p) => void p.close().catch(() => {}));
-      await page.locator("details").filter({ has: page.locator("summary", { hasText: "Constancia de pago" }) }).getByRole("button", { name: "WhatsApp" }).click();
+      // WhatsApp se abriría en otra ventana: aquí solo se lee el mensaje.
+      await page.evaluate(() => {
+        window.open = ((u: string) => (((window as unknown as { wa: string }).wa = u), null)) as typeof window.open;
+      });
+      const constancia = page.locator("details").filter({ has: page.locator("summary", { hasText: "Constancia de pago" }) });
+      await constancia.getByRole("button", { name: "WhatsApp" }).click();
+      const mensaje = decodeURIComponent(await page.evaluate(() => (window as unknown as { wa: string }).wa));
+      // Nombra la factura, no el N° de la orden, que es de control interno.
+      expect(mensaje).toMatch(/: pagamos la \S+ - \S+, obra .+\. Operación .+, S\/ [\d,.]+\./);
+      expect(mensaje).not.toContain(`OC ${numero}`);
+      // Abrir WhatsApp no prueba que se envió: lo confirma Logística.
+      expect(estado(obraId, numero)).toBe("PAGADA");
+      await constancia.getByRole("button", { name: "Confirmar envío" }).click();
       await expect.poll(() => estado(obraId, numero)).toBe("EN_ENTREGA");
     });
 

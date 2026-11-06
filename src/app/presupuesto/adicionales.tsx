@@ -11,6 +11,7 @@ import { SearchSelect } from "@/components/ui/search-select";
 import { Sheet } from "@/components/ui/sheet";
 import { qty, soles } from "@/lib/format";
 import { agregarAdicional } from "./actions";
+import { Faltan } from "@/components/ui/faltan";
 
 export type PartidaAdicional = { id: number; etapa: string; requerimiento: string; itemId: number; cantidad: number; pu: number | null };
 type Linea = { key: number; etapa: string; itemId: string; cantidad: string; pu: string };
@@ -158,6 +159,7 @@ function NuevoAdicional({
               {error}
             </p>
           )}
+          <Faltan items={[!validas && "etapa, ítem, cantidad y P.U. en cada línea"]} />
           <Button onClick={guardar} disabled={!validas || pending}>
             Guardar adicional · {soles(total)}
           </Button>

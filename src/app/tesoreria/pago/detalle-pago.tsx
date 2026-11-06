@@ -27,6 +27,7 @@ import { BotonCopiar, Dato } from "@/components/copiar";
 import { ItemsOrden } from "@/components/items-orden";
 import { SelectorDiseno } from "@/components/selector-diseno";
 import type { DisenoItems, PantallaDiseno } from "@/lib/diseno";
+import { Faltan } from "@/components/ui/faltan";
 
 const BANCOS = ["BBVA", "BCP", "INTERBANK", "SCOTIABANK", "BANCO DE LA NACION", "EFECTIVO"];
 
@@ -540,7 +541,9 @@ export function DetallePago({
       </main>
 
       {pendiente && (
-        <ActionBar>
+        <ActionBar
+          arriba={!bloqueo && <Faltan items={[!banco && "banco", operacion.trim() === "" && "N° de operación", voucher == null && "voucher"]} />}
+        >
           <Button variant="secondary" disabled={pending} onClick={() => setRechazar(true)}>
             Rechazar
           </Button>
@@ -555,14 +558,17 @@ export function DetallePago({
           onClose={() => setRechazar(false)}
           title={`Rechazar ${titulo}`}
           footer={
-            <Button
-              variant="danger"
-              size="lg"
-              disabled={pending || (destino.ordenPagoId == null && motivoRechazo.trim().length < 5)}
-              onClick={confirmarRechazo}
-            >
-              Rechazar
-            </Button>
+            <div className="flex flex-col gap-2">
+              <Faltan items={[destino.ordenPagoId == null && motivoRechazo.trim().length < 5 && "motivo (al menos 5 letras)"]} />
+              <Button
+                variant="danger"
+                size="lg"
+                disabled={pending || (destino.ordenPagoId == null && motivoRechazo.trim().length < 5)}
+                onClick={confirmarRechazo}
+              >
+                Rechazar
+              </Button>
+            </div>
           }
         >
           <div className="flex flex-col gap-4 p-4">

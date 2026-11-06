@@ -12,6 +12,7 @@ import { subirArchivos } from "@/components/documentos";
 import { marcarGuiaAnulada, registrarGuia, setRequiereGuia } from "../../../actions";
 import { EnlaceArchivo } from "@/components/visor";
 import { FichaTransportista, TRANSPORTISTA_VACIO, type Transportista } from "../../../transportistas/transportistas-list";
+import { Faltan } from "@/components/ui/faltan";
 
 export type ModalidadTransporte = "PROVEEDOR" | "PROPIO" | "TERCERO";
 export const MODALIDAD: Record<ModalidadTransporte, string> = {
@@ -220,9 +221,12 @@ function FormGuia({
       onClose={onClose}
       title="Registrar guía"
       footer={
-        <Button size="lg" onClick={enviar} disabled={pending || (modalidad === "TERCERO" && !transportista) || !numeroGuia.trim() || !archivo}>
-          Registrar guía
-        </Button>
+        <div className="flex flex-col gap-2">
+          <Faltan items={[!numeroGuia.trim() && "N° de guía", modalidad === "TERCERO" && !transportista && "transportista", !archivo && "archivo de la guía"]} />
+          <Button size="lg" onClick={enviar} disabled={pending || (modalidad === "TERCERO" && !transportista) || !numeroGuia.trim() || !archivo}>
+            Registrar guía
+          </Button>
+        </div>
       }
     >
       <div className="flex flex-col gap-4 p-4">

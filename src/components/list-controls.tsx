@@ -30,17 +30,23 @@ export function SearchBox({ placeholder = "Buscar", param = "q" }: { placeholder
     }
   }
 
+  // Se compara también con la barra de direcciones y se revisa al terminar cada navegación: lo que hay en el campo manda, y una
+  // navegación que quedó atrás no deja la URL con lo ya borrado.
+  const [navegando, navegar] = useTransition();
   useEffect(() => {
+    if (navegando) return;
     const t = setTimeout(() => {
-      if ((params.get(param) ?? "") === q) return;
+      const enBarra = new URLSearchParams(window.location.search).get(param) ?? "";
+      if ((params.get(param) ?? "") === q && enBarra === q) return;
       const next = new URLSearchParams(params.toString());
       if (q) next.set(param, q);
       else next.delete(param);
+      const consulta = next.toString();
       setEnviados((e) => [...e, q]);
-      router.replace(`${path}?${next}`, { scroll: false });
+      navegar(() => router.replace(consulta ? `${path}?${consulta}` : path, { scroll: false }));
     }, 250);
     return () => clearTimeout(t);
-  }, [q, param, params, path, router]);
+  }, [q, param, params, path, router, navegando]);
 
   return (
     <div className="relative">

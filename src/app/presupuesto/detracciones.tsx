@@ -7,6 +7,7 @@ import { Button } from "@/components/ui/button";
 import { NumberInput } from "@/components/ui/field";
 import { SearchSelect } from "@/components/ui/search-select";
 import { guardarDetracciones } from "./actions";
+import { Faltan } from "@/components/ui/faltan";
 
 export type ItemObra = { itemId: number; descripcion: string };
 const POR_DEFECTO = "5";
@@ -95,9 +96,12 @@ export function DetraccionesObra({ obraId, items, guardadas }: { obraId: number;
         </p>
       )}
       {cambios.length > 0 && (
-        <Button onClick={guardar} disabled={pending || !validos}>
-          Guardar detracciones
-        </Button>
+        <>
+          <Faltan items={[!validos && "% entre 0 y 100 en cada ítem marcado"]} />
+          <Button onClick={guardar} disabled={pending || !validos}>
+            Guardar detracciones
+          </Button>
+        </>
       )}
     </section>
   );

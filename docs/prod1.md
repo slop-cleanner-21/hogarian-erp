@@ -117,8 +117,9 @@ Contabilidad, Residente y RRHH **no entran**. Sus roles siguen en la base
   valorizaciones ni retenciones). El seguimiento de mano de obra usa el mismo recorrido que el de
   los subcontratos.
 - **Recepción: pendiente.** Nadie registra lo que llega todavía; se definirá después. Las entregas
-  históricas del Excel se siguen viendo. Una orden pasa a «Enviada» (estado EN_ENTREGA) cuando Logística envía la
-  constancia de pago al proveedor y ahí se queda; su detalle avisa «Los residentes aún no pueden marcar
+  históricas del Excel se siguen viendo. Una orden pasa a «Enviada» (estado EN_ENTREGA) cuando Logística confirma que envió la
+  constancia de pago al proveedor («Confirmar envío»: abrir WhatsApp o compartir no lo prueba) y ahí se queda. El mensaje nombra la
+  factura, no el N° de la orden, que es de control interno; su detalle avisa «Los residentes aún no pueden marcar
   las entregas».
 - **Logística › OC / OS:** una pestaña por estado, con nombres cortos y en dos filas para que se vean
   todas a 360 px (Borrador, Cotizando, Facturar, Guía en OC o Contrato en OS, Tesorería, Pagada / Enviada, Recibida (las del
@@ -262,6 +263,8 @@ Contabilidad, Residente y RRHH **no entran**. Sus roles siguen en la base
 - **Rendimiento:** las filas de las listas (Pagos, OC / OS) no precargan su detalle (`prefetch={false}`):
   al abrir una lista eran decenas de peticiones que en el celular competían con lo que se ve; el
   detalle se pide al tocarlo. En Pagos, la lista y los totales se consultan a la vez.
+- **Por qué no se puede enviar un formulario:** junto al botón deshabilitado, «Falta: …» dice qué falta y se va quitando
+  (`Faltan`, en `components/ui`). Un campo vacío no muestra un valor de ejemplo que parezca lleno (la serie del comprobante).
 - **Montos y precios siempre con «S/»** (`soles()` y `solesPu()` en `src/lib/format.ts`).
 - **El bloque «Presupuesto» de una orden** arranca plegado y recuerda, por pantalla, si se dejó abierto.
 - **Proveedor en Nueva OC / OS, en acordeones:** cada proveedor que ya vendió trae una flecha que despliega los

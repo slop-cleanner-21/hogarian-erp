@@ -26,6 +26,10 @@ test.describe("@logistica borrador de Nueva OC / OS", () => {
     await page.locator("main label").filter({ hasText: descripcion.slice(0, 20) }).first().locator('input[type="checkbox"]').check();
     await page.getByRole("button", { name: /^Continuar/ }).click();
 
+    // Lo que falta para emitir se dice junto al botón, y se va quitando.
+    const faltan = page.getByRole("status", { name: "Lo que falta" });
+    await expect(faltan).toHaveText("Falta: proveedor, comprobante, fecha de inicio");
+
     await page.getByRole("button", { name: "Proveedor", exact: true }).click();
     const opcion = page.getByRole("listbox", { name: "Proveedor" }).getByRole("option").first();
     const proveedor = (await opcion.locator("span span").first().innerText()).trim();
@@ -33,6 +37,7 @@ test.describe("@logistica borrador de Nueva OC / OS", () => {
     await page.getByRole("button", { name: "Comprobante", exact: true }).click();
     await page.getByRole("listbox", { name: "Comprobante" }).getByRole("option", { name: "Factura" }).click();
     await page.getByLabel("Fecha de inicio").fill("2026-01-15");
+    await expect(faltan).toHaveCount(0);
 
     // Sale de la pantalla y entra de nuevo, sin la obra en la URL (el botón Nueva).
     await page.goto("/logistica?tipo=OS");

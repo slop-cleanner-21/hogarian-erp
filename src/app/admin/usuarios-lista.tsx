@@ -15,6 +15,7 @@ import { ROLES_PROD1 } from "@/lib/prod1";
 import type { Rol } from "@/lib/types";
 import { celularLegible, contrasenaAlAzar, enlaceWhatsapp, mensajeContrasena, mensajeLink, MIN_CONTRASENA, normalizarCelular, ROL_LABEL } from "@/lib/usuarios";
 import { cambiarActivo, crearUsuario, editarUsuario, generarLink, restablecerContrasena, type Acceso } from "./actions";
+import { Faltan } from "@/components/ui/faltan";
 
 export type Usuario = {
   id: string;
@@ -266,21 +267,33 @@ function NuevoUsuario({ onClose }: { onClose: () => void }) {
             Listo
           </Button>
         ) : (
-          <Button
-            size="lg"
-            onClick={crear}
-            disabled={
-              pending ||
-              nombres.trim().length < 2 ||
-              !email.trim() ||
-              !rol ||
-              (modo === "contrasena" && contrasena.length < MIN_CONTRASENA) ||
-              !dniValido(dni, gerencia) ||
-              !celularValido(telefono)
-            }
-          >
-            Crear cuenta
-          </Button>
+          <div className="flex flex-col gap-2">
+            <Faltan
+              items={[
+                nombres.trim().length < 2 && "nombres",
+                !email.trim() && "correo",
+                !rol && "rol",
+                modo === "contrasena" && contrasena.length < MIN_CONTRASENA && `contraseña de ${MIN_CONTRASENA} caracteres`,
+                !dniValido(dni, gerencia) && "DNI válido",
+                !celularValido(telefono) && "celular válido",
+              ]}
+            />
+            <Button
+              size="lg"
+              onClick={crear}
+              disabled={
+                pending ||
+                nombres.trim().length < 2 ||
+                !email.trim() ||
+                !rol ||
+                (modo === "contrasena" && contrasena.length < MIN_CONTRASENA) ||
+                !dniValido(dni, gerencia) ||
+                !celularValido(telefono)
+              }
+            >
+              Crear cuenta
+            </Button>
+          </div>
         )
       }
     >
@@ -397,13 +410,24 @@ function FichaUsuario({ u, onClose }: { u: Usuario; onClose: () => void }) {
       onClose={onClose}
       title={u.nombre || u.email}
       footer={
-        <Button
-          size="lg"
-          onClick={guardar}
-          disabled={pending || !cambios || nombres.trim().length < 2 || !email.trim() || !rol || !dniValido(dni, gerencia) || !celularValido(telefono)}
-        >
-          Guardar
-        </Button>
+        <div className="flex flex-col gap-2">
+          <Faltan
+            items={[
+              nombres.trim().length < 2 && "nombres",
+              !email.trim() && "correo",
+              !rol && "rol",
+              !dniValido(dni, gerencia) && "DNI válido",
+              !celularValido(telefono) && "celular válido",
+            ]}
+          />
+          <Button
+            size="lg"
+            onClick={guardar}
+            disabled={pending || !cambios || nombres.trim().length < 2 || !email.trim() || !rol || !dniValido(dni, gerencia) || !celularValido(telefono)}
+          >
+            Guardar
+          </Button>
+        </div>
       }
     >
       <div className="flex flex-col gap-4 p-4">

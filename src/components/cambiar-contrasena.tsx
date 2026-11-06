@@ -7,6 +7,7 @@ import { Button } from "./ui/button";
 import { Field } from "./ui/field";
 import { PasswordInput } from "./ui/password-input";
 import { Sheet } from "./ui/sheet";
+import { Faltan } from "./ui/faltan";
 
 /** Cambiar la propia contraseña (desde el menú del usuario). */
 export function CambiarContrasena({ onClose }: { onClose: () => void }) {
@@ -37,9 +38,18 @@ export function CambiarContrasena({ onClose }: { onClose: () => void }) {
             Listo
           </Button>
         ) : (
-          <Button size="lg" onClick={guardar} disabled={pending || !actual || nueva.length < MIN_CONTRASENA || nueva !== repetida}>
-            Cambiar contraseña
-          </Button>
+          <div className="flex flex-col gap-2">
+            <Faltan
+              items={[
+                !actual && "contraseña actual",
+                nueva.length < MIN_CONTRASENA && `nueva de ${MIN_CONTRASENA} caracteres`,
+                nueva !== repetida && "repetir la nueva",
+              ]}
+            />
+            <Button size="lg" onClick={guardar} disabled={pending || !actual || nueva.length < MIN_CONTRASENA || nueva !== repetida}>
+              Cambiar contraseña
+            </Button>
+          </div>
         )
       }
     >

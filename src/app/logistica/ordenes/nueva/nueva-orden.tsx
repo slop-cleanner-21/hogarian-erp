@@ -18,6 +18,7 @@ import { ETIQUETA_GARANTIA, GARANTIA_DEFECTO, categoriaGarantia, pctValido, rete
 import { faltaSuspension } from "@/lib/retencion";
 import type { Proveedor, TipoOrden, VPartida } from "@/lib/types";
 import { crearOrden, guardarBorradorOrden } from "../../actions";
+import { Faltan } from "@/components/ui/faltan";
 
 type ObraOpt = { id: number; nombre: string; empresa: string };
 type ProveedorOpt = Pick<Proveedor, "id" | "ruc_o_cod" | "razon_social" | "comprobante_habitual" | "suspension_4ta_fecha"> & { tipos: string[] };
@@ -466,7 +467,20 @@ export function NuevaOrden({
           </ul>
           {error && <p role="alert" className="text-danger">{error}</p>}
         </main>
-        <ActionBar>
+        <ActionBar
+          arriba={
+            <Faltan
+              items={[
+                !proveedorId && "proveedor",
+                tipo === "OS" && !comprobante && "comprobante",
+                tipo === "OS" && (!fechaInicio || inicioInvalido) && "fecha de inicio",
+                seleccionadas.length === 0 && "partidas",
+                invalidas.length > 0 && "cantidades válidas",
+                garantiaInvalida && "retención por garantía",
+              ]}
+            />
+          }
+        >
           <Button variant="secondary" onClick={guardarEnCuenta} disabled={pending || seleccionadas.length === 0}>
             Guardar borrador
           </Button>
@@ -679,7 +693,7 @@ export function NuevaOrden({
       </main>
       {error && <p role="alert" className="mx-auto max-w-2xl px-4 pb-24 text-danger">{error}</p>}
       {obraId && (
-        <ActionBar>
+        <ActionBar arriba={<Faltan items={[sel.size === 0 && "elegir partidas"]} />}>
           {sel.size > 0 && (
             <Button variant="secondary" onClick={guardarEnCuenta} disabled={pending}>
               Guardar borrador

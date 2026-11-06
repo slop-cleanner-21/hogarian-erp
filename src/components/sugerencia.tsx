@@ -9,6 +9,7 @@ import { TIPOS_SUGERENCIA, type TipoSugerencia } from "@/lib/sugerencias";
 import { Button } from "./ui/button";
 import { Field, inputClass } from "./ui/field";
 import { Sheet } from "./ui/sheet";
+import { Faltan } from "./ui/faltan";
 
 const MAX_CAPTURAS = 5;
 const MAX_MB = 10;
@@ -116,6 +117,7 @@ function HojaSugerencia({ onClose }: { onClose: () => void }) {
       footer={
         <div className="flex flex-col gap-2">
           {error && <p role="alert" className="text-danger">{error}</p>}
+          <Faltan items={[texto.trim().length < 3 && "detalle"]} />
           <Button size="lg" onClick={enviar} disabled={pending || texto.trim().length < 3}>
             {pending ? "Enviando…" : "Enviar"}
           </Button>

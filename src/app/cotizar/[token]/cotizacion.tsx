@@ -10,6 +10,7 @@ import { fecha, qty, soles, solesPu } from "@/lib/format";
 import { guardar, leer } from "@/lib/recordar";
 
 import { retenidoDe } from "@/lib/garantia";
+import { Faltan } from "@/components/ui/faltan";
 
 export type CotizacionData = {
   numero: string;
@@ -171,7 +172,7 @@ function Formulario({ token, data, conBorrador }: { token: string; data: Cotizac
         {enviada && !orden && <p role="status" className="font-medium text-ok">Cotización enviada</p>}
       </main>
       {!enviada && (
-        <ActionBar>
+        <ActionBar arriba={<Faltan items={[!completa && "el precio de cada ítem"]} />}>
           <Button size="lg" onClick={enviar} disabled={!completa || pending}>
             Enviar cotización
           </Button>

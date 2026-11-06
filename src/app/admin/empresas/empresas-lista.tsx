@@ -8,6 +8,7 @@ import { Field, Input } from "@/components/ui/field";
 import { SearchSelect } from "@/components/ui/search-select";
 import { Sheet } from "@/components/ui/sheet";
 import { guardarEmpresa } from "./actions";
+import { Faltan } from "@/components/ui/faltan";
 
 export type EmpresaFicha = {
   id: number;
@@ -77,9 +78,12 @@ function FichaEmpresa({ e, gerentes, onClose }: { e: EmpresaFicha; gerentes: Ger
       onClose={onClose}
       title={e.nombre}
       footer={
-        <Button size="lg" onClick={guardar} disabled={pending || !rucValido}>
-          Guardar
-        </Button>
+        <div className="flex flex-col gap-2">
+          <Faltan items={[!rucValido && "RUC de 11 dígitos"]} />
+          <Button size="lg" onClick={guardar} disabled={pending || !rucValido}>
+            Guardar
+          </Button>
+        </div>
       }
     >
       <div className="flex flex-col gap-4 p-4">

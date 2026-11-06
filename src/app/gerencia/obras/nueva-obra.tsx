@@ -8,6 +8,7 @@ import { Field, Input } from "@/components/ui/field";
 import { SearchSelect } from "@/components/ui/search-select";
 import { Sheet } from "@/components/ui/sheet";
 import { guardarObra } from "../actions";
+import { Faltan } from "@/components/ui/faltan";
 
 /** Gerencia crea una obra; su presupuesto queda en borrador para Operaciones. */
 export function NuevaObra({ empresas }: { empresas: { id: number; nombre: string }[] }) {
@@ -42,9 +43,12 @@ export function NuevaObra({ empresas }: { empresas: { id: number; nombre: string
           onClose={() => setOpen(false)}
           title="Nueva obra"
           footer={
-            <Button size="lg" onClick={crear} disabled={pending || !nombre.trim() || !empresa}>
-              Crear obra
-            </Button>
+            <div className="flex flex-col gap-2">
+              <Faltan items={[!nombre.trim() && "nombre", !empresa && "empresa"]} />
+              <Button size="lg" onClick={crear} disabled={pending || !nombre.trim() || !empresa}>
+                Crear obra
+              </Button>
+            </div>
           }
         >
           <div className="flex flex-col gap-4 p-4">

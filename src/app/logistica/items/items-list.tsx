@@ -18,6 +18,7 @@ export type ItemCatalogo = { id: number; descripcion: string; unidad: string | n
 import { crearItem } from "@/app/gerencia/actions";
 import { actualizarTipoMaterial } from "../actions";
 import { NuevoTipoSheet } from "../nuevo-tipo";
+import { Faltan } from "@/components/ui/faltan";
 
 const RUBROS_SERVICIO: Rubro[] = ["MANO OBRA", "SUBCONTRATO", "LOCACION", "PROYECTO", "FINALIZACION", "OTRO"];
 type Clase = "mat" | "serv";
@@ -203,9 +204,12 @@ function NuevoItemSheet({
       onClose={onClose}
       title={clase === "mat" ? "Nuevo material" : "Nuevo servicio"}
       footer={
-        <Button size="lg" onClick={guardar} disabled={pending || !descripcion.trim() || !unidad || !!igual}>
-          Guardar
-        </Button>
+        <div className="flex flex-col gap-2">
+          <Faltan items={[!descripcion.trim() && "descripción", !unidad && "unidad"]} />
+          <Button size="lg" onClick={guardar} disabled={pending || !descripcion.trim() || !unidad || !!igual}>
+            Guardar
+          </Button>
+        </div>
       }
     >
       <div className="flex flex-col gap-4 p-4">

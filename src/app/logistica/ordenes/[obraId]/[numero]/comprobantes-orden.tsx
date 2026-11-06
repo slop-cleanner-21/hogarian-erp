@@ -14,6 +14,7 @@ import { createClient } from "@/lib/supabase/client";
 import { TIPO_COMPROBANTE_LABEL, type TipoComprobante } from "@/lib/types";
 import { editarComprobante } from "../../../actions";
 import { EnlaceArchivo } from "@/components/visor";
+import { Faltan } from "@/components/ui/faltan";
 
 type Datos = { tipo: TipoComprobante; serie: string; numero: string; fecha_emision: string; total: number; retencion: number; archivo_path: string | null };
 
@@ -218,6 +219,7 @@ function EditarComprobante({
       footer={
         <div className="flex flex-col gap-2">
           {error && <p role="alert" className="text-danger">{error}</p>}
+          <Faltan items={[!serie.trim() && "serie", !num.trim() && "número", !(Number(total) > 0) && "total"]} />
           <Button size="lg" onClick={guardar} disabled={pending || !serie.trim() || !num.trim() || !(Number(total) > 0)}>
             Guardar corrección
           </Button>
