@@ -181,7 +181,7 @@ export function ContratoDoc({ orden, items, datos }: { orden: VOrden; items: VOc
               <Text style={s.cD}>{it.descripcion}</Text>
               <Text style={s.cU}>{it.unidad}</Text>
               <Text style={s.cQ}>{qty(it.cantidad)}</Text>
-              <Text style={s.cP}>S/ {precio(it.pu_efectivo ?? it.pu_partida)}</Text>
+              <Text style={s.cP}>S/ {precio(it.pu_bruto ?? it.pu_efectivo ?? it.pu_partida)}</Text>
               <Text style={s.cT}>S/ {money(bruto(it))}</Text>
             </View>
           ))}
@@ -420,7 +420,7 @@ function ContratoComercial({ orden, items, datos, total, retenido }: { orden: VO
               <Text style={s.cD}>{it.descripcion}</Text>
               <Text style={s.cU}>{it.unidad}</Text>
               <Text style={s.cQ}>{qty(it.cantidad)}</Text>
-              <Text style={s.cP}>S/ {precio(it.pu_efectivo ?? it.pu_partida)}</Text>
+              <Text style={s.cP}>S/ {precio(it.pu_bruto ?? it.pu_efectivo ?? it.pu_partida)}</Text>
               <Text style={s.cT}>S/ {money(bruto(it))}</Text>
             </View>
           ))}

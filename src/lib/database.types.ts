@@ -1457,6 +1457,7 @@ export type Database = {
           partida_id: number;
           precio_fijado_at: string | null;
           pu_aprobado: number | null;
+          pu_bruto: number | null;
           pu_cotizado: number | null;
           pu_fijado: number | null;
           ret_garantia_pct: number;
@@ -1474,6 +1475,7 @@ export type Database = {
           partida_id: number;
           precio_fijado_at?: string | null;
           pu_aprobado?: number | null;
+          pu_bruto?: number | null;
           pu_cotizado?: number | null;
           pu_fijado?: number | null;
           ret_garantia_pct?: number;
@@ -1490,6 +1492,7 @@ export type Database = {
           partida_id?: number;
           precio_fijado_at?: string | null;
           pu_aprobado?: number | null;
+          pu_bruto?: number | null;
           pu_cotizado?: number | null;
           pu_fijado?: number | null;
           ret_garantia_pct?: number;
@@ -3194,6 +3197,7 @@ export type Database = {
           partida_codigo: string;
           partida_id: number;
           pu_aprobado: number | null;
+          pu_bruto: number | null;
           pu_cotizado: number | null;
           pu_efectivo: number | null;
           pu_hist: number | null;
@@ -3356,6 +3360,7 @@ export type Database = {
           partida_id: number;
           proveedor_id: number;
           pu_aprobado: number | null;
+          pu_bruto: number | null;
           pu_cotizado: number | null;
           pu_efectivo: number | null;
           pu_max: number | null;
@@ -4328,6 +4333,10 @@ export type Database = {
         Returns: number;
       };
       fn_faltante_partida: { Args: { p_partida_id: number }; Returns: number };
+      fn_garantia_historica: {
+        Args: Record<PropertyKey, never>;
+        Returns: undefined;
+      };
       fn_orden_etapa: {
         Args: { p_etapa: string; p_obra_id: number };
         Returns: number;

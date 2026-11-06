@@ -95,6 +95,31 @@ test.describe("@logistica retención por garantía en la base", () => {
   });
 });
 
+test.describe("@logistica garantía de las OS históricas", () => {
+  test("sus montos no se mueven y lo ya devuelto no se vuelve a pagar", ({}, info) => {
+    test.skip(info.project.name !== "m390", "basta con un tamaño");
+    // El neto sigue siendo el del Excel: cantidad × P.U. neto, y lo retenido es lo que falta para el 100 %.
+    expect(
+      sql1(`select count(*) from v_oc_items_calc where pu_bruto is not null
+             and (parcial <> round(cantidad * pu_efectivo, 2) or retenido <> round(cantidad * pu_bruto, 2) - parcial or retenido < 0)`),
+    ).toBe("0");
+    expect(
+      sql1(`select count(*) from comprobantes c where c.historico and c.anulado_at is null
+             and exists (select 1 from oc_items l where l.comprobante_id = c.id and l.pu_bruto is not null)
+             and abs(c.total - (select sum(v.parcial) from v_oc_items_calc v where v.comprobante_id = c.id)) > 0.05`),
+      "cada comprobante sigue cuadrando con sus líneas",
+    ).toBe("0");
+    expect(Number(sql1("select count(*) from oc_items where pu_bruto is not null"))).toBeGreaterThan(0);
+    // Donde la devolución ya se pagó, nada queda por devolver.
+    expect(
+      sql1(`select coalesce(sum(r.retenido), 0) from v_os_retenidas r
+             where r.retenida_en is null and r.obra_id in (
+               select c.obra_id from v_oc_items_calc c where c.descripcion ilike 'RETENCION%' and c.estado in ('PAGADA', 'EN_ENTREGA', 'RECIBIDA'))`),
+    ).toBe("0");
+    expect(sql1("select count(*) from oc_items l join partidas p on p.id = l.partida_id join items i on i.id = p.item_id where i.descripcion ilike 'RETENCION%' and l.pu_bruto is not null"), "la devolución no es retención").toBe("0");
+  });
+});
+
 test.describe("@logistica pantallas de garantía y borradores", () => {
   test("Nueva OS: retención por defecto, borrador en la cuenta, otra orden aparte, retomar y emitir", async ({ abrir }, info) => {
     test.skip(info.project.name !== "m390", "escribe en la base");
@@ -168,7 +193,8 @@ test.describe("@logistica pantallas de garantía y borradores", () => {
     )[0];
     sql(`update proveedores set suspension_4ta_fecha = null, suspension_4ta_path = null, suspension_4ta_operacion = null where id = ${prov}`);
     const nombre = `E2E GARANTIA ${Date.now()}`;
-    const obra = sql1(`insert into obras (empresa_id, nombre, presupuesto_estado) values (${empresa}, '${nombre}', 'PUBLICADO') returning id`);
+    // Con id negativo: las pruebas que corren a la vez buscan órdenes desde la obra más nueva, y no deben tomar estas.
+    const obra = sql1(`insert into obras (id, empresa_id, nombre, presupuesto_estado) values (-${Date.now() % 1000000}, ${empresa}, '${nombre}', 'PUBLICADO') returning id`);
     try {
       const partida = sql1(
         `insert into partidas (obra_id, codigo, etapa, requerimiento, item_id, cantidad, pu)

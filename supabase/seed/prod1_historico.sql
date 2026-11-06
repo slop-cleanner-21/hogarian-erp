@@ -15,3 +15,6 @@ update public.oc_items l
    and o.tipo = 'OS' and o.historico and l.precio_fijado_at is not null;
 
 reset app.skip_audit;
+
+-- La retención por garantía de las OS históricas (migración prod1_garantia_historica).
+select public.fn_garantia_historica();

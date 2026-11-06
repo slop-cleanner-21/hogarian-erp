@@ -252,7 +252,7 @@ export function DetalleOrden({
         if (!editable)
           return {
             it,
-            pu: it.pu_cotizado,
+            pu: it.pu_bruto ?? it.pu_cotizado,
             sobre: it.alerta === "SOBREPRECIO",
             // Antes de la garantía: la línea es cantidad × P.U.; lo retenido se resta en el total.
             parcial: Number(it.parcial ?? 0) + Number(it.retenido ?? 0),
@@ -270,7 +270,8 @@ export function DetalleOrden({
           sobre,
           aprobado: p.aprobado,
           parcial: pu == null ? null : pu * Number(it.cantidad),
-          retenido: pu == null ? 0 : retenidoDe(pu * Number(it.cantidad), Number(it.ret_garantia_pct ?? 0)),
+          // Una histórica ya tiene su P.U. neto: no se descuenta otra vez.
+          retenido: pu == null || it.pu_bruto != null ? 0 : retenidoDe(pu * Number(it.cantidad), Number(it.ret_garantia_pct ?? 0)),
         };
       }),
     [items, precios, editable],

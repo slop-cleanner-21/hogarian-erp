@@ -77,7 +77,7 @@ export default async function NuevaOrdenPage({ searchParams }: PageProps<"/logis
         todas((a, b) =>
           supabase
             .from("v_oc_items_calc")
-            .select("item_id, proveedor_id, fecha, pu_efectivo")
+            .select("item_id, proveedor_id, fecha, pu_efectivo, pu_bruto")
             .in("item_id", itemIds.slice(k * 300, k * 300 + 300))
             .neq("estado", "ANULADA")
             .order("id")
@@ -91,7 +91,7 @@ export default async function NuevaOrdenPage({ searchParams }: PageProps<"/logis
         const previa = ventas.get(k);
         const conPu = l.pu_efectivo != null && (fechaPu.get(k) ?? "") <= l.fecha;
         if (conPu) fechaPu.set(k, l.fecha);
-        const pu = conPu ? Number(l.pu_efectivo) : (previa?.[3] ?? null);
+        const pu = conPu ? Number(l.pu_bruto ?? l.pu_efectivo) : (previa?.[3] ?? null);
         ventas.set(k, [l.item_id, l.proveedor_id, !previa || previa[2] < l.fecha ? l.fecha : previa[2], pu]);
       }
     }

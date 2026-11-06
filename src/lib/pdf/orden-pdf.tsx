@@ -59,7 +59,7 @@ export function OrdenDoc({ orden, items }: { orden: VOrden; items: VOcItem[] }) 
             <Text style={s.cD}>{it.descripcion}</Text>
             <Text style={s.cU}>{it.unidad}</Text>
             <Text style={s.cQ}>{qty(it.cantidad)}</Text>
-            {conPrecios && <Text style={s.cP}>{precio(it.pu_efectivo ?? it.pu_partida)}</Text>}
+            {conPrecios && <Text style={s.cP}>{precio(it.pu_bruto ?? it.pu_efectivo ?? it.pu_partida)}</Text>}
             {conPrecios && <Text style={s.cT}>{money(neto(it) + Number(it.retenido ?? 0))}</Text>}
           </View>
         ))}

@@ -82,7 +82,7 @@ export async function vistaOrden(
     todas((a, b) =>
       supabase
         .from("v_oc_items_calc")
-        .select("item_id, obra_id, numero_oc, fecha, pu_efectivo")
+        .select("item_id, obra_id, numero_oc, fecha, pu_efectivo, pu_bruto")
         .in("item_id", itemIds)
         .neq("estado", "ANULADA")
         .not("pu_efectivo", "is", null)
@@ -124,7 +124,7 @@ export async function vistaOrden(
   const h = new Map<number, { min: number; max: number; ultimo: number }>();
   for (const x of hist) {
     if (x.obra_id === obraId && x.numero_oc === numero) continue;
-    const pu = Number(x.pu_efectivo);
+    const pu = Number(x.pu_bruto ?? x.pu_efectivo);
     const prev = h.get(x.item_id!);
     if (!prev) h.set(x.item_id!, { min: pu, max: pu, ultimo: pu });
     else h.set(x.item_id!, { ...prev, min: Math.min(prev.min, pu), max: Math.max(prev.max, pu) });
@@ -164,7 +164,7 @@ export async function vistaOrden(
         descripcion: i.descripcion ?? "",
         unidad: i.unidad ?? "",
         cantidad: Number(i.cantidad),
-        pu: i.pu_efectivo,
+        pu: i.pu_bruto ?? i.pu_efectivo,
         // Antes de la garantía: la línea es cantidad × P.U.; lo retenido se resta en el total.
         parcial: Number(i.parcial ?? 0) + Number(i.retenido ?? 0),
         puMin: manoObra ? null : (x?.min ?? null),

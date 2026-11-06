@@ -91,8 +91,11 @@ Contabilidad, Residente y RRHH **no entran**. Sus roles siguen en la base
   partida con cantidad 1 y el monto como precio aprobado, para que el total sea lo retenido al céntimo. Sigue el recorrido normal,
   con su contrato de locación, que lista las OS retenidas. Cada OS devuelta queda marcada (`retenida_en`) y no se devuelve dos
   veces; si la OS de retenciones se anula, vuelve a estar por devolver. Al cerrar la obra, Logística recibe el aviso con el monto.
-  **Históricos:** aún sin retención cargada. Las 1,019 líneas de OS al 95 % del presupuesto están a su neto, y en dos obras
-  ya se pagó un ítem «RETENCION 5%» a otro proveedor: cargar ese acumulado tal cual pagaría dos veces.
+  **Históricos** (migración `prod1_garantia_historica`, `fn_garantia_historica`): la mano de obra al 95 % del presupuesto está a su
+  neto en el Excel. Precio, parcial, comprobantes y pagos no se tocan: `oc_items.pu_bruto` guarda el P.U. acordado y lo retenido es
+  la diferencia, al céntimo. **Excepción:** en una obra donde ya se pagó el ítem «RETENCION 5%», la devolución se hizo a un proveedor
+  por la cuadrilla: sus OS quedan devueltas en esa orden y no se vuelven a pagar. Las líneas a otros porcentajes (0.855, 0.8938…)
+  no se marcan: no se sabe cuánto de esa rebaja es retención.
 - **Retención de 4ta categoría** (LIR art. 71): solo en recibos por honorarios de **más de S/ 1,500**, por el %
   del proveedor (8 % por defecto; Logística lo cambia en su ficha). Tesorería paga el neto y la retención
   queda registrada. No se retiene si el proveedor tiene **suspensión de 4ta** vigente: Logística la marca en
