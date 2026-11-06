@@ -1,5 +1,6 @@
 "use client";
 
+import { createPortal } from "react-dom";
 import { Check, ChevronDown, Plus, Search } from "lucide-react";
 import { useMemo, useState, type ReactNode } from "react";
 import { cn, matches, norm } from "@/lib/format";
@@ -193,17 +194,21 @@ export function SearchSelect({
         <span className={cn("min-w-0 flex-1", multilinea ? "line-clamp-2" : "truncate", !selected && "text-ink-3")}>{selected?.label ?? placeholder}</span>
         <ChevronDown size={18} className="shrink-0 text-ink-3" />
       </button>
-      {open && (
-        <SearchSheet
-          open
-          onClose={() => setOpen(false)}
-          title={label}
-          options={options}
-          value={value}
-          onChange={onChange}
-          crear={crear}
-        />
-      )}
+      {/* Fuera del árbol: Field es un <label>, y un clic dentro de un label se reenvía a su control (este botón). En Samsung
+          Internet cada toque en la hoja la cerraba y ese clic la reabría al instante: parecía que nada respondía. */}
+      {open &&
+        createPortal(
+          <SearchSheet
+            open
+            onClose={() => setOpen(false)}
+            title={label}
+            options={options}
+            value={value}
+            onChange={onChange}
+            crear={crear}
+          />,
+          document.body,
+        )}
     </>
   );
 }

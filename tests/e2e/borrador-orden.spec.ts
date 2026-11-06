@@ -2,7 +2,7 @@ import { expect, test } from "./fixtures";
 import { sesion, sql } from "./lib";
 
 // Nueva OC / OS: lo avanzado se recuerda en el dispositivo si se sale de la pantalla (también en otra visita sin la obra en la
-// URL), y en Samsung Internet la hoja de selección no abre el teclado sola.
+// URL), y la hoja de selección funciona en Samsung Internet.
 
 const SAMSUNG = "Mozilla/5.0 (Linux; Android 10; K) AppleWebKit/537.36 (KHTML, like Gecko) SamsungBrowser/30.0 Chrome/143.0.0.0 Mobile Safari/537.36";
 
@@ -64,7 +64,7 @@ test.describe("@logistica borrador de Nueva OC / OS", () => {
     await expect(page.getByRole("button", { name: "Proveedor", exact: true })).toHaveCount(0);
   });
 
-  test("en Samsung Internet la hoja no abre el teclado sola, y se cierra y elige con toques", async ({ browser }, info) => {
+  test("en Samsung Internet la hoja se cierra y elige con toques, y lo que pasa llega a los logs", async ({ browser }, info) => {
     const [obra, descripcion] = partida();
     const ctx = await browser.newContext({ ...info.project.use, userAgent: SAMSUNG, storageState: sesion("logistica"), hasTouch: true, isMobile: true });
     const page = await ctx.newPage();
@@ -80,9 +80,16 @@ test.describe("@logistica borrador de Nueva OC / OS", () => {
     await page.getByRole("button", { name: "Proveedor", exact: true }).tap();
     const hoja = page.getByRole("dialog", { name: "Proveedor" });
     await expect(hoja).toBeVisible();
-    expect(await page.evaluate(() => document.activeElement?.tagName), "el buscador no toma el foco").not.toBe("INPUT");
+    // La causa del S25: la hoja estaba dentro del <label> de Field, y Samsung Internet reenviaba cada toque al botón, que la
+    // reabría. Ninguna hoja puede quedar dentro de un label.
+    expect(await page.evaluate(() => [...document.querySelectorAll("dialog")].filter((d) => d.closest("label")).length), "hojas dentro de un label").toBe(0);
+    expect(await page.evaluate(() => document.activeElement?.tagName), "el buscador toma el foco").toBe("INPUT");
     await hoja.getByRole("button", { name: "Cerrar" }).tap();
     await expect(hoja).toHaveCount(0);
+
+    await page.getByRole("button", { name: "Comprobante", exact: true }).tap();
+    expect(await page.evaluate(() => [...document.querySelectorAll("dialog")].filter((d) => d.closest("label")).length), "tampoco esta").toBe(0);
+    await page.getByRole("listbox", { name: "Comprobante" }).getByRole("option", { name: "Factura" }).tap();
 
     await page.getByRole("button", { name: "Proveedor", exact: true }).tap();
     await page.getByRole("listbox", { name: "Proveedor" }).getByRole("option").first().tap();
