@@ -161,7 +161,7 @@ export async function proxy(request: NextRequest) {
 
   // Lista sin filtros: se abre directamente con la última vista guardada (sin pintarla vacía y saltar).
   if (request.method === "GET") {
-    const destino = vistaGuardada(request.cookies.get(COOKIE_VISTAS)?.value, path, request.nextUrl.searchParams);
+    const destino = vistaGuardada(request.cookies.get(COOKIE_VISTAS)?.value, path, request.nextUrl.searchParams, request.headers.get("referer"));
     if (destino) {
       const redireccion = NextResponse.redirect(new URL(destino, request.url));
       // Conserva las cookies de sesión que haya refrescado Supabase.

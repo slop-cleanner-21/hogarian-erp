@@ -30,13 +30,21 @@ export function leerVistas(cookie: string | undefined): Vistas {
 
 /**
  * Adónde llevar una petición a `path` con `params`: la vista guardada si llega sin filtros (sin nada, o
- * solo con su base). null si no hay que redirigir.
+ * solo con su base). null si no hay que redirigir. `anterior` es la pantalla desde la que se pide: si es esta misma
+ * vista, el usuario está cambiando sus filtros (p. ej. vació el buscador) y no se restaura; la cookie todavía tiene
+ * lo de antes, y lo borrado volvía a aparecer.
  */
-export function vistaGuardada(cookie: string | undefined, path: string, params: URLSearchParams): string | null {
+export function vistaGuardada(cookie: string | undefined, path: string, params: URLSearchParams, anterior?: string | null): string | null {
   const entrada = leerVistas(cookie)[path];
   if (!entrada) return null;
   const propios = new URLSearchParams(params);
   for (const a of AJENOS) propios.delete(a);
+  if (anterior) {
+    try {
+      const a = new URL(anterior);
+      if (a.pathname === path && claveBase(a.searchParams, entrada.b) === claveBase(propios, entrada.b)) return null;
+    } catch {}
+  }
   const nombres = [...new Set(propios.keys())];
   if (nombres.some((n) => !entrada.b.includes(n))) return null; // ya trae filtros
   // Un valor vacío en la base (p. ej. «?area=») es elegir de nuevo: no se restaura.

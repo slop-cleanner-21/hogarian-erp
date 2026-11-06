@@ -16,11 +16,18 @@ export function SearchBox({ placeholder = "Buscar", param = "q" }: { placeholder
   const qUrl = params.get(param) ?? "";
   const [q, setQ] = useState(qUrl);
 
-  // Si la URL cambia desde fuera (p. ej. filtros restaurados), el campo la sigue.
+  // Si la URL cambia desde fuera (p. ej. filtros restaurados), el campo la sigue. Lo que este campo mandó no cuenta: en una
+  // lista lenta la URL llega tarde, y pisaba lo que el usuario ya había borrado (el texto volvía a aparecer).
   const [qUrlPrevio, setQUrlPrevio] = useState(qUrl);
+  const [enviados, setEnviados] = useState<string[]>([]);
   if (qUrl !== qUrlPrevio) {
     setQUrlPrevio(qUrl);
-    setQ(qUrl);
+    const propio = enviados.indexOf(qUrl);
+    if (propio >= 0) setEnviados(enviados.slice(propio + 1));
+    else {
+      setEnviados([]);
+      setQ(qUrl);
+    }
   }
 
   useEffect(() => {
@@ -29,6 +36,7 @@ export function SearchBox({ placeholder = "Buscar", param = "q" }: { placeholder
       const next = new URLSearchParams(params.toString());
       if (q) next.set(param, q);
       else next.delete(param);
+      setEnviados((e) => [...e, q]);
       router.replace(`${path}?${next}`, { scroll: false });
     }, 250);
     return () => clearTimeout(t);

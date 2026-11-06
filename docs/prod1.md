@@ -207,6 +207,8 @@ Contabilidad, Residente y RRHH **no entran**. Sus roles siguen en la base
   así va como sobreprecio aprobado, para que sus fórmulas no la dejen en cero.
 - **Tolerancia de las OS:** las nuevas no tienen (cualquier precio sobre el presupuesto es sobreprecio). Las históricas usan la
   del ítem, como el Excel (migración `prod1_tolerancia_historicos`; al recargar, `prod1_historico.sql`).
+- **Buscadores de las listas** (`SearchBox`, los 10 de la app): lo borrado no vuelve. El proxy no restaura la vista guardada si el
+  pedido viene de esa misma vista (`Referer`), y el campo ignora la URL de lo que él mismo mandó, que en una lista lenta llega tarde.
 - **Buscador de OC / OS:** por N°, proveedor, obra o **ítem** (sin importar tildes ni mayúsculas; «cemento sol» halla «CEMENTO
   PORTLAND SOL»). El ítem es la columna `items_busqueda` de `v_ordenes`, una subconsulta que solo se calcula si el filtro la usa:
   medido por la API, pasa de 4-6 ms a 11-16 ms. No usar una función por fila: era 15 a 40 veces más lenta. Al rehacer una vista,

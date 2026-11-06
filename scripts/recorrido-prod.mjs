@@ -186,7 +186,9 @@ try {
     // Una sugerencia con captura: la subida al almacenamiento de la nube.
     playwright(clave, "tests/e2e/sugerencias.spec.ts", "--project=m390", "--no-deps", "-g", "Logística manda") &&
     // Una hoja en Samsung Internet (emulado), con su diagnóstico.
-    playwright(clave, "tests/e2e/borrador-orden.spec.ts", "--project=m390", "--no-deps", "-g", "Samsung Internet");
+    playwright(clave, "tests/e2e/borrador-orden.spec.ts", "--project=m390", "--no-deps", "-g", "Samsung Internet") &&
+    // Los buscadores, con la red real y frenada: lo borrado no vuelve.
+    playwright(clave, "tests/e2e/buscador-limpiar.spec.ts", "--project=m390", "--no-deps", "-g", "lo borrado no vuelve");
 } finally {
   await limpiar(inicio);
 }
