@@ -177,7 +177,11 @@ try {
   const clave = await crearCuentas();
   fs.rmSync(SESIONES, { recursive: true, force: true });
   fs.mkdirSync(SESIONES, { recursive: true });
-  ok = playwright(clave, "--project=sesiones") && playwright(clave, "tests/e2e/flujo.spec.ts", "--project=flujo", "--no-deps");
+  ok =
+    playwright(clave, "--project=sesiones") &&
+    playwright(clave, "tests/e2e/flujo.spec.ts", "--project=flujo", "--no-deps") &&
+    // El export, dentro de Vercel (memoria, tiempo, descarga directa de Supabase): en local eso no se puede probar.
+    playwright(clave, "tests/e2e/excel.spec.ts", "--project=excel", "--no-deps");
 } finally {
   await limpiar(inicio);
 }

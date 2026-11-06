@@ -5,7 +5,7 @@ import path from "node:path";
 import type { Page } from "@playwright/test";
 import { strFromU8, unzipSync } from "fflate";
 import { expect, test } from "./fixtures";
-import { sql, sql1 } from "./lib";
+import { EN_PROD, ROLES, sql, sql1 } from "./lib";
 
 // Exportar el Excel de control de costos: el mismo .xlsm (plantilla en el bucket privado «excel»), con lo que se registró
 // en la app escrito en sus celdas de datos. Se comprueba leyéndolo con el mismo extractor con el que se cargó: lo que la
@@ -75,10 +75,11 @@ test.describe("@excel exportar el Excel", () => {
         expect(extraido, "operación").toContain(`'${operacion}'`);
       }
       const nuevas = Number(sql1(`select count(*) from oc_items l join ordenes_compra o on o.obra_id = l.obra_id and o.numero = l.numero_oc where not o.historico and not ${fuera}`));
-      expect(nuevas, "hay órdenes de la app para exportar").toBeGreaterThan(0);
+      // En producción el recorrido ya limpió lo suyo: puede no haber ninguna.
+      if (!EN_PROD) expect(nuevas, "hay órdenes de la app para exportar").toBeGreaterThan(0);
     } finally {
       fs.rmSync(carpeta, { recursive: true, force: true });
-      sql(`delete from audit_log where accion = 'EXPORTAR_EXCEL'`);
+      sql(`delete from audit_log where accion = 'EXPORTAR_EXCEL' and user_id in (select id from auth.users where email in ('${ROLES.logistica}', '${ROLES.gerencia}'))`);
     }
   });
 
@@ -97,7 +98,7 @@ test.describe("@excel exportar el Excel", () => {
       expect(fs.statSync(path.join(carpeta, "exportado.xlsm")).size).toBeGreaterThan(1_000_000);
     } finally {
       fs.rmSync(carpeta, { recursive: true, force: true });
-      sql(`delete from audit_log where accion = 'EXPORTAR_EXCEL'`);
+      sql(`delete from audit_log where accion = 'EXPORTAR_EXCEL' and user_id in (select id from auth.users where email in ('${ROLES.logistica}', '${ROLES.gerencia}'))`);
     }
   });
 
