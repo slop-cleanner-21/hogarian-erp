@@ -200,6 +200,8 @@ Contabilidad, Residente y RRHH **no entran**. Sus roles siguen en la base
   por precios), se suelta. En los dos casos Logística recibe un aviso en esa orden («Cambió el presupuesto de la OC N: rige para su
   cotización» o «… sus precios no cambian», con el ítem y los dos precios). Las anuladas no avisan. En el Excel exportado una línea
   así va como sobreprecio aprobado, para que sus fórmulas no la dejen en cero.
+- **Tolerancia de las OS:** las nuevas no tienen (cualquier precio sobre el presupuesto es sobreprecio). Las históricas usan la
+  del ítem, como el Excel (migración `prod1_tolerancia_historicos`; al recargar, `prod1_historico.sql`).
 - **Buscador de OC / OS:** por N°, proveedor, obra o **ítem** (sin importar tildes ni mayúsculas; «cemento sol» halla «CEMENTO
   PORTLAND SOL»). El ítem es la columna `items_busqueda` de `v_ordenes`, una subconsulta que solo se calcula si el filtro la usa:
   medido por la API, pasa de 4-6 ms a 11-16 ms. No usar una función por fila: era 15 a 40 veces más lenta. Al rehacer una vista,

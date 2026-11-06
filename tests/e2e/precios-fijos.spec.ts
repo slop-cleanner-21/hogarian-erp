@@ -134,4 +134,32 @@ test.describe("@precios el presupuesto y las órdenes", () => {
       commit;`);
     expect(sql1(`select pu_fijado from oc_items where id = ${l!.id}`)).toBe(antes);
   });
+
+  test("tolerancia: una OS histórica usa la del ítem, como el Excel; una OS nueva no tiene", () => {
+    // Del Excel: una OS sobre el presupuesto pero dentro de la tolerancia vale lo cotizado, aunque tenga otro aprobado.
+    const f = sql(
+      `select c.id, c.cantidad, c.pu_cotizado, c.parcial, c.sobreprecio from v_oc_items_calc c join ordenes_compra o on o.obra_id = c.obra_id and o.numero = c.numero_oc
+        where o.tipo = 'OS' and o.historico and c.pu_partida is not null and c.pu_cotizado > c.pu_partida + 0.001 and c.pu_cotizado <= c.pu_max
+        order by c.id limit 1`,
+    )[0];
+    expect(f, "hay una OS histórica dentro de su tolerancia").toBeTruthy();
+    expect(Number(f[3])).toBeCloseTo(Number(f[1]) * Number(f[2]), 1);
+    expect(f[4]).toBe("f");
+    expect(sql1(`select count(*) from oc_items l join ordenes_compra o on o.obra_id = l.obra_id and o.numero = l.numero_oc join partidas p on p.id = l.partida_id join items i on i.id = p.item_id
+                  where o.tipo = 'OS' and o.historico and l.precio_fijado_at is not null and l.tol_fijada is distinct from i.tolerancia_pct`), "todas las históricas").toBe("0");
+
+    // Nueva: un céntimo sobre el presupuesto ya es sobreprecio, aunque el ítem tenga 5 % de tolerancia.
+    const n = sql(
+      `select l.id, l.partida_id, l.obra_id, l.numero_oc from oc_items l join ordenes_compra o on o.obra_id = l.obra_id and o.numero = l.numero_oc join partidas p on p.id = l.partida_id
+        where o.tipo = 'OS' and not o.historico and o.estado = 'EMITIDA' and p.pu > 0 order by l.id limit 1`,
+    )[0];
+    expect(n, "hay una OS nueva en cotización").toBeTruthy();
+    const r = sqlScript(`begin;
+      update items i set tolerancia_pct = 0.05 from partidas p where p.item_id = i.id and p.id = ${n[1]};
+      update oc_items l set pu_cotizado = p.pu + 0.01, pu_aprobado = null from partidas p where p.id = l.partida_id and l.id = ${n[0]};
+      select 'nueva', sobreprecio, tolerancia_pct from v_oc_items_calc where id = ${n[0]};
+      rollback;`);
+    expect(fila(r, "nueva")?.[1]).toBe("t");
+    expect(Number(fila(r, "nueva")?.[2])).toBe(0);
+  });
 });

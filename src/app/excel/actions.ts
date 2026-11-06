@@ -84,7 +84,7 @@ async function leerDatos(db: ReturnType<typeof createAdminClient>): Promise<Dato
       const ops = (l.comprobante_id ? operaciones.get(`c${l.comprobante_id}`) : undefined) ?? operaciones.get(`o${l.obra_id}/${l.numero_oc}`);
       // El Excel compara cada compra con el presupuesto de hoy. Si Gerencia lo bajó después de aprobar los precios, la orden
       // no cambió: va como sobreprecio aprobado, para que el Excel no la deje en cero.
-      const tolerancia = o.tipo === "OS" ? 0 : Number(item.get(p.item_id)?.tolerancia_pct ?? 0);
+      const tolerancia = o.tipo === "OS" && !o.historico ? 0 : Number(item.get(p.item_id)?.tolerancia_pct ?? 0);
       const cotizado = num(l.pu_cotizado);
       const superaHoy = p.pu !== null && cotizado !== null && cotizado > Number(p.pu) * (1 + tolerancia);
       return [
