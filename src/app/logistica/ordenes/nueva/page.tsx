@@ -1,6 +1,6 @@
 import type { Metadata } from "next";
 import { todas } from "@/lib/paginar";
-import { createClient } from "@/lib/supabase/server";
+import { createClient, requireSesion } from "@/lib/supabase/server";
 import type { VPartida } from "@/lib/types";
 import { RecordarFiltros } from "@/components/recordar-filtros";
 import { NuevaOrden, type Venta } from "./nueva-orden";
@@ -11,6 +11,7 @@ export async function generateMetadata({ searchParams }: PageProps<"/logistica/o
 
 export default async function NuevaOrdenPage({ searchParams }: PageProps<"/logistica/ordenes/nueva">) {
   const sp = await searchParams;
+  const { userId } = await requireSesion(["LOGISTICA"]);
   const tipo = sp.tipo === "OS" ? "OS" : "OC";
   const obraId = Number(sp.obra) || null;
   const supabase = await createClient();
@@ -112,6 +113,7 @@ export default async function NuevaOrdenPage({ searchParams }: PageProps<"/logis
       <RecordarFiltros clave="nueva" base={["tipo"]} ignorar={["req"]} />
       <NuevaOrden
       key={`${obraId ?? 0}-${sp.req ?? ""}`}
+      usuario={userId}
       tipo={tipo}
       obraId={obraId}
       obras={(obras ?? []).map((o) => ({

@@ -211,6 +211,9 @@ Contabilidad, Residente y RRHH **no entran**. Sus roles siguen en la base
   PORTLAND SOL»). El ítem es la columna `items_busqueda` de `v_ordenes`, una subconsulta que solo se calcula si el filtro la usa:
   medido por la API, pasa de 4-6 ms a 11-16 ms. No usar una función por fila: era 15 a 40 veces más lenta. Al rehacer una vista,
   repetir `with (security_invoker = true)`: `create or replace` lo quita y la vista deja de aplicar las reglas de cada rol.
+- **Borrador de Nueva OC / OS:** lo avanzado (obra, ítems, proveedor, comprobante, fecha, guía) queda en el dispositivo, por usuario
+  y tipo (`src/lib/borrador-orden.ts`, 14 días): al salir, retroceder o cerrar la app y volver a Nueva sigue como estaba. Se borra
+  al emitir la orden o al quitar todos los ítems.
 - **Nueva OC / OS:** sin desplegables de «Ordenar por» ni de «Regular o adicional» (siempre por etapa);
   las partidas adicionales llevan la etiqueta «Adicional N».
 - **Avisos** (campana; `notificar`, solo a las cuentas activas del rol):

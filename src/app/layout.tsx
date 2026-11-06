@@ -1,3 +1,4 @@
+import { Diagnostico } from "@/components/diagnostico";
 import type { Metadata, Viewport } from "next";
 import { Barlow, Barlow_Condensed } from "next/font/google";
 import { APP_CORTO, APP_DESCRIPCION, APP_NOMBRE } from "@/lib/marca";
@@ -63,6 +64,7 @@ export default function RootLayout({ children }: LayoutProps<"/">) {
           <RecordarRuta />
           <BarraCarga />
         </Suspense>
+        <Diagnostico />
       </body>
     </html>
   );

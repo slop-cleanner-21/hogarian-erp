@@ -30,8 +30,9 @@ export function Sheet({
     if (!d) return;
     if (open && !d.open) {
       d.showModal();
-      // showModal enfoca el primer botón ("Cerrar"): si la hoja tiene un campo principal, va ahí.
-      d.querySelector<HTMLElement>("[data-autofocus]")?.focus();
+      // showModal enfoca el primer botón ("Cerrar"): si la hoja tiene un campo principal, va ahí. En Samsung Internet no: abre el
+      // teclado solo y, con él abierto, la hoja dejaba de responder a los toques (un S25); se toca el buscador para escribir.
+      if (!/SamsungBrowser/.test(navigator.userAgent)) d.querySelector<HTMLElement>("[data-autofocus]")?.focus();
     }
     if (!open && d.open) d.close();
   }, [open]);

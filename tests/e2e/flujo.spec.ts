@@ -456,6 +456,8 @@ test.describe("@flujo flujo completo por las pantallas", () => {
       await page.waitForURL(new RegExp(`/logistica/ordenes/${obraId}/`));
       os = decodeURIComponent(page.url().match(new RegExp(`/logistica/ordenes/${obraId}/([^?]+)`))![1]);
       expect(sql1(`select tipo || ' ' || comprobante_tipo from ordenes_compra where obra_id = ${obraId} and numero = '${os}'`)).toBe("OS RXH");
+      // Emitida, no queda borrador que retomar.
+      expect(await page.evaluate(() => Object.keys(localStorage).filter((k) => k.startsWith("prod1_borrador")))).toEqual([]);
     });
 
     await test.step("El proveedor cotiza la OS y Logística confirma", async () => {

@@ -3,7 +3,7 @@
 import { MarcaAdicional } from "@/components/marca-adicional";
 import { Check, Search, X } from "lucide-react";
 import { useRouter } from "next/navigation";
-import { useMemo, useState, useTransition } from "react";
+import { useEffect, useMemo, useRef, useState, useTransition } from "react";
 import { ActionBar } from "@/components/action-bar";
 import { TopBar } from "@/components/shell";
 import { Button } from "@/components/ui/button";
@@ -13,6 +13,7 @@ import { SearchSelect } from "@/components/ui/search-select";
 import { TODOS as TODAS, SIN_TIPO } from "@/lib/filtros";
 import { cn, fecha, hoyISO, matches, qty, solesPu } from "@/lib/format";
 import { PROVEEDOR_VACIO, ProveedorSheet } from "../../proveedores/proveedores-list";
+import { borrarBorrador, claveBorrador, guardarBorrador, leerBorrador } from "@/lib/borrador-orden";
 import type { Proveedor, TipoOrden, VPartida } from "@/lib/types";
 import { crearOrden } from "../../actions";
 
@@ -67,7 +68,10 @@ export function NuevaOrden({
   atender,
   siguienteNumero,
   filtros,
+  usuario,
 }: {
+  /** Para recordar lo avanzado por usuario en este dispositivo. */
+  usuario: string;
   tipo: TipoOrden;
   obraId: number | null;
   obras: ObraOpt[];
@@ -124,6 +128,39 @@ export function NuevaOrden({
     if (habitual === "RXH" || habitual === "FACTURA") setComprobante(habitual);
   };
   const [requiereGuia, setRequiereGuia] = useState(false);
+
+  // Lo avanzado queda en el dispositivo: al salir y volver a Nueva (o cerrar la app), sigue como estaba.
+  const clave = claveBorrador(usuario, tipo);
+  const restaurado = useRef(!!atender);
+  const [listo, setListo] = useState(!!atender);
+  useEffect(() => {
+    if (restaurado.current) return;
+    const b = leerBorrador(clave);
+    if (b && !obraId) {
+      router.replace(`/logistica/ordenes/nueva?tipo=${tipo}&obra=${b.obraId}`);
+      return;
+    }
+    restaurado.current = true;
+    /* eslint-disable react-hooks/set-state-in-effect -- localStorage no existe en el servidor: se lee después de hidratar */
+    if (b && b.obraId === obraId) {
+      const vivas = b.sel.filter(([id]) => partidas.some((p) => p.id === id && Number(p.saldo_cant) > 0));
+      setSel(new Map(vivas));
+      if (proveedoresIniciales.some((p) => String(p.id) === b.proveedorId)) setProveedorIdS(b.proveedorId);
+      setComprobante(b.comprobante);
+      setFechaInicio(b.fechaInicio);
+      setRequiereGuia(b.requiereGuia);
+      if (b.paso === 2 && vivas.length) setPaso(2);
+    }
+    setListo(true);
+    /* eslint-enable react-hooks/set-state-in-effect */
+  }, [clave, obraId, partidas, proveedoresIniciales, router, tipo]);
+  useEffect(() => {
+    if (!listo || !obraId || atender) return;
+    const elegidas = [...sel].filter(([id]) => partidas.some((p) => p.id === id));
+    if (!elegidas.length) return borrarBorrador(clave);
+    guardarBorrador(clave, { obraId, paso, sel: elegidas, proveedorId, comprobante, fechaInicio, requiereGuia });
+  }, [listo, clave, obraId, atender, paso, sel, partidas, proveedorId, comprobante, fechaInicio, requiereGuia]);
+
   const [confirmar, setConfirmar] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [pending, startTransition] = useTransition();
@@ -196,6 +233,7 @@ export function NuevaOrden({
         setError(res.error);
         return;
       }
+      borrarBorrador(clave);
       router.replace(`/logistica/ordenes/${obraId}/${encodeURIComponent(res.data)}?tipo=${tipo}`);
     });
 
