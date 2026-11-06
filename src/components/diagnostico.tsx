@@ -4,9 +4,17 @@ import { useEffect } from "react";
 
 // Diagnóstico en el navegador del usuario, para lo que no se puede reproducir aquí. Va a los logs del servidor (/diagnostico):
 //   · los errores de JavaScript, de todos;
-//   · en Samsung Internet, qué pasa con cada toque mientras hay una hoja abierta (qué se tocó y qué eventos llegaron), por una
-//     hoja que en ese navegador no respondía. Nunca lo que se escribe: solo el tipo de evento y el nombre del botón.
-const MAX_ENVIOS = 12;
+//   · en Android, qué pasa con las hojas (se abrió, qué se tocó, qué eventos llegaron, dónde estaba la hoja, si siguió abierta
+//     después del toque, si la página se trabó), por una hoja que en un S25 no respondía a los toques.
+// Si se ve «abre» y después nada, los toques no están llegando a la página. Nunca lo que se escribe: solo el tipo de evento y el
+// nombre del botón. Se envía al juntar varios, tras 2 segundos sin actividad y al salir de la pantalla.
+const MAX_ENVIOS = 30;
+const POR_ENVIO = 15;
+
+const hojaSuperior = () => {
+  const hojas = document.querySelectorAll<HTMLDialogElement>("dialog[open]");
+  return { n: hojas.length, hoja: hojas[hojas.length - 1] ?? null };
+};
 
 export function Diagnostico() {
   useEffect(() => {
@@ -14,40 +22,78 @@ export function Diagnostico() {
     let lote: string[] = [];
     let espera: number | undefined;
     const enviar = () => {
+      window.clearTimeout(espera);
       if (!lote.length || enviados >= MAX_ENVIOS) return;
       enviados++;
-      const cuerpo = JSON.stringify({ ruta: location.pathname, ua: navigator.userAgent.slice(0, 120), ancho: innerWidth, alto: innerHeight, vv: Math.round(visualViewport?.height ?? 0), eventos: lote });
+      const v = window.visualViewport;
+      const cuerpo = JSON.stringify({ ruta: location.pathname, ua: navigator.userAgent.slice(0, 120), ancho: innerWidth, alto: innerHeight, vv: `${Math.round(v?.height ?? 0)}+${Math.round(v?.offsetTop ?? 0)}`, eventos: lote });
       lote = [];
-      navigator.sendBeacon?.("/diagnostico", cuerpo.slice(0, 3000));
+      navigator.sendBeacon?.("/diagnostico", cuerpo.slice(0, 6000));
     };
     const anotar = (texto: string) => {
-      if (lote.length < 40) lote.push(texto.slice(0, 120));
+      lote.push(`${Math.round(performance.now())} ${texto.slice(0, 160)}`);
+      if (lote.length >= POR_ENVIO) return enviar();
       window.clearTimeout(espera);
-      espera = window.setTimeout(enviar, 2500);
+      espera = window.setTimeout(enviar, 2000);
     };
 
     const error = (e: ErrorEvent) => anotar(`error ${e.message} ${e.filename?.split("/").pop() ?? ""}:${e.lineno}`);
     const rechazo = (e: PromiseRejectionEvent) => anotar(`rechazo ${String(e.reason?.message ?? e.reason)}`);
     window.addEventListener("error", error);
     window.addEventListener("unhandledrejection", rechazo);
+    // Al salir de la pantalla o cambiar de app, lo pendiente se manda ya.
+    const salir = () => document.visibilityState === "hidden" && enviar();
+    window.addEventListener("pagehide", enviar);
+    document.addEventListener("visibilitychange", salir);
 
-    const samsung = /SamsungBrowser/.test(navigator.userAgent);
+    const android = /Android/.test(navigator.userAgent);
+    const nombre = (el: Element | null | undefined) => el?.getAttribute("aria-label") ?? el?.getAttribute("role") ?? "";
     const toque = (e: Event) => {
-      const hojas = document.querySelectorAll("dialog[open]");
-      if (!hojas.length) return;
+      const { n, hoja } = hojaSuperior();
+      if (!hoja) return;
       const t = e.target as HTMLElement | null;
       const boton = t?.closest?.("button");
-      const superior = hojas[hojas.length - 1] as HTMLElement;
-      anotar(`${e.type} ${t?.tagName ?? "?"} ${boton?.getAttribute("aria-label") ?? boton?.getAttribute("role") ?? ""} hojas=${hojas.length} sup=${superior.getAttribute("aria-label") ?? ""} ${(e as PointerEvent).pointerType ?? ""}`);
+      const p = e as PointerEvent;
+      const r = hoja.getBoundingClientRect();
+      anotar(`${e.type} ${t?.tagName ?? "?"} «${nombre(boton)}» hojas=${n} sup=«${nombre(hoja)}» ${p.pointerType ?? ""} y=${Math.round(p.clientY ?? 0)} hoja=${Math.round(r.top)}+${Math.round(r.height)}`);
+      if (e.type === "click" && boton) {
+        const etiqueta = nombre(boton);
+        // El veredicto: ¿el toque cerró la hoja?
+        window.setTimeout(() => {
+          if (hoja.isConnected && hoja.open) anotar(`sigue-abierta «${nombre(hoja)}» tras click en «${etiqueta}»`);
+          enviar();
+        }, 700);
+      }
     };
     const tipos = ["pointerdown", "pointerup", "pointercancel", "click"];
-    if (samsung) tipos.forEach((t) => document.addEventListener(t, toque, true));
+    let aperturas: MutationObserver | undefined;
+    let trabas: PerformanceObserver | undefined;
+    if (android) {
+      tipos.forEach((t) => document.addEventListener(t, toque, true));
+      aperturas = new MutationObserver((cambios) => {
+        for (const c of cambios) {
+          const d = c.target as HTMLDialogElement;
+          if (d.tagName === "DIALOG" && d.open) anotar(`abre «${nombre(d)}» foco=${document.activeElement?.tagName}`);
+        }
+      });
+      aperturas.observe(document.documentElement, { subtree: true, attributes: true, attributeFilter: ["open"] });
+      try {
+        trabas = new PerformanceObserver((l) => {
+          for (const e of l.getEntries()) if (e.duration > 300 && hojaSuperior().hoja) anotar(`traba ${Math.round(e.duration)}ms`);
+        });
+        trabas.observe({ type: "longtask" });
+      } catch {}
+    }
 
     return () => {
-      window.clearTimeout(espera);
+      enviar();
       window.removeEventListener("error", error);
       window.removeEventListener("unhandledrejection", rechazo);
-      if (samsung) tipos.forEach((t) => document.removeEventListener(t, toque, true));
+      window.removeEventListener("pagehide", enviar);
+      document.removeEventListener("visibilitychange", salir);
+      if (android) tipos.forEach((t) => document.removeEventListener(t, toque, true));
+      aperturas?.disconnect();
+      trabas?.disconnect();
     };
   }, []);
   return null;

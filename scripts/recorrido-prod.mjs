@@ -184,7 +184,9 @@ try {
     // El export, dentro de Vercel (memoria, tiempo, descarga directa de Supabase): en local eso no se puede probar.
     playwright(clave, "tests/e2e/excel.spec.ts", "--project=excel", "--no-deps") &&
     // Una sugerencia con captura: la subida al almacenamiento de la nube.
-    playwright(clave, "tests/e2e/sugerencias.spec.ts", "--project=m390", "--no-deps", "-g", "Logística manda");
+    playwright(clave, "tests/e2e/sugerencias.spec.ts", "--project=m390", "--no-deps", "-g", "Logística manda") &&
+    // Una hoja en Samsung Internet (emulado), con su diagnóstico.
+    playwright(clave, "tests/e2e/borrador-orden.spec.ts", "--project=m390", "--no-deps", "-g", "Samsung Internet");
 } finally {
   await limpiar(inicio);
 }

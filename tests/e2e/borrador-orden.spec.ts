@@ -1,5 +1,5 @@
 import { expect, test } from "./fixtures";
-import { sql } from "./lib";
+import { sesion, sql } from "./lib";
 
 // Nueva OC / OS: lo avanzado se recuerda en el dispositivo si se sale de la pantalla (también en otra visita sin la obra en la
 // URL), y en Samsung Internet la hoja de selección no abre el teclado sola.
@@ -66,10 +66,11 @@ test.describe("@logistica borrador de Nueva OC / OS", () => {
 
   test("en Samsung Internet la hoja no abre el teclado sola, y se cierra y elige con toques", async ({ browser }, info) => {
     const [obra, descripcion] = partida();
-    const ctx = await browser.newContext({ ...info.project.use, userAgent: SAMSUNG, storageState: "tests/e2e/.auth/logistica.json", hasTouch: true, isMobile: true });
+    const ctx = await browser.newContext({ ...info.project.use, userAgent: SAMSUNG, storageState: sesion("logistica"), hasTouch: true, isMobile: true });
     const page = await ctx.newPage();
     const avisos: string[] = [];
-    page.on("request", (r) => {
+    // Del contexto: el envío al salir de la pantalla sale de un documento que ya se fue.
+    ctx.on("request", (r) => {
       if (r.url().endsWith("/diagnostico")) avisos.push(r.postData() ?? "");
     });
     await page.goto(`/logistica/ordenes/nueva?tipo=OS&obra=${obra}`);
@@ -87,9 +88,33 @@ test.describe("@logistica borrador de Nueva OC / OS", () => {
     await page.getByRole("listbox", { name: "Proveedor" }).getByRole("option").first().tap();
     await expect(hoja).toHaveCount(0);
 
-    // Lo que pasó con los toques llega a los logs, sin lo escrito.
-    await expect.poll(() => avisos.join(" "), { timeout: 6000 }).toContain("Cerrar");
+    // Lo que pasó con los toques llega a los logs.
+    await expect.poll(() => avisos.join(" "), { timeout: 6000 }).toContain("«Cerrar»");
+    expect(avisos.join(" ")).toContain("abre «Proveedor»");
     expect(avisos.join(" ")).toContain("hojas=1");
+    expect(avisos.join(" "), "se cerró: nada que avisar").not.toContain("sigue-abierta");
+
+    // Una hoja trabada, como la del S25: los toques llegan pero no la cierran. Queda en los logs, aunque salga enseguida.
+    avisos.length = 0;
+    await page.evaluate(() => {
+      document.addEventListener("click", (e) => (e.target as Element).closest?.("dialog") && e.stopPropagation(), { capture: true });
+    });
+    await page.getByRole("button", { name: "Proveedor", exact: true }).tap();
+    await expect(hoja).toBeVisible();
+    await hoja.getByPlaceholder("Buscar").tap();
+    await hoja.getByPlaceholder("Buscar").fill("TEXTO-PRIVADO");
+    await hoja.getByRole("button", { name: "Cerrar" }).tap();
+    await expect.poll(() => avisos.join(" "), { timeout: 6000 }).toContain("sigue-abierta «Proveedor» tras click en «Cerrar»");
+    expect(avisos.join(" "), "lo escrito no viaja").not.toContain("TEXTO-PRIVADO");
+
+    // Si los toques ni llegan: queda «abre» y nada más. Y lo pendiente sale al abandonar la pantalla.
+    await page.reload();
+    await page.getByRole("button", { name: "Proveedor", exact: true }).tap();
+    await expect(hoja).toBeVisible();
+    // (Un envío de una página que ya se fue no se ve desde aquí: se dispara el mismo evento con la página viva.)
+    avisos.length = 0;
+    await page.evaluate(() => window.dispatchEvent(new Event("pagehide")));
+    await expect.poll(() => avisos.join(" "), { timeout: 1500 }).toContain("abre «Proveedor»");
     await page.evaluate(() => Object.keys(localStorage).filter((k) => k.startsWith("prod1_borrador")).forEach((k) => localStorage.removeItem(k)));
     await ctx.close();
   });

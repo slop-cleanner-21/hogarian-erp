@@ -8,7 +8,7 @@ test.describe("@admin empresas", () => {
   test("el Admin completa una empresa (RUC validado, firmante de Gerencia) y queda en la auditoría", async ({ abrir }, info) => {
     test.skip(info.project.name !== "m390", "escribe en la base");
     const [id, nombre, antes] = sql(`select id, nombre, row_to_json(e)::text from empresas e where nombre = 'ARISANT'`)[0];
-    const [gerenteId, gerente] = sql(`select user_id, nombre from perfiles where rol = 'GERENCIA' order by user_id limit 1`)[0];
+    const [gerenteId, gerente] = sql(`select p.user_id, p.nombre from perfiles p join auth.users u on u.id = p.user_id where u.email = '${ROLES.gerencia}'`)[0];
     const admin = sql1(`select id from auth.users where email = '${ROLES.admin}'`);
     // Parte sin RUC (fuera de lo que se mira en la auditoría).
     sql(`update empresas set ruc = null where id = ${id}`);
