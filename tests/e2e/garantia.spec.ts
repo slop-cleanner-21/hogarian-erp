@@ -7,7 +7,7 @@ import { sql, sql1, sqlScript, uidDe } from "./lib";
 const partidaMo = () => {
   const [obra, partida, pu, descripcion] = sql(
     `select p.obra_id, p.id, p.pu, p.descripcion from v_partidas p join obras o on o.id = p.obra_id
-      where p.rubro = 'MANO OBRA' and p.requerimiento = 'REGULAR' and p.pu > 1 and p.saldo_cant >= 2
+      where p.rubro = 'MANO OBRA' and p.requerimiento = 'REGULAR' and p.pu > 1 and p.saldo_cant >= 2 and p.pu * 2 > 60
         and o.presupuesto_estado = 'PUBLICADO' and o.estado <> 'CERRADA'
       order by p.obra_id desc, p.id limit 1`,
   )[0];
@@ -38,7 +38,7 @@ test.describe("@logistica retención por garantía en la base", () => {
         return 'error: ' || sqlerrm;
       end $f$;
       create function pg_temp.escenario() returns setof text language plpgsql as $e$
-      declare v_n text; v_d text; v_t text;
+      declare v_n text; v_d text; v_t text; v_c text; v_item bigint; v_neto numeric; v_bruto numeric;
       begin
         return next 'pct100|' || pg_temp.t('${log}', $q$select crear_orden(${obra}, null, ${prov}, 'OS', '[{"partida_id":${partida},"cantidad":1,"ret_garantia_pct":100}]')$q$);
         return next 'oc|' || pg_temp.t('${log}', $q$select crear_orden(${obra}, null, ${prov}, 'OC', '[{"partida_id":${partida},"cantidad":1,"ret_garantia_pct":5}]')$q$);
@@ -49,6 +49,14 @@ test.describe("@logistica retención por garantía en la base", () => {
         return next 'retenidas_jefe|' || pg_temp.t('${jefe}', format($q$select count(*) from v_os_retenidas where obra_id = ${obra} and numero = %L$q$, v_n));
         return next 'retenidas_log|' || pg_temp.t('${log}', format($q$select retenido from v_os_retenidas where obra_id = ${obra} and numero = %L$q$, v_n));
 
+        perform pg_temp.t('${log}', format($q$select confirmar_precios(${obra}, %L)$q$, v_n));
+        v_item := (select min(id) from oc_items where obra_id = ${obra} and numero_oc = v_n);
+        v_neto := (select sum(parcial) from v_oc_items_calc where obra_id = ${obra} and numero_oc = v_n);
+        v_bruto := v_neto + (select sum(retenido) from v_oc_items_calc where obra_id = ${obra} and numero_oc = v_n);
+        return next 'recibo_100|' || pg_temp.t('${log}', format($q$select registrar_comprobante(${prov}, 'RXH', 'E777', '1', current_date, %s, null, 'e2e/x.pdf', array[%s]::bigint[], null)$q$, v_bruto + 2, v_item));
+        v_c := pg_temp.t('${log}', format($q$select registrar_comprobante(${prov}, 'RXH', 'E777', '2', current_date, %s, null, 'e2e/x.pdf', array[%s]::bigint[], null)$q$, v_neto, v_item));
+        return next 'recibo_neto|' || (v_c ~ '^[0-9]+$');
+        return next 'corregir_100|' || pg_temp.t('${log}', format($q$select editar_comprobante(%s, 'RXH', 'E777', '2', current_date, %s, null, null, 'e2e')$q$, v_c, v_bruto + 2));
         update ordenes_compra set estado = 'PAGADA' where obra_id = ${obra} and numero = v_n;
         return next 'abierta|' || pg_temp.t('${log}', $q$select crear_orden_retencion(${obra}, null, ${prov})$q$);
         update obras set estado = 'CERRADA' where id = ${obra};
@@ -82,6 +90,9 @@ test.describe("@logistica retención por garantía en la base", () => {
     expect(r.cambiar, "solo al crearla").not.toMatch(/^\d+$/);
     expect(r.retenidas_jefe, "el Jefe no lee lo financiero").toBe("0");
     expect(r.retenidas_log).toBe(retenido);
+    expect(r.recibo_100, "por el 100 % no: Tesorería pagaría lo retenido").toMatch(/^error: El comprobante debe ser por S\/ [\d,.]+ \(sin la retención por garantía\)$/);
+    expect(r.recibo_neto).toBe("true");
+    expect(r.corregir_100).toMatch(/^error: El comprobante debe ser por/);
     expect(r.abierta).toBe("error: Las retenciones se devuelven con la obra cerrada");
     expect(r.jefe).toMatch(/^error/);
     expect(r.devolucion).toMatch(/^PRECIOS_CONFIRMADOS\|true\|RXH\|Retenciones de la obra /);

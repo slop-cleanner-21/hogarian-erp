@@ -18,6 +18,7 @@ function ordenPorFacturar(tipo: "OC" | "OS") {
       where o.tipo = '${tipo}' and o.estado = 'PRECIOS_CONFIRMADOS' and not o.es_retencion and o.valorizacion_id is null
         and not exists (select 1 from oc_items l where l.obra_id = o.obra_id and l.numero_oc = o.numero and l.comprobante_id is not null)
         and exists (select 1 from oc_items l join partidas p on p.id = l.partida_id where l.obra_id = o.obra_id and l.numero_oc = o.numero)
+        and not exists (select 1 from oc_items l where l.obra_id = o.obra_id and l.numero_oc = o.numero and (l.pu_bruto is not null or l.ret_garantia_pct > 0))
       order by o.obra_id desc, o.numero limit 1`,
   )[0];
   if (!f) return null;

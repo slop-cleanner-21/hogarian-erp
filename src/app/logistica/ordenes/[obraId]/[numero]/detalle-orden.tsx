@@ -1084,6 +1084,8 @@ function ComprobanteSheet({
           ((totalNum * elegidas.reduce((a, i) => a + Number(i.parcial ?? 0) * (detracciones[i.item_id ?? -1] ?? 0), 0)) / 100 / sumaParcial) * 100,
         ) / 100
       : 0;
+  // Con retención por garantía se factura el neto (la base rechaza otro total).
+  const netoMal = items.some((i) => sel.has(i.id!) && Number(i.retenido) > 0) && Math.abs(totalNum - sugerido) > 1;
   const [detraccion, setDetraccion] = useState<string>("");
   const detraccionNum = conDetraccion ? (detraccion === "" ? detraccionSugerida : Number(detraccion)) : 0;
   const [archivo, setArchivo] = useState<File | null>(null);
@@ -1154,13 +1156,14 @@ function ComprobanteSheet({
               sel.size === 0 && "ítems",
               !(totalNum > 0) && "total",
               !archivo && !historico && "archivo de la factura",
+              netoMal && `total de ${soles(sugerido)}, sin la retención por garantía`,
             ]}
           />
           <Button
             size="lg"
             onClick={guardar}
             disabled={
-              pending || !serie || !numero || sel.size === 0 || !(totalNum > 0) || (!archivo && !historico)
+              pending || !serie || !numero || sel.size === 0 || !(totalNum > 0) || (!archivo && !historico) || netoMal
             }
           >
             {sel.size === items.length && (orden.tipo === "OC" ? !requiereGuia || guiaRegistrada : contratoFirmado && !regenera)

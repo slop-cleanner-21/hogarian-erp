@@ -83,7 +83,8 @@ Contabilidad, Residente y RRHH **no entran**. Sus roles siguen en la base
 - **Retención por garantía** (OS; distinta de la de 4ta y anterior a ella): Logística la define al crear la OS, por tipo de
   partida: mano de obra 5 %, subcontratos 0 % y adicionales 0 % por defecto (`src/lib/garantia.ts`); después no se cambia. Va por
   línea (`oc_items.ret_garantia_pct`). El P.U. sigue siendo el acordado (contra él se compara el presupuesto) y `parcial` es el
-  neto: el proveedor factura y cobra el neto (S/ 1,000 al 5 % son S/ 950) y la 4ta se calcula sobre ese comprobante. Las pantallas
+  neto: el proveedor factura y cobra el neto (S/ 1,000 al 5 % son S/ 950) y la 4ta se calcula sobre ese comprobante. La base no
+  acepta otro total (`fn_exigir_neto`, S/ 1 de margen por redondeo): con el 100 %, lo retenido se pagaría dos veces. Las pantallas
   muestran cada línea a cantidad × P.U. y restan lo retenido en el total. En el Excel exportado va el P.U. neto.
 - **OS de retenciones** (Proveedores › Retenciones, `/logistica/retenciones`, vista `v_os_retenidas`): lo retenido por proveedor y
   obra: por devolver (OS ya pagadas), sin pagar (aún no se retuvo) y devuelto. Con la obra cerrada, Logística crea una OS por

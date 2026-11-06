@@ -4332,6 +4332,10 @@ export type Database = {
         Args: { p_comprobante_id: number };
         Returns: number;
       };
+      fn_exigir_neto: {
+        Args: { p_item_ids: number[]; p_total: number };
+        Returns: undefined;
+      };
       fn_faltante_partida: { Args: { p_partida_id: number }; Returns: number };
       fn_garantia_historica: {
         Args: Record<PropertyKey, never>;
