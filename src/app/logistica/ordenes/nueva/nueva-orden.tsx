@@ -11,17 +11,21 @@ import { Confirm } from "@/components/ui/confirm";
 import { Field, Input, NumberInput, inputClass } from "@/components/ui/field";
 import { SearchSelect } from "@/components/ui/search-select";
 import { TODOS as TODAS, SIN_TIPO } from "@/lib/filtros";
-import { cn, fecha, hoyISO, matches, qty, solesPu } from "@/lib/format";
+import { cn, fecha, hoyISO, matches, qty, soles, solesPu } from "@/lib/format";
 import { PROVEEDOR_VACIO, ProveedorSheet } from "../../proveedores/proveedores-list";
-import { borrarBorrador, claveBorrador, guardarBorrador, leerBorrador } from "@/lib/borrador-orden";
+import { borrarBorrador, claveBorrador, guardarBorrador, leerBorrador, type BorradorCuenta } from "@/lib/borrador-orden";
+import { ETIQUETA_GARANTIA, GARANTIA_DEFECTO, categoriaGarantia, pctValido, retenidoDe, type CategoriaGarantia, type Garantia } from "@/lib/garantia";
+import { faltaSuspension } from "@/lib/retencion";
 import type { Proveedor, TipoOrden, VPartida } from "@/lib/types";
-import { crearOrden } from "../../actions";
+import { crearOrden, guardarBorradorOrden } from "../../actions";
 
 type ObraOpt = { id: number; nombre: string; empresa: string };
-type ProveedorOpt = Pick<Proveedor, "id" | "ruc_o_cod" | "razon_social" | "comprobante_habitual"> & { tipos: string[] };
+type ProveedorOpt = Pick<Proveedor, "id" | "ruc_o_cod" | "razon_social" | "comprobante_habitual" | "suspension_4ta_fecha"> & { tipos: string[] };
 /** Venta previa: [item_id, proveedor_id, fecha de la última orden, su P.U.]. */
 export type Venta = [number, number, string, number | null];
 
+
+const ORDEN_GARANTIA: CategoriaGarantia[] = ["mano", "sub", "adic"];
 
 /** Las partidas, siempre por etapa y código (sin desplegable para ordenar). */
 const porEtapa = (a: VPartida, b: VPartida) =>
@@ -69,9 +73,12 @@ export function NuevaOrden({
   siguienteNumero,
   filtros,
   usuario,
+  borrador,
 }: {
   /** Para recordar lo avanzado por usuario en este dispositivo. */
   usuario: string;
+  /** El borrador de la cuenta que se retoma. */
+  borrador: BorradorCuenta | null;
   tipo: TipoOrden;
   obraId: number | null;
   obras: ObraOpt[];
@@ -128,14 +135,20 @@ export function NuevaOrden({
     if (habitual === "RXH" || habitual === "FACTURA") setComprobante(habitual);
   };
   const [requiereGuia, setRequiereGuia] = useState(false);
+  const [garantia, setGarantia] = useState<Garantia>(GARANTIA_DEFECTO);
 
   // Lo avanzado queda en el dispositivo: al salir y volver a Nueva (o cerrar la app), sigue como estaba.
-  const clave = claveBorrador(usuario, tipo);
+  const clave = claveBorrador(usuario, tipo, borrador?.id);
   const restaurado = useRef(!!atender);
   const [listo, setListo] = useState(!!atender);
   useEffect(() => {
     if (restaurado.current) return;
-    const b = leerBorrador(clave);
+    const local = leerBorrador(clave);
+    // De un borrador de la cuenta, lo editado aquí si es más nuevo que lo guardado.
+    const b =
+      borrador && obraId && !(local && local.guardado > Date.parse(borrador.actualizado))
+        ? { ...borrador.datos, obraId, guardado: Date.parse(borrador.actualizado) }
+        : local;
     if (b && !obraId) {
       router.replace(`/logistica/ordenes/nueva?tipo=${tipo}&obra=${b.obraId}`);
       return;
@@ -149,17 +162,18 @@ export function NuevaOrden({
       setComprobante(b.comprobante);
       setFechaInicio(b.fechaInicio);
       setRequiereGuia(b.requiereGuia);
+      if (b.garantia) setGarantia(b.garantia);
       if (b.paso === 2 && vivas.length) setPaso(2);
     }
     setListo(true);
     /* eslint-enable react-hooks/set-state-in-effect */
-  }, [clave, obraId, partidas, proveedoresIniciales, router, tipo]);
+  }, [borrador, clave, obraId, partidas, proveedoresIniciales, router, tipo]);
   useEffect(() => {
     if (!listo || !obraId || atender) return;
     const elegidas = [...sel].filter(([id]) => partidas.some((p) => p.id === id));
     if (!elegidas.length) return borrarBorrador(clave);
-    guardarBorrador(clave, { obraId, paso, sel: elegidas, proveedorId, comprobante, fechaInicio, requiereGuia });
-  }, [listo, clave, obraId, atender, paso, sel, partidas, proveedorId, comprobante, fechaInicio, requiereGuia]);
+    guardarBorrador(clave, { obraId, paso, sel: elegidas, proveedorId, comprobante, fechaInicio, requiereGuia, garantia });
+  }, [listo, clave, obraId, atender, paso, sel, partidas, proveedorId, comprobante, fechaInicio, requiereGuia, garantia]);
 
   const [confirmar, setConfirmar] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -226,7 +240,12 @@ export function NuevaOrden({
         tipo,
         requiereGuia,
         ...(tipo === "OS" ? { comprobante: comprobante!, fechaInicio } : {}),
-        items: seleccionadas.map((p) => ({ partida_id: p.id, cantidad: Number(sel.get(p.id)) })),
+        items: seleccionadas.map((p) => ({
+          partida_id: p.id,
+          cantidad: Number(sel.get(p.id)),
+          ...(tipo === "OS" ? { ret_garantia_pct: Number(garantia[categoriaGarantia(p)]) } : {}),
+        })),
+        ...(borrador ? { borradorId: borrador.id } : {}),
       });
       if (!res.ok) {
         setConfirmar(false);
@@ -237,7 +256,31 @@ export function NuevaOrden({
       router.replace(`/logistica/ordenes/${obraId}/${encodeURIComponent(res.data)}?tipo=${tipo}`);
     });
 
+  // A la cuenta: queda en la pestaña Borradores y se puede empezar otra orden.
+  const guardarEnCuenta = () =>
+    startTransition(async () => {
+      setError(null);
+      const res = await guardarBorradorOrden({
+        id: borrador?.id ?? null,
+        tipo,
+        obraId: obraId!,
+        datos: { paso, sel: seleccionadas.map((p) => [p.id, sel.get(p.id) ?? ""]), proveedorId, comprobante, fechaInicio, requiereGuia, garantia },
+      });
+      if (!res.ok) return setError(res.error);
+      borrarBorrador(clave);
+      router.replace(`/logistica?tipo=${tipo}&tab=bor`);
+    });
+
+  const categorias = [...new Set(seleccionadas.map(categoriaGarantia))].sort((a, b) => ORDEN_GARANTIA.indexOf(a) - ORDEN_GARANTIA.indexOf(b));
+  const garantiaInvalida = tipo === "OS" && categorias.some((c) => !pctValido(garantia[c]));
+  const retenido =
+    tipo === "OS"
+      ? seleccionadas.reduce((a, p) => a + retenidoDe(Number(sel.get(p.id)) * Number(p.pu ?? 0), Number(garantia[categoriaGarantia(p)]) || 0), 0)
+      : 0;
+
   const proveedor = proveedores.find((p) => String(p.id) === proveedorId);
+  const bruto = seleccionadas.reduce((a, p) => a + Number(sel.get(p.id)) * Number(p.pu ?? 0), 0);
+  const avisoSuspension = tipo === "OS" && comprobante === "RXH" && !!proveedor && faltaSuspension(bruto - retenido, proveedor.suspension_4ta_fecha, hoyISO());
 
   // Primero quienes ya vendieron estos ítems (más ítems y más reciente), luego quienes venden ese
   // tipo de material y después el resto. La marca lo muestra también al buscar.
@@ -340,6 +383,7 @@ export function NuevaOrden({
                 />
               </Field>
               {inicioInvalido && <p className="col-span-2 text-danger">La fecha de inicio no puede ser posterior a la de fin ({fecha(hoyISO())})</p>}
+              {avisoSuspension && <p role="status" className="col-span-2 font-semibold text-warn">Sin suspensión de 4ta: pídele la constancia al proveedor</p>}
             </div>
           )}
 
@@ -353,6 +397,32 @@ export function NuevaOrden({
                 className="h-6 w-6 shrink-0 accent-primary"
               />
             </label>
+          )}
+
+          {tipo === "OS" && (
+            <section aria-label="Retención por garantía" className="flex flex-col gap-2 rounded-panel bg-surface p-4">
+              <h2 className="font-semibold">Retención por garantía</h2>
+              {categorias.map((c) => (
+                <label key={c} className="flex items-center justify-between gap-3">
+                  <span>{ETIQUETA_GARANTIA[c]}</span>
+                  <span className="flex items-center gap-2">
+                    <NumberInput
+                      aria-label={`Retención ${ETIQUETA_GARANTIA[c]}`}
+                      value={garantia[c]}
+                      onChange={(e) => setGarantia({ ...garantia, [c]: e.target.value })}
+                      className={cn("w-20", !pctValido(garantia[c]) && "border-danger")}
+                    />
+                    %
+                  </span>
+                </label>
+              ))}
+              {retenido > 0.005 && (
+                <p className="flex justify-between text-ink-2">
+                  <span>Se retiene</span>
+                  <span className="num">{soles(retenido)}</span>
+                </p>
+              )}
+            </section>
           )}
 
           <ul className="overflow-hidden rounded-panel bg-surface">
@@ -397,8 +467,8 @@ export function NuevaOrden({
           {error && <p role="alert" className="text-danger">{error}</p>}
         </main>
         <ActionBar>
-          <Button variant="secondary" onClick={() => setPaso(1)}>
-            Partidas
+          <Button variant="secondary" onClick={guardarEnCuenta} disabled={pending || seleccionadas.length === 0}>
+            Guardar borrador
           </Button>
           <Button
             className="flex-1"
@@ -406,6 +476,7 @@ export function NuevaOrden({
               !proveedorId ||
               seleccionadas.length === 0 ||
               invalidas.length > 0 ||
+              garantiaInvalida ||
               (tipo === "OS" && (!comprobante || !fechaInicio || inicioInvalido))
             }
             onClick={() => setConfirmar(true)}
@@ -435,6 +506,12 @@ export function NuevaOrden({
                 <dd className="num">
                   {fechaInicio && fecha(fechaInicio)} – {fecha(hoyISO())}
                 </dd>
+                {retenido > 0.005 && (
+                  <>
+                    <dt className="text-ink-3">Garantía</dt>
+                    <dd className="num">{soles(retenido)}</dd>
+                  </>
+                )}
               </>
             )}
             {tipo === "OC" && (
@@ -600,8 +677,14 @@ export function NuevaOrden({
           </>
         )}
       </main>
+      {error && <p role="alert" className="mx-auto max-w-2xl px-4 pb-24 text-danger">{error}</p>}
       {obraId && (
         <ActionBar>
+          {sel.size > 0 && (
+            <Button variant="secondary" onClick={guardarEnCuenta} disabled={pending}>
+              Guardar borrador
+            </Button>
+          )}
           <Button className="flex-1" disabled={sel.size === 0} onClick={() => setPaso(2)}>
             Continuar{sel.size > 0 && ` (${sel.size})`}
           </Button>

@@ -9,6 +9,8 @@ import { FileText, Receipt } from "lucide-react";
 import { fecha, qty, soles, solesPu } from "@/lib/format";
 import { guardar, leer } from "@/lib/recordar";
 
+import { retenidoDe } from "@/lib/garantia";
+
 export type CotizacionData = {
   numero: string;
   tipo: "OC" | "OS";
@@ -27,7 +29,7 @@ export type CotizacionData = {
   pagos?: { id: number; fecha: string; monto: number; banco: string | null; operacion: string | null; vouchers: number[] }[] | null;
   /** OS: su contrato (el firmado, si Logística ya lo subió). */
   contrato?: { firmado: boolean } | null;
-  items: { id: number; descripcion: string; unidad: string; cantidad: number; pu_cotizado: number | null }[];
+  items: { id: number; descripcion: string; unidad: string; cantidad: number; pu_cotizado: number | null; ret_garantia_pct?: number }[];
 };
 
 type Precios = Record<number, string>;
@@ -62,7 +64,9 @@ function Formulario({ token, data, conBorrador }: { token: string; data: Cotizac
   const [error, setError] = useState<string | null>(null);
   const [pending, startTransition] = useTransition();
 
-  const total = data.items.reduce((a, i) => a + (Number(pu[i.id]) || 0) * Number(i.cantidad), 0);
+  const subtotal = data.items.reduce((a, i) => a + (Number(pu[i.id]) || 0) * Number(i.cantidad), 0);
+  const garantia = data.items.reduce((a, i) => a + retenidoDe((Number(pu[i.id]) || 0) * Number(i.cantidad), Number(i.ret_garantia_pct ?? 0)), 0);
+  const total = subtotal - garantia;
   const completa = data.items.every((i) => Number(pu[i.id]) > 0);
 
   const cambiar = (id: number, valor: string) =>
@@ -144,9 +148,23 @@ function Formulario({ token, data, conBorrador }: { token: string; data: Cotizac
             </li>
           ))}
         </ul>
-        <div className="flex items-baseline justify-between rounded-panel bg-surface p-4">
-          <span className="font-semibold">Total</span>
-          <span className="rotulo text-[28px] font-semibold">{soles(total)}</span>
+        <div className="flex flex-col gap-1 rounded-panel bg-surface p-4">
+          {garantia > 0.005 && (
+            <>
+              <div className="num flex justify-between text-[15px] text-ink-2">
+                <span>Subtotal</span>
+                <span>{soles(subtotal)}</span>
+              </div>
+              <div className="num flex justify-between text-[15px] text-ink-2">
+                <span>Retención por garantía</span>
+                <span>− {soles(garantia)}</span>
+              </div>
+            </>
+          )}
+          <div className="flex items-baseline justify-between">
+            <span className="font-semibold">Total</span>
+            <span className="rotulo text-[28px] font-semibold">{soles(total)}</span>
+          </div>
         </div>
         {orden && <Orden token={token} data={data} />}
         {error && <p role="alert" className="text-danger">{error}</p>}

@@ -50,7 +50,7 @@ const MODULOS: Record<ClaveModulo, { label: string; roles: Rol[]; nav: NavItem[]
         href: "/logistica/proveedores",
         label: "Proveedores",
         icon: Truck,
-        match: (p) => p.startsWith("/logistica/proveedores") || p.startsWith("/logistica/transportistas"),
+        match: (p) => p.startsWith("/logistica/proveedores") || p.startsWith("/logistica/transportistas") || p.startsWith("/logistica/retenciones"),
       },
       { href: "/logistica/items", label: "Ítems", icon: Package },
     ],

@@ -1,6 +1,7 @@
 import type { Metadata } from "next";
 import { todas } from "@/lib/paginar";
 import { createClient, requireSesion } from "@/lib/supabase/server";
+import type { BorradorCuenta, DatosBorrador } from "@/lib/borrador-orden";
 import type { VPartida } from "@/lib/types";
 import { RecordarFiltros } from "@/components/recordar-filtros";
 import { NuevaOrden, type Venta } from "./nueva-orden";
@@ -15,13 +16,21 @@ export default async function NuevaOrdenPage({ searchParams }: PageProps<"/logis
   const tipo = sp.tipo === "OS" ? "OS" : "OC";
   const obraId = Number(sp.obra) || null;
   const supabase = await createClient();
+  // Retomar un borrador de la cuenta (solo se ven los propios).
+  const borradorId = Number(sp.borrador) || null;
+  const { data: filaBorrador } = borradorId
+    ? await supabase.from("orden_borradores").select("id, datos, updated_at").eq("id", borradorId).eq("tipo", tipo).eq("obra_id", obraId ?? 0).maybeSingle()
+    : { data: null };
+  const borrador: BorradorCuenta | null = filaBorrador
+    ? { id: filaBorrador.id, datos: filaBorrador.datos as unknown as DatosBorrador, actualizado: filaBorrador.updated_at }
+    : null;
 
   // Partidas de la obra: por páginas (la API corta cada respuesta en 1000 filas), solo las columnas que usa la
   // pantalla. Prod 1 (sin valorizaciones): la mano de obra se ordena en OS, como los subcontratos.
   const pagina = (a: number, b: number) => {
     const q = supabase
       .from("v_partidas")
-      .select("id, codigo, etapa, requerimiento, item_id, descripcion, unidad, cantidad, cant_comprometida, saldo_cant, tipo_material, cantidad_efectiva")
+      .select("id, codigo, etapa, requerimiento, item_id, descripcion, unidad, rubro, pu, cantidad, cant_comprometida, saldo_cant, tipo_material, cantidad_efectiva")
       .eq("obra_id", obraId!)
       .order("etapa")
       .order("codigo")
@@ -37,7 +46,7 @@ export default async function NuevaOrdenPage({ searchParams }: PageProps<"/logis
     todas((a, b) =>
       supabase
         .from("proveedores")
-        .select("id, ruc_o_cod, razon_social, comprobante_habitual, tipos:proveedor_tipos_material(tipo_material)")
+        .select("id, ruc_o_cod, razon_social, comprobante_habitual, suspension_4ta_fecha, tipos:proveedor_tipos_material(tipo_material)")
         .order("razon_social")
         .order("id")
         .range(a, b),
@@ -110,10 +119,11 @@ export default async function NuevaOrdenPage({ searchParams }: PageProps<"/logis
 
   return (
     <>
-      <RecordarFiltros clave="nueva" base={["tipo"]} ignorar={["req"]} />
+      <RecordarFiltros clave="nueva" base={["tipo"]} ignorar={["req", "borrador"]} />
       <NuevaOrden
-      key={`${obraId ?? 0}-${sp.req ?? ""}`}
+      key={`${obraId ?? 0}-${sp.req ?? ""}-${borrador?.id ?? ""}`}
       usuario={userId}
+      borrador={borrador}
       tipo={tipo}
       obraId={obraId}
       obras={(obras ?? []).map((o) => ({
@@ -126,6 +136,7 @@ export default async function NuevaOrdenPage({ searchParams }: PageProps<"/logis
         ruc_o_cod: p.ruc_o_cod,
         razon_social: p.razon_social,
         comprobante_habitual: p.comprobante_habitual,
+        suspension_4ta_fecha: p.suspension_4ta_fecha,
         tipos: p.tipos.map((t) => t.tipo_material),
       }))}
       partidas={partidas}

@@ -165,7 +165,8 @@ export async function vistaOrden(
         unidad: i.unidad ?? "",
         cantidad: Number(i.cantidad),
         pu: i.pu_efectivo,
-        parcial: i.parcial,
+        // Antes de la garantía: la línea es cantidad × P.U.; lo retenido se resta en el total.
+        parcial: Number(i.parcial ?? 0) + Number(i.retenido ?? 0),
         puMin: manoObra ? null : (x?.min ?? null),
         puMax: manoObra ? null : (x?.max ?? null),
         puUltimo: manoObra ? null : (x?.ultimo ?? null),
@@ -198,6 +199,7 @@ export async function vistaOrden(
     ],
     pdfOrden: { orden: orden as VOrden, items: items as VOcItem[] },
     total,
+    garantia: items.reduce((a, i) => a + Number(i.retenido ?? 0), 0),
     pagado,
     // En la consulta no se paga: sin saldo, no hay formulario ni acciones.
     saldo: modo === "tesoreria" && doc?.estado === "PENDIENTE" ? Number(doc.saldo) : 0,

@@ -227,6 +227,13 @@ export type Database = {
             referencedColumns: ["obra_id", "numero"];
           },
           {
+            foreignKeyName: "adjuntos_obra_id_numero_oc_fkey";
+            columns: ["obra_id", "numero_oc"];
+            isOneToOne: false;
+            referencedRelation: "v_os_retenidas";
+            referencedColumns: ["obra_id", "numero"];
+          },
+          {
             foreignKeyName: "adjuntos_orden_pago_id_fkey";
             columns: ["orden_pago_id"];
             isOneToOne: false;
@@ -1014,6 +1021,13 @@ export type Database = {
             referencedColumns: ["obra_id", "numero"];
           },
           {
+            foreignKeyName: "entregas_obra_id_numero_oc_fkey";
+            columns: ["obra_id", "numero_oc"];
+            isOneToOne: false;
+            referencedRelation: "v_os_retenidas";
+            referencedColumns: ["obra_id", "numero"];
+          },
+          {
             foreignKeyName: "entregas_oc_item_id_fkey";
             columns: ["oc_item_id"];
             isOneToOne: false;
@@ -1149,6 +1163,13 @@ export type Database = {
             columns: ["obra_id", "numero_oc"];
             isOneToOne: false;
             referencedRelation: "v_ordenes";
+            referencedColumns: ["obra_id", "numero"];
+          },
+          {
+            foreignKeyName: "guias_obra_id_numero_oc_fkey";
+            columns: ["obra_id", "numero_oc"];
+            isOneToOne: false;
+            referencedRelation: "v_os_retenidas";
             referencedColumns: ["obra_id", "numero"];
           },
           {
@@ -1438,6 +1459,7 @@ export type Database = {
           pu_aprobado: number | null;
           pu_cotizado: number | null;
           pu_fijado: number | null;
+          ret_garantia_pct: number;
           tol_fijada: number | null;
         };
         ComputedFields: never;
@@ -1454,6 +1476,7 @@ export type Database = {
           pu_aprobado?: number | null;
           pu_cotizado?: number | null;
           pu_fijado?: number | null;
+          ret_garantia_pct?: number;
           tol_fijada?: number | null;
         };
         Update: {
@@ -1469,6 +1492,7 @@ export type Database = {
           pu_aprobado?: number | null;
           pu_cotizado?: number | null;
           pu_fijado?: number | null;
+          ret_garantia_pct?: number;
           tol_fijada?: number | null;
         };
         Relationships: [
@@ -1515,6 +1539,13 @@ export type Database = {
             referencedColumns: ["obra_id", "numero"];
           },
           {
+            foreignKeyName: "oc_items_obra_id_numero_oc_fkey";
+            columns: ["obra_id", "numero_oc"];
+            isOneToOne: false;
+            referencedRelation: "v_os_retenidas";
+            referencedColumns: ["obra_id", "numero"];
+          },
+          {
             foreignKeyName: "oc_items_partida_id_obra_id_fkey";
             columns: ["partida_id", "obra_id"];
             isOneToOne: false;
@@ -1551,6 +1582,45 @@ export type Database = {
           },
         ];
       };
+      orden_borradores: {
+        Row: {
+          created_at: string;
+          datos: NonNullable<Json>;
+          id: number;
+          obra_id: number;
+          tipo: Database["public"]["Enums"]["tipo_orden"];
+          updated_at: string;
+          user_id: string;
+        };
+        ComputedFields: never;
+        Insert: {
+          created_at?: string;
+          datos: NonNullable<Json>;
+          id?: number;
+          obra_id: number;
+          tipo: Database["public"]["Enums"]["tipo_orden"];
+          updated_at?: string;
+          user_id?: string;
+        };
+        Update: {
+          created_at?: string;
+          datos?: NonNullable<Json>;
+          id?: number;
+          obra_id?: number;
+          tipo?: Database["public"]["Enums"]["tipo_orden"];
+          updated_at?: string;
+          user_id?: string;
+        };
+        Relationships: [
+          {
+            foreignKeyName: "orden_borradores_obra_id_fkey";
+            columns: ["obra_id"];
+            isOneToOne: false;
+            referencedRelation: "obras";
+            referencedColumns: ["id"];
+          },
+        ];
+      };
       ordenes_compra: {
         Row: {
           comprobante_tipo:
@@ -1576,6 +1646,7 @@ export type Database = {
           obra_id: number;
           proveedor_id: number;
           requiere_guia: boolean;
+          retenida_en: string | null;
           tipo: Database["public"]["Enums"]["tipo_orden"];
           token_cotizacion: string | null;
           updated_at: string;
@@ -1607,6 +1678,7 @@ export type Database = {
           obra_id: number;
           proveedor_id: number;
           requiere_guia?: boolean;
+          retenida_en?: string | null;
           tipo?: Database["public"]["Enums"]["tipo_orden"];
           token_cotizacion?: string | null;
           updated_at?: string;
@@ -1637,6 +1709,7 @@ export type Database = {
           obra_id?: number;
           proveedor_id?: number;
           requiere_guia?: boolean;
+          retenida_en?: string | null;
           tipo?: Database["public"]["Enums"]["tipo_orden"];
           token_cotizacion?: string | null;
           updated_at?: string;
@@ -1805,6 +1878,13 @@ export type Database = {
             columns: ["obra_id", "numero_oc"];
             isOneToOne: false;
             referencedRelation: "v_ordenes";
+            referencedColumns: ["obra_id", "numero"];
+          },
+          {
+            foreignKeyName: "pago_aplicaciones_obra_id_numero_oc_fkey";
+            columns: ["obra_id", "numero_oc"];
+            isOneToOne: false;
+            referencedRelation: "v_os_retenidas";
             referencedColumns: ["obra_id", "numero"];
           },
           {
@@ -2208,6 +2288,7 @@ export type Database = {
           retencion_4ta_pct: number;
           ruc_o_cod: string;
           suspension_4ta_fecha: string | null;
+          suspension_4ta_operacion: string | null;
           suspension_4ta_path: string | null;
         };
         ComputedFields: never;
@@ -2221,6 +2302,7 @@ export type Database = {
           retencion_4ta_pct?: number;
           ruc_o_cod: string;
           suspension_4ta_fecha?: string | null;
+          suspension_4ta_operacion?: string | null;
           suspension_4ta_path?: string | null;
         };
         Update: {
@@ -2233,6 +2315,7 @@ export type Database = {
           retencion_4ta_pct?: number;
           ruc_o_cod?: string;
           suspension_4ta_fecha?: string | null;
+          suspension_4ta_operacion?: string | null;
           suspension_4ta_path?: string | null;
         };
         Relationships: [];
@@ -2331,6 +2414,13 @@ export type Database = {
             columns: ["obra_id", "numero"];
             isOneToOne: false;
             referencedRelation: "v_ordenes";
+            referencedColumns: ["obra_id", "numero"];
+          },
+          {
+            foreignKeyName: "rechazos_obra_id_numero_fkey";
+            columns: ["obra_id", "numero"];
+            isOneToOne: false;
+            referencedRelation: "v_os_retenidas";
             referencedColumns: ["obra_id", "numero"];
           },
           {
@@ -2724,6 +2814,25 @@ export type Database = {
         };
         Relationships: [];
       };
+      suspensiones_4ta: {
+        Row: {
+          fecha: string;
+          numero_operacion: string;
+          ruc: string;
+        };
+        ComputedFields: never;
+        Insert: {
+          fecha: string;
+          numero_operacion: string;
+          ruc: string;
+        };
+        Update: {
+          fecha?: string;
+          numero_operacion?: string;
+          ruc?: string;
+        };
+        Relationships: [];
+      };
       tipos_material: {
         Row: {
           codigo: string;
@@ -3008,6 +3117,13 @@ export type Database = {
             referencedRelation: "v_ordenes";
             referencedColumns: ["obra_id", "numero"];
           },
+          {
+            foreignKeyName: "oc_items_obra_id_numero_oc_fkey";
+            columns: ["obra_id", "numero_oc"];
+            isOneToOne: false;
+            referencedRelation: "v_os_retenidas";
+            referencedColumns: ["obra_id", "numero"];
+          },
         ];
       };
       v_expediente: {
@@ -3084,6 +3200,8 @@ export type Database = {
           pu_max: number | null;
           pu_partida: number | null;
           requerimiento: string;
+          ret_garantia_pct: number;
+          retenido: number | null;
           rubro: Database["public"]["Enums"]["rubro"];
           tipo_material: string | null;
           unidad: string | null;
@@ -3144,6 +3262,13 @@ export type Database = {
             columns: ["obra_id", "numero_oc"];
             isOneToOne: false;
             referencedRelation: "v_ordenes";
+            referencedColumns: ["obra_id", "numero"];
+          },
+          {
+            foreignKeyName: "oc_items_obra_id_numero_oc_fkey";
+            columns: ["obra_id", "numero_oc"];
+            isOneToOne: false;
+            referencedRelation: "v_os_retenidas";
             referencedColumns: ["obra_id", "numero"];
           },
           {
@@ -3236,6 +3361,8 @@ export type Database = {
           pu_max: number | null;
           pu_partida: number | null;
           requerimiento: string;
+          ret_garantia_pct: number;
+          retenido: number | null;
           rubro: Database["public"]["Enums"]["rubro"];
           sobreprecio: boolean | null;
           tipo: Database["public"]["Enums"]["tipo_orden"];
@@ -3299,6 +3426,13 @@ export type Database = {
             columns: ["obra_id", "numero_oc"];
             isOneToOne: false;
             referencedRelation: "v_ordenes";
+            referencedColumns: ["obra_id", "numero"];
+          },
+          {
+            foreignKeyName: "oc_items_obra_id_numero_oc_fkey";
+            columns: ["obra_id", "numero_oc"];
+            isOneToOne: false;
+            referencedRelation: "v_os_retenidas";
             referencedColumns: ["obra_id", "numero"];
           },
           {
@@ -3432,6 +3566,13 @@ export type Database = {
             referencedRelation: "v_ordenes";
             referencedColumns: ["obra_id", "numero"];
           },
+          {
+            foreignKeyName: "oc_items_obra_id_numero_oc_fkey";
+            columns: ["obra_id", "numero_oc"];
+            isOneToOne: false;
+            referencedRelation: "v_os_retenidas";
+            referencedColumns: ["obra_id", "numero"];
+          },
         ];
       };
       v_ordenes: {
@@ -3472,6 +3613,41 @@ export type Database = {
             referencedRelation: "empresas";
             referencedColumns: ["id"];
           },
+          {
+            foreignKeyName: "ordenes_compra_obra_id_fkey";
+            columns: ["obra_id"];
+            isOneToOne: false;
+            referencedRelation: "obras";
+            referencedColumns: ["id"];
+          },
+          {
+            foreignKeyName: "ordenes_compra_proveedor_id_fkey";
+            columns: ["proveedor_id"];
+            isOneToOne: false;
+            referencedRelation: "proveedores";
+            referencedColumns: ["id"];
+          },
+        ];
+      };
+      v_os_retenidas: {
+        Row: {
+          devolucion_estado: Database["public"]["Enums"]["estado_oc"] | null;
+          estado: Database["public"]["Enums"]["estado_oc"];
+          fecha: string;
+          neto: number | null;
+          numero: string;
+          obra: string;
+          obra_estado: string;
+          obra_id: number;
+          pagada: boolean | null;
+          proveedor: string;
+          proveedor_id: number;
+          proveedor_ruc: string;
+          retenida_en: string | null;
+          retenido: number | null;
+        };
+        ComputedFields: never;
+        Relationships: [
           {
             foreignKeyName: "ordenes_compra_obra_id_fkey";
             columns: ["obra_id"];
@@ -4276,6 +4452,7 @@ export type Database = {
           obra_id: number;
           proveedor_id: number;
           requiere_guia: boolean;
+          retenida_en: string | null;
           tipo: Database["public"]["Enums"]["tipo_orden"];
           token_cotizacion: string | null;
           updated_at: string;

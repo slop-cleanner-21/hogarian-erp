@@ -12,7 +12,7 @@ import { SearchSelect } from "@/components/ui/search-select";
 import { Sheet } from "@/components/ui/sheet";
 import { createClient } from "@/lib/supabase/client";
 import { cn, hoyISO } from "@/lib/format";
-import { suspensionVigente } from "@/lib/retencion";
+import { suspensionDelAnio } from "@/lib/retencion";
 import { TIPO_COMPROBANTE_LABEL, type Proveedor, type TipoComprobante } from "@/lib/types";
 import { guardarProveedor } from "../actions";
 import { NuevoTipoSheet } from "../nuevo-tipo";
@@ -37,6 +37,7 @@ export const PROVEEDOR_VACIO: ProveedorFicha = {
   retencion_4ta_pct: 8,
   suspension_4ta_fecha: null,
   suspension_4ta_path: null,
+  suspension_4ta_operacion: null,
   banco: null,
   cuenta_bancaria: null,
   contactos: [],
@@ -106,7 +107,7 @@ export function ProveedorSheet({
   proveedor: ProveedorFicha;
   tiposMaterial: string[];
   onClose: () => void;
-  onGuardado?: (p: { id: number; ruc_o_cod: string; razon_social: string; comprobante_habitual: TipoComprobante | null; tipos: string[] }) => void;
+  onGuardado?: (p: { id: number; ruc_o_cod: string; razon_social: string; comprobante_habitual: TipoComprobante | null; suspension_4ta_fecha: string | null; tipos: string[] }) => void;
 }) {
   const router = useRouter();
   const [p, setP] = useState(proveedor);
@@ -117,7 +118,7 @@ export function ProveedorSheet({
   const [error, setError] = useState<string | null>(null);
   const [pending, startTransition] = useTransition();
   // Suspensión de retenciones de 4ta: se registra con la constancia (la nueva se sube al guardar).
-  const [suspension, setSuspension] = useState(!!proveedor.suspension_4ta_path);
+  const [suspension, setSuspension] = useState(!!proveedor.suspension_4ta_fecha);
   const [constancia, setConstancia] = useState<File | null>(null);
   const [retencionPct, setRetencionPct] = useState(String(proveedor.retencion_4ta_pct ?? 8));
   // Recibo por honorarios: personas naturales (DNI o RUC 10) o quien lo emite habitualmente.
@@ -134,7 +135,7 @@ export function ProveedorSheet({
   const guardar = () =>
     startTransition(async () => {
       setError(null);
-      if (suspension && !constancia && !p.suspension_4ta_path) return setError("Sube la constancia de suspensión de 4ta");
+      if (suspension && !constancia && !p.suspension_4ta_path && !p.suspension_4ta_operacion?.trim()) return setError("Sube la constancia o ingresa su N° de operación");
       if (suspension && !p.suspension_4ta_fecha) return setError("Ingresa la fecha de la constancia");
       const supabase = createClient();
       let path = suspension ? p.suspension_4ta_path : null;
@@ -152,6 +153,7 @@ export function ProveedorSheet({
         retencion_4ta_pct: retencionPct === "" ? 8 : Number(retencionPct),
         suspension_4ta_fecha: suspension ? p.suspension_4ta_fecha : null,
         suspension_4ta_path: path,
+        suspension_4ta_operacion: suspension ? p.suspension_4ta_operacion?.trim() || null : null,
         banco: p.banco || null,
         cuenta_bancaria: p.cuenta_bancaria || null,
         contactos: contactos.filter((c) => c.telefono.trim()),
@@ -162,7 +164,8 @@ export function ProveedorSheet({
         return setError(res.error);
       }
       onGuardado?.({
-        id: res.data,
+        id: res.data.id,
+        suspension_4ta_fecha: res.data.suspension,
         ruc_o_cod: p.ruc_o_cod.trim(),
         razon_social: p.razon_social.trim(),
         comprobante_habitual: p.comprobante_habitual,
@@ -326,10 +329,19 @@ export function ProveedorSheet({
                   />
                 </Field>
                 {p.suspension_4ta_fecha && (
-                  <p className={cn("num text-[15px]", suspensionVigente(p.suspension_4ta_fecha, hoyISO()) ? "text-ok" : "font-semibold text-danger")}>
-                    {suspensionVigente(p.suspension_4ta_fecha, hoyISO()) ? "Vigente" : "Vencida"} hasta el 31/12/{p.suspension_4ta_fecha.slice(0, 4)}
+                  <p className={cn("num text-[15px]", suspensionDelAnio(p.suspension_4ta_fecha, hoyISO()) ? "text-ok" : "font-semibold text-danger")}>
+                    {suspensionDelAnio(p.suspension_4ta_fecha, hoyISO()) ? "Vigente" : "Vencida"} hasta el 31/12/{p.suspension_4ta_fecha.slice(0, 4)}
                   </p>
                 )}
+                <Field label="N° de operación">
+                  <Input
+                    value={p.suspension_4ta_operacion ?? ""}
+                    inputMode="numeric"
+                    maxLength={12}
+                    onChange={(e) => set({ suspension_4ta_operacion: e.target.value.replace(/\D/g, "") || null })}
+                    className="num"
+                  />
+                </Field>
                 <ArchivoConstancia
                   actual={!constancia ? p.suspension_4ta_path : null}
                   elegido={constancia}

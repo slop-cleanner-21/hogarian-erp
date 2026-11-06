@@ -114,8 +114,8 @@ export function Tabs({
             prefetch={false}
             onClick={() => setTocada({ value: o.value, desde: current })}
             className={cn(
-              "flex h-11 items-center justify-center gap-1 whitespace-nowrap rounded-field text-[15px]",
-              deslizable ? "shrink-0 px-3.5" : "px-1",
+              "flex h-11 items-center justify-center gap-1 whitespace-nowrap rounded-field",
+              deslizable ? "shrink-0 px-3.5 text-[15px]" : porFila ? "px-0.5 text-[14px]" : "px-1 text-[15px]",
               active ? "bg-surface font-semibold" : "text-ink-2",
             )}
           >

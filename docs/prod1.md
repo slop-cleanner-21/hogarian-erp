@@ -80,15 +80,32 @@ Contabilidad, Residente y RRHH **no entran**. Sus roles siguen en la base
   Los archivos los entrega `/cotizar/<token>/archivo`, que valida el token en la base (`archivo_link`, solo con la
   clave secreta) sin mostrar el almacenamiento. El link **vence 15 días después del pago** (`link_vigente`) o al
   anularse la orden; rechazar por precios lo renueva.
+- **Retención por garantía** (OS; distinta de la de 4ta y anterior a ella): Logística la define al crear la OS, por tipo de
+  partida: mano de obra 5 %, subcontratos 0 % y adicionales 0 % por defecto (`src/lib/garantia.ts`); después no se cambia. Va por
+  línea (`oc_items.ret_garantia_pct`). El P.U. sigue siendo el acordado (contra él se compara el presupuesto) y `parcial` es el
+  neto: el proveedor factura y cobra el neto (S/ 1,000 al 5 % son S/ 950) y la 4ta se calcula sobre ese comprobante. Las pantallas
+  muestran cada línea a cantidad × P.U. y restan lo retenido en el total. En el Excel exportado va el P.U. neto.
+- **OS de retenciones** (Proveedores › Retenciones, `/logistica/retenciones`, vista `v_os_retenidas`): lo retenido por proveedor y
+  obra: por devolver (OS ya pagadas), sin pagar (aún no se retuvo) y devuelto. Con la obra cerrada, Logística crea una OS por
+  proveedor y obra (`crear_orden_retencion`): recibo por honorarios con el concepto «Retenciones de la obra X», una línea por
+  partida con cantidad 1 y el monto como precio aprobado, para que el total sea lo retenido al céntimo. Sigue el recorrido normal,
+  con su contrato de locación, que lista las OS retenidas. Cada OS devuelta queda marcada (`retenida_en`) y no se devuelve dos
+  veces; si la OS de retenciones se anula, vuelve a estar por devolver. Al cerrar la obra, Logística recibe el aviso con el monto.
+  **Históricos:** aún sin retención cargada. Las 1,019 líneas de OS al 95 % del presupuesto están a su neto, y en dos obras
+  ya se pagó un ítem «RETENCION 5%» a otro proveedor: cargar ese acumulado tal cual pagaría dos veces.
 - **Retención de 4ta categoría** (LIR art. 71): solo en recibos por honorarios de **más de S/ 1,500**, por el %
   del proveedor (8 % por defecto; Logística lo cambia en su ficha). Tesorería paga el neto y la retención
   queda registrada. No se retiene si el proveedor tiene **suspensión de 4ta** vigente: Logística la marca en
-  su ficha solo subiendo la constancia (Formulario 1609) con su fecha; vale hasta el 31 de diciembre de ese
-  año (`src/lib/retencion.ts`). **La calcula la base** (`fn_retencion_4ta`, migración `prod1_impuestos_base`): al
+  su ficha con su fecha y la constancia (Formulario 1609) o su N° de operación, que se valida en SUNAT. Rige desde el **día
+  siguiente** al de su emisión y vale hasta el 31 de diciembre de ese año (`src/lib/retencion.ts`). Las conocidas están en
+  `suspensiones_4ta`, por RUC y solo para la base (seed `suspensiones_4ta.sql`, datos reales, fuera del repo): un proveedor nuevo
+  toma la más reciente por su RUC o por el DNI de su RUC 10. De los demás se asume que no la tienen: con un recibo de más de
+  S/ 1,500 sin suspensión del año, Nueva OS y el detalle de la orden avisan «Sin suspensión de 4ta: pídele la constancia al
+  proveedor». **La calcula la base** (`fn_retencion_4ta`, migración `prod1_impuestos_base`): al
   registrar o corregir un comprobante rechaza cualquier otra («La retención de 4ta de este recibo es S/ …»), y en la
   pantalla se muestra calculada, sin editar. Corregir un comprobante sin cambiar tipo, fecha ni total la deja como
-  estaba. La suspensión solo se guarda con la constancia de verdad subida (`documentos/proveedores/`) y sin fecha
-  futura, también por la API.
+  estaba. La suspensión solo se guarda con la constancia de verdad subida (`documentos/proveedores/`) o su N° de
+  operación, y sin fecha futura, también por la API.
 - **Detracción** (SPOT): solo la llevan las facturas (OC y OS) de más de S/ 700 (700 exactos no), en los ítems que marca
   Gerencia; un recibo por honorarios nunca la lleva. La base la hace cumplir: si no corresponde (otro comprobante, bajo el mínimo o sin ítems que la lleven) no
   acepta ninguna; si corresponde, no puede ser 0 (Logística puede ajustar el monto al de la factura). Al corregir el
@@ -101,7 +118,7 @@ Contabilidad, Residente y RRHH **no entran**. Sus roles siguen en la base
   constancia de pago al proveedor y ahí se queda; su detalle avisa «Los residentes aún no pueden marcar
   las entregas».
 - **Logística › OC / OS:** una pestaña por estado, con nombres cortos y en dos filas para que se vean
-  todas a 360 px (Cotizando, Facturar, Guía en OC o Contrato en OS, Tesorería, Pagada / Enviada, Recibida (las del
+  todas a 360 px (Borrador, Cotizando, Facturar, Guía en OC o Contrato en OS, Tesorería, Pagada / Enviada, Recibida (las del
   Excel y el MVP), Anulada, Todas). En «Guía» / «Contrato» (facturadas) cada fila dice lo que falta: «Subir guía» o
   «Firmar contrato».
 - **Pago completo:** Tesorería paga siempre la orden entera (todo su saldo): el monto viene fijo y
@@ -213,9 +230,11 @@ Contabilidad, Residente y RRHH **no entran**. Sus roles siguen en la base
   PORTLAND SOL»). El ítem es la columna `items_busqueda` de `v_ordenes`, una subconsulta que solo se calcula si el filtro la usa:
   medido por la API, pasa de 4-6 ms a 11-16 ms. No usar una función por fila: era 15 a 40 veces más lenta. Al rehacer una vista,
   repetir `with (security_invoker = true)`: `create or replace` lo quita y la vista deja de aplicar las reglas de cada rol.
-- **Borrador de Nueva OC / OS:** lo avanzado (obra, ítems, proveedor, comprobante, fecha, guía) queda en el dispositivo, por usuario
-  y tipo (`src/lib/borrador-orden.ts`, 14 días): al salir, retroceder o cerrar la app y volver a Nueva sigue como estaba. Se borra
-  al emitir la orden o al quitar todos los ítems.
+- **Borrador de Nueva OC / OS:** lo avanzado (obra, ítems, proveedor, comprobante, fecha, guía, garantía) queda en el dispositivo,
+  por usuario y tipo (`src/lib/borrador-orden.ts`, 14 días): al salir, retroceder o cerrar la app y volver a Nueva sigue como
+  estaba. Se borra al emitir la orden o al quitar todos los ítems. **«Guardar borrador»** lo pasa a la cuenta (`orden_borradores`,
+  cada uno ve los suyos, desde cualquier dispositivo) y deja empezar otra: varios a la vez, en la pestaña «Borrador» de OC / OS.
+  Todavía no son órdenes: no tienen N° (se pone al emitir), no cuentan contra el saldo y no se auditan. Se borra al emitirlo.
 - **Nueva OC / OS:** sin desplegables de «Ordenar por» ni de «Regular o adicional» (siempre por etapa);
   las partidas adicionales llevan la etiqueta «Adicional N».
 - **Avisos** (campana; `notificar`, solo a las cuentas activas del rol):

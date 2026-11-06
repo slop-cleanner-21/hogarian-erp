@@ -1,6 +1,7 @@
 import { logoPdfEmpresa } from "@/lib/empresas";
 import { contratoPdfBuffer } from "@/lib/pdf/contrato-pdf.server";
 import { representanteContratos } from "@/lib/representante";
+import { osRetenidas } from "@/lib/retenidas";
 import { createAdminClient } from "@/lib/supabase/admin";
 import type { VOcItem, VOrden } from "@/lib/types";
 
@@ -50,7 +51,7 @@ export async function GET(req: Request, { params }: RouteContext<"/cotizar/[toke
   const [{ data: orden }, { data: items }, { data: oc }] = await Promise.all([
     db.from("v_ordenes").select("*").eq("obra_id", r.obra_id).eq("numero", r.numero).maybeSingle(),
     db.from("v_oc_items").select("*").eq("obra_id", r.obra_id).eq("numero_oc", r.numero).order("id"),
-    db.from("ordenes_compra").select("comprobante_tipo, fecha_inicio").eq("obra_id", r.obra_id).eq("numero", r.numero).maybeSingle(),
+    db.from("ordenes_compra").select("comprobante_tipo, fecha_inicio, es_retencion").eq("obra_id", r.obra_id).eq("numero", r.numero).maybeSingle(),
   ]);
   if (!orden) return noDisponible();
   // Sin la imagen de la firma de Gerencia: el link lo ve cualquiera que lo tenga, y la firma va al firmar.
@@ -60,6 +61,7 @@ export async function GET(req: Request, { params }: RouteContext<"/cotizar/[toke
     comprobante: (oc?.comprobante_tipo as "RXH" | "FACTURA" | null) ?? null,
     fechaInicio: oc?.fecha_inicio ?? null,
     ...firmante,
+    ...(oc?.es_retencion ? { retenidas: await osRetenidas(db, r.obra_id, r.numero) } : {}),
     logo: logo ? new URL(logo, url.origin).href : null,
   });
   return new Response(new Uint8Array(pdf), {

@@ -90,7 +90,7 @@ const sinDetraccion = (o: Orden) => `delete from detracciones d using oc_items l
 /** Proveedor con su % de 4ta y su suspensión (fecha SQL o null). */
 const proveedor = (o: Orden, pct: number, suspension: string | null) =>
   `update proveedores set retencion_4ta_pct = ${pct}, suspension_4ta_fecha = ${suspension ?? "null"},
-     suspension_4ta_path = ${suspension ? "'proveedores/e2e/suspension.pdf'" : "null"} where id = ${o.proveedor};`;
+     suspension_4ta_path = ${suspension ? "'proveedores/e2e/suspension.pdf'" : "null"}, suspension_4ta_operacion = null where id = ${o.proveedor};`;
 
 /** Lo que pesa el ítem con detracción en la orden (su parcial sobre el total), para calcular la esperada. */
 const peso = (o: Orden) =>
@@ -174,13 +174,16 @@ test.describe("@impuestos retención de 4ta, detracción y comprobante de OS en 
         { sql: [registrar(o!, "RXH", 2000, { retencion: 0 })] },
         { sql: [registrar(o!, "RXH", 2000, { retencion: 160 })] },
         // Un recibo de antes de la suspensión sí se retiene.
+        { sql: [registrar(o!, "RXH", 2000, { retencion: 160, fecha: `${hoy} - 2` })] },
+        // El día de su emisión tampoco cubre: rige desde el siguiente.
         { sql: [registrar(o!, "RXH", 2000, { retencion: 160, fecha: `${hoy} - 1` })] },
       ],
-      base + proveedor(o!, 8, hoy),
+      base + proveedor(o!, 8, `${hoy} - 1`),
     );
     expect(suspendido[0], "con suspensión vigente").toEqual(["ok", "0.00", "0.00"]);
     expect(suspendido[1]).toEqual(["error", "Este comprobante no lleva retención de 4ta"]);
     expect(suspendido[2], "recibo anterior a la suspensión").toEqual(["ok", "0.00", "160.00"]);
+    expect(suspendido[3], "recibo del mismo día de la suspensión").toEqual(["ok", "0.00", "160.00"]);
 
     const [vencida] = probar(
       [{ sql: [registrar(o!, "RXH", 2000, { retencion: 0 })] }],
@@ -267,7 +270,7 @@ test.describe("@impuestos retención de 4ta, detracción y comprobante de OS en 
     const o = ordenPorFacturar("OC");
     test.skip(!o, "sin OC por facturar");
     const actualizar = (path: string, fecha: string) =>
-      `update proveedores set suspension_4ta_fecha = ${fecha}, suspension_4ta_path = '${path}' where id = ${o!.proveedor} returning id`;
+      `update proveedores set suspension_4ta_fecha = ${fecha}, suspension_4ta_path = '${path}', suspension_4ta_operacion = null where id = ${o!.proveedor} returning id`;
     const leer = `select suspension_4ta_fecha from proveedores where id = ${o!.proveedor} and %s is not null`;
     const r = probar(
       [
@@ -285,6 +288,34 @@ test.describe("@impuestos retención de 4ta, detracción y comprobante de OS en 
     expect(r[3][1]).toBe(sql1("select current_date"));
   });
 
+  test("suspensión de 4ta: basta el N° de operación, y un proveedor nuevo toma la que se conoce por su RUC o DNI", () => {
+    const o = ordenPorFacturar("OC");
+    test.skip(!o, "sin OC por facturar");
+    const conOperacion = (op: string) =>
+      `update proveedores set suspension_4ta_fecha = current_date, suspension_4ta_path = null, suspension_4ta_operacion = ${op} where id = ${o!.proveedor} returning id`;
+    const leer = `select suspension_4ta_operacion from proveedores where id = ${o!.proveedor} and %s is not null`;
+    const nuevo = (cod: string) => `insert into proveedores (ruc_o_cod, razon_social) values ('${cod}', 'E2E SUSPENSION') returning id`;
+    const leerNuevo = `select suspension_4ta_fecha || '|' || suspension_4ta_operacion from proveedores where id = %s`;
+    const r = probar(
+      [
+        { sql: [conOperacion("'12345678'")], leer },
+        { sql: [conOperacion("'12'")], leer },
+        { sql: [conOperacion("null")], leer },
+        { sql: [nuevo("10999999991")], leer: leerNuevo },
+        { sql: [nuevo("99999999")], leer: leerNuevo },
+        { sql: [nuevo("10999999992")], leer: `select coalesce(suspension_4ta_fecha::text, 'sin') from proveedores where id = %s` },
+      ],
+      `insert into suspensiones_4ta (ruc, fecha, numero_operacion) values ('10999999991', '2026-01-05', '11111111'), ('10999999991', '2026-02-05', '22222222');
+       update proveedores set suspension_4ta_path = null, suspension_4ta_fecha = null, suspension_4ta_operacion = null where id = ${o!.proveedor};`,
+    );
+    expect(r[0], "con el N° de operación, sin archivo").toEqual(["ok", "12345678"]);
+    expect(r[1][0], "solo dígitos, de 6 a 12").toBe("error");
+    expect(r[2], "sin constancia ni N°").toEqual(["error", "Sube la constancia de suspensión de 4ta o ingresa su N° de operación"]);
+    expect(r[3], "por RUC, la más reciente").toEqual(["ok", "2026-02-05", "22222222"]);
+    expect(r[4], "por el DNI del RUC 10").toEqual(["ok", "2026-02-05", "22222222"]);
+    expect(r[5], "de los demás se asume que no la tiene").toEqual(["ok", "sin"]);
+  });
+
   test("pantalla: al corregir un comprobante la retención se muestra calculada y se guarda la que corresponde", async ({ abrir }) => {
     const fila = sql(
       `select o.obra_id, o.numero, c.id, o.proveedor_id from comprobantes c
@@ -298,9 +329,9 @@ test.describe("@impuestos retención de 4ta, detracción y comprobante de OS en 
     test.skip(!fila, "sin OC facturada con su factura por corregir");
     const [obra, numero, id, prov] = fila;
     const antes = sql1(`select row_to_json(c)::text from (select tipo, serie, numero, fecha_emision, total, retencion, detraccion, base, igv, periodo_anotacion from comprobantes where id = ${id}) c`);
-    const [pct, fechaS, pathS] = sql(`select retencion_4ta_pct, coalesce(suspension_4ta_fecha::text, ''), coalesce(suspension_4ta_path, '') from proveedores where id = ${prov}`)[0];
+    const [pct, fechaS, pathS, opS] = sql(`select retencion_4ta_pct, coalesce(suspension_4ta_fecha::text, ''), coalesce(suspension_4ta_path, ''), coalesce(suspension_4ta_operacion, '') from proveedores where id = ${prov}`)[0];
     try {
-      sql(`update proveedores set retencion_4ta_pct = 8, suspension_4ta_fecha = null, suspension_4ta_path = null where id = ${prov}`);
+      sql(`update proveedores set retencion_4ta_pct = 8, suspension_4ta_fecha = null, suspension_4ta_path = null, suspension_4ta_operacion = null where id = ${prov}`);
       const page = await abrir("logistica", `/logistica/ordenes/${obra}/${numero}?tipo=OC`);
       await page.getByRole("button", { name: "Corregir comprobante" }).first().click();
       const hoja = page.getByRole("dialog", { name: "Corregir comprobante" });
@@ -319,7 +350,7 @@ test.describe("@impuestos retención de 4ta, detracción y comprobante de OS en 
       await expect(hoja).toBeHidden();
       expect(sql(`select tipo, total, retencion, detraccion from comprobantes where id = ${id}`)[0]).toEqual(["RXH", "2000.00", "160.00", "0.00"]);
     } finally {
-      sql(`update proveedores set retencion_4ta_pct = ${pct}, suspension_4ta_fecha = ${fechaS ? `'${fechaS}'` : "null"}, suspension_4ta_path = ${pathS ? `'${pathS}'` : "null"} where id = ${prov};
+      sql(`update proveedores set retencion_4ta_pct = ${pct}, suspension_4ta_fecha = ${fechaS ? `'${fechaS}'` : "null"}, suspension_4ta_path = ${pathS ? `'${pathS}'` : "null"}, suspension_4ta_operacion = ${opS ? `'${opS}'` : "null"} where id = ${prov};
            update comprobantes c set tipo = a.tipo, serie = a.serie, numero = a.numero, fecha_emision = a.fecha_emision, total = a.total,
                   retencion = a.retencion, base = a.base, igv = a.igv, periodo_anotacion = a.periodo_anotacion
              from json_populate_record(null::comprobantes, '${antes.replace(/'/g, "''")}') a where c.id = ${id};

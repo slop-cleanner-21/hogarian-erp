@@ -55,6 +55,7 @@ const LECTURA = tabla(`
   obras                        T   T   T   P   T   T   T   0
   oc_items                     T   T   T   P   T   T   T   0
   ordenes_compra               T   T   T   P   T   T   T   0
+  orden_borradores             M   0   0   0   0   0   0   0
   ordenes_pago                 T   T   T   0   0   0   0   0
   pago_aplicaciones            T   T   T   0   T   T   0   0
   pagos                        T   T   T   0   T   0   0   0
@@ -64,6 +65,7 @@ const LECTURA = tabla(`
   perfil_privado               0   0   0   0   0   0   0   0
   perfil_roles                 M   M   M   M   M   M   M   M
   sugerencias                  X   X   X   X   X   X   X   X
+  suspensiones_4ta             X   X   X   X   X   X   X   X
   huellas                      X   X   X   X   X   X   X   X
   huella_desafios              X   X   X   X   X   X   X   X
   credenciales                 X   X   X   X   X   X   X   X

@@ -338,7 +338,7 @@ test.describe("@prod1 diseños de los ítems en el detalle de la orden", () => {
 test.describe("@prod1 @logistica pestañas por estado y «Enviada»", () => {
   test("pestañas por estado (con «Enviada», «Recibida» y «Anulada»), y Cotizando al entrar", async ({ abrir }) => {
     const page = await abrir("logistica", "/logistica?tipo=OC");
-    await expect(page.getByRole("tab")).toHaveText(["Cotizando", "Facturar", "Guía", "Tesorería", "Pagada", "Enviada", "Recibida", "Anulada", "Todas"]);
+    await expect(page.getByRole("tab")).toHaveText(["Borrador", "Cotizando", "Facturar", "Guía", "Tesorería", "Pagada", "Enviada", "Recibida", "Anulada", "Todas"]);
     // Todas a la vista, sin deslizar ni cortar el nombre.
     for (const t of await page.getByRole("tab").all()) {
       await expect(t).toBeInViewport({ ratio: 1 });
@@ -347,7 +347,7 @@ test.describe("@prod1 @logistica pestañas por estado y «Enviada»", () => {
     await expect(page.getByRole("tab", { name: "Cotizando" })).toHaveAttribute("aria-selected", "true");
     // En OS la pestaña es «Contrato».
     const os = await abrir("logistica", "/logistica?tipo=OS");
-    await expect(os.getByRole("tab")).toHaveText(["Cotizando", "Facturar", "Contrato", "Tesorería", "Pagada", "Enviada", "Recibida", "Anulada", "Todas"]);
+    await expect(os.getByRole("tab")).toHaveText(["Borrador", "Cotizando", "Facturar", "Contrato", "Tesorería", "Pagada", "Enviada", "Recibida", "Anulada", "Todas"]);
     await expect(page.locator("main a[href^='/logistica/ordenes/']")).toHaveCount(
       Math.min(100, Number(sql1("select count(*) from ordenes_compra where tipo = 'OC' and estado = 'EMITIDA'"))),
     );

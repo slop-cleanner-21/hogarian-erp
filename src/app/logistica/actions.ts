@@ -35,8 +35,10 @@ const CrearOrden = z
     comprobante: z.enum(["RXH", "FACTURA"], { error: "Elige el comprobante" }).optional(),
     fechaInicio: FECHA.optional(),
     items: z
-      .array(z.object({ partida_id: z.number().int(), cantidad: z.number().positive() }))
+      .array(z.object({ partida_id: z.number().int(), cantidad: z.number().positive(), ret_garantia_pct: z.number().min(0).lt(100).optional() }))
       .min(1, "Selecciona al menos una partida"),
+    /** Si viene de un borrador de la cuenta: se borra al emitir. */
+    borradorId: z.number().int().positive().optional(),
   })
   .refine((o) => o.tipo === "OC" || o.comprobante, { message: "Elige el comprobante" })
   .refine((o) => o.tipo === "OC" || o.fechaInicio, { message: "Ingresa la fecha de inicio" })
@@ -69,7 +71,58 @@ export async function crearOrden(input: z.input<typeof CrearOrden>): Promise<Res
     });
     if (eo) return fail(eo.message);
   }
+  if (p.data.borradorId) await supabase.from("orden_borradores").delete().eq("id", p.data.borradorId);
   revalidatePath("/logistica");
+  return { ok: true, data: String(data) };
+}
+
+const BorradorOrden = z.object({
+  id: z.number().int().positive().nullable(),
+  tipo: z.enum(["OC", "OS"]),
+  obraId: z.number().int().positive(),
+  datos: z.object({
+    paso: z.union([z.literal(1), z.literal(2)]),
+    sel: z.array(z.tuple([z.number().int(), z.string().max(30)])).min(1, "Elige al menos una partida").max(5000),
+    proveedorId: z.string().max(20).nullable(),
+    comprobante: z.enum(["RXH", "FACTURA"]).nullable(),
+    fechaInicio: z.string().max(10),
+    requiereGuia: z.boolean(),
+    garantia: z.object({ mano: z.string().max(8), sub: z.string().max(8), adic: z.string().max(8) }).optional(),
+  }),
+});
+
+/** Guarda lo avanzado de una Nueva OC / OS en la cuenta (nuevo o sobre el que se retomó). */
+export async function guardarBorradorOrden(input: z.input<typeof BorradorOrden>): Promise<Result<number>> {
+  const p = BorradorOrden.safeParse(input);
+  if (!p.success) return fail(p.error.issues[0].message);
+  const supabase = await db();
+  const fila = { tipo: p.data.tipo, obra_id: p.data.obraId, datos: p.data.datos };
+  const { data, error } = p.data.id
+    ? await supabase.from("orden_borradores").update({ ...fila, updated_at: new Date().toISOString() }).eq("id", p.data.id).select("id").single()
+    : await supabase.from("orden_borradores").insert(fila).select("id").single();
+  if (error) return fail(error.message);
+  revalidatePath("/logistica");
+  return { ok: true, data: data.id };
+}
+
+export async function eliminarBorradorOrden(id: number): Promise<Result> {
+  const supabase = await db();
+  const { error } = await supabase.from("orden_borradores").delete().eq("id", id);
+  if (error) return fail(error.message);
+  revalidatePath("/logistica");
+  return { ok: true, data: undefined };
+}
+
+/** OS de retenciones: devuelve a un proveedor lo retenido en sus OS pagadas de una obra cerrada. */
+export async function crearOsRetenciones(obraId: number, proveedorId: number): Promise<Result<string>> {
+  const supabase = await db();
+  const { data, error } = await supabase.rpc("crear_orden_retencion", {
+    p_obra_id: obraId,
+    p_numero: null as unknown as string,
+    p_proveedor_id: proveedorId,
+  });
+  if (error) return fail(error.message);
+  revalidatePath("/logistica/retenciones");
   return { ok: true, data: String(data) };
 }
 
@@ -189,6 +242,7 @@ const Proveedor = z.object({
   /** Suspensión de retenciones de 4ta: solo con la constancia subida (vale hasta el 31/12 de su año). */
   suspension_4ta_fecha: FECHA.nullable().default(null),
   suspension_4ta_path: z.string().trim().min(1).nullable().default(null),
+  suspension_4ta_operacion: z.string().trim().regex(/^\d{6,12}$/, "El N° de operación son de 6 a 12 dígitos").nullable().default(null),
   banco: z.string().trim().max(60).nullable(),
   cuenta_bancaria: z.string().trim().max(60).nullable(),
   contactos: z.array(
@@ -205,17 +259,17 @@ const Proveedor = z.object({
   tipos: z.array(z.string()),
 });
 
-export async function guardarProveedor(input: z.input<typeof Proveedor>): Promise<Result<number>> {
+export async function guardarProveedor(input: z.input<typeof Proveedor>): Promise<Result<{ id: number; suspension: string | null }>> {
   const p = Proveedor.safeParse(input);
   if (!p.success) return fail(p.error.issues[0].message);
   const supabase = await db();
   const { id, contactos, tipos, banco, cuenta_bancaria, ...row } = p.data;
-  if ((row.suspension_4ta_fecha == null) !== (row.suspension_4ta_path == null))
-    return fail("Para registrar la suspensión de 4ta sube la constancia y su fecha");
+  if ((row.suspension_4ta_fecha == null) !== (row.suspension_4ta_path == null && row.suspension_4ta_operacion == null))
+    return fail("Para registrar la suspensión de 4ta ingresa su fecha y su constancia o N° de operación");
   if (row.suspension_4ta_fecha && row.suspension_4ta_fecha > hoyISO()) return fail("La fecha de la constancia no puede ser futura");
   const q = id
-    ? supabase.from("proveedores").update(row).eq("id", id).select("id").single()
-    : supabase.from("proveedores").insert(row).select("id").single();
+    ? supabase.from("proveedores").update(row).eq("id", id).select("id, suspension_4ta_fecha").single()
+    : supabase.from("proveedores").insert(row).select("id, suspension_4ta_fecha").single();
   const { data, error } = await q;
   if (error) return fail(error.code === "23505" ? "Ya existe un proveedor con ese RUC" : error.message);
 
@@ -244,7 +298,8 @@ export async function guardarProveedor(input: z.input<typeof Proveedor>): Promis
   if (i1.error || i2.error) return fail((i1.error ?? i2.error)!.message);
 
   revalidatePath("/logistica/proveedores");
-  return { ok: true, data: provId };
+  // La base pudo ponerle una suspensión conocida por su RUC.
+  return { ok: true, data: { id: provId, suspension: data.suspension_4ta_fecha } };
 }
 
 // Prod 1: los ítems los crea Gerencia (crearItem en src/app/gerencia/actions.ts); Logística los clasifica.

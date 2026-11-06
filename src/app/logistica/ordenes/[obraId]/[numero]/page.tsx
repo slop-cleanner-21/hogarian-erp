@@ -1,3 +1,4 @@
+import { osRetenidas } from "@/lib/retenidas";
 import { cookies } from "next/headers";
 import { rechazosDeOrden } from "@/lib/rechazos";
 import { representanteContratos } from "@/lib/representante";
@@ -60,7 +61,7 @@ export default async function OrdenPage({ params }: PageProps<"/logistica/ordene
     listarAdjuntos({ obraId: Number(obraId), numeroOc: numero }),
     supabase
       .from("ordenes_compra")
-      .select("cotizacion_estado, cotizacion_enviada_at, cotizacion_recibida_at, requiere_guia, entrega_cerrada_at, entrega_cerrada_motivo, valorizacion_id, es_retencion, comprobante_tipo, fecha_inicio, historico")
+      .select("cotizacion_estado, cotizacion_enviada_at, cotizacion_recibida_at, requiere_guia, entrega_cerrada_at, entrega_cerrada_motivo, valorizacion_id, es_retencion, retenida_en, comprobante_tipo, fecha_inicio, historico")
       .eq("obra_id", Number(obraId))
       .eq("numero", numero)
       .maybeSingle(),
@@ -158,6 +159,7 @@ export default async function OrdenPage({ params }: PageProps<"/logistica/ordene
       comprobanteHabitual={prov?.comprobante_habitual ?? null}
       requiereGuia={cot?.requiere_guia ?? false}
       historico={cot?.historico ?? false}
+      retenidaEn={cot?.retenida_en ?? null}
       retencionProveedor={{ pct: Number(prov?.retencion_4ta_pct ?? 8), suspension: prov?.suspension_4ta_fecha ?? null }}
       contrato={
         orden.tipo === "OS"
@@ -165,6 +167,7 @@ export default async function OrdenPage({ params }: PageProps<"/logistica/ordene
               comprobante: (cot?.comprobante_tipo as "RXH" | "FACTURA" | null) ?? null,
               fechaInicio: cot?.fecha_inicio ?? null,
               ...representante!,
+              ...(cot?.es_retencion ? { retenidas: await osRetenidas(supabase, Number(obraId), numero) } : {}),
             }
           : undefined
       }

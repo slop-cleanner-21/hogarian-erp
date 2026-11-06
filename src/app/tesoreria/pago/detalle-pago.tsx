@@ -88,6 +88,7 @@ export function DetallePago({
   enlaces,
   pdfOrden,
   total,
+  garantia = 0,
   pagado,
   saldo,
   pagos,
@@ -112,6 +113,8 @@ export function DetallePago({
   enlaces: EnlaceVer[];
   pdfOrden?: { orden: VOrden; items: VOcItem[] };
   total: number;
+  /** Lo retenido por garantía: ya está descontado del total. */
+  garantia?: number;
   pagado: number;
   saldo: number;
   pagos: PagoHecho[];
@@ -332,6 +335,18 @@ export function DetallePago({
         )}
 
         <section className="num flex flex-col gap-1 rounded-panel bg-surface p-4">
+          {garantia > 0.005 && (
+            <>
+              <div className="flex justify-between text-ink-2">
+                <span>Subtotal</span>
+                <span>{soles(total + descuentos + garantia)}</span>
+              </div>
+              <div className="flex justify-between text-ink-2">
+                <span>Retención por garantía</span>
+                <span>− {soles(garantia)}</span>
+              </div>
+            </>
+          )}
           {descuentos > 0.005 && (
             <>
               <div className="flex justify-between text-ink-2">

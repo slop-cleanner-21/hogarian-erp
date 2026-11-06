@@ -133,9 +133,9 @@ test.describe("@prod1 @logistica facturar: guía y retención", () => {
     )[0];
     test.skip(!fila, "no hay OS con precios confirmados sin facturar");
     const [obra, numero, prov, antes] = fila;
-    const [pct, fechaS, pathS] = sql(`select retencion_4ta_pct, coalesce(suspension_4ta_fecha::text, ''), coalesce(suspension_4ta_path, '') from proveedores where id = ${prov}`)[0];
+    const [pct, fechaS, pathS, opS] = sql(`select retencion_4ta_pct, coalesce(suspension_4ta_fecha::text, ''), coalesce(suspension_4ta_path, ''), coalesce(suspension_4ta_operacion, '') from proveedores where id = ${prov}`)[0];
     try {
-      sql(`update proveedores set retencion_4ta_pct = 8, suspension_4ta_fecha = null, suspension_4ta_path = null where id = ${prov};
+      sql(`update proveedores set retencion_4ta_pct = 8, suspension_4ta_fecha = null, suspension_4ta_path = null, suspension_4ta_operacion = null where id = ${prov};
            update ordenes_compra set comprobante_tipo = 'RXH' where obra_id = ${obra} and numero = '${numero}'`);
       const page = await abrir("logistica", `/logistica/ordenes/${obra}/${numero}?tipo=OS`);
       await page.getByRole("button", { name: "Registrar comprobante" }).click();
@@ -169,7 +169,7 @@ test.describe("@prod1 @logistica facturar: guía y retención", () => {
       await expect(hoja.getByLabel("Retención 4ta (8 %)")).toHaveValue("S/ 160.00");
 
       // Con el % propio del proveedor (Logística lo cambia en su ficha): 10 % de S/ 2,000.
-      sql(`update proveedores set retencion_4ta_pct = 10, suspension_4ta_fecha = null, suspension_4ta_path = null where id = ${prov}`);
+      sql(`update proveedores set retencion_4ta_pct = 10, suspension_4ta_fecha = null, suspension_4ta_path = null, suspension_4ta_operacion = null where id = ${prov}`);
       await page.reload();
       await page.getByRole("button", { name: "Registrar comprobante" }).click();
       await hoja.getByRole("button", { name: "Tipo de comprobante" }).click();
@@ -177,14 +177,14 @@ test.describe("@prod1 @logistica facturar: guía y retención", () => {
       await hoja.getByLabel("Total").fill("2000");
       await expect(hoja.getByLabel("Retención 4ta (10 %)")).toHaveValue("S/ 200.00");
     } finally {
-      sql(`update proveedores set retencion_4ta_pct = ${pct}, suspension_4ta_fecha = ${fechaS ? `'${fechaS}'` : "null"}, suspension_4ta_path = ${pathS ? `'${pathS}'` : "null"} where id = ${prov};
+      sql(`update proveedores set retencion_4ta_pct = ${pct}, suspension_4ta_fecha = ${fechaS ? `'${fechaS}'` : "null"}, suspension_4ta_path = ${pathS ? `'${pathS}'` : "null"}, suspension_4ta_operacion = ${opS ? `'${opS}'` : "null"} where id = ${prov};
            update ordenes_compra set comprobante_tipo = ${antes ? `'${antes}'` : "null"} where obra_id = ${obra} and numero = '${numero}'`);
     }
   });
 
   test("proveedor: la suspensión de 4ta solo se guarda con la constancia y su fecha", async ({ abrir }, info) => {
     test.skip(info.project.name !== "m390", "escribe en la base");
-    const [id, ruc, razon] = sql(`select id, ruc_o_cod, razon_social from proveedores where comprobante_habitual = 'RXH' and suspension_4ta_path is null order by id limit 1`)[0];
+    const [id, ruc, razon] = sql(`select id, ruc_o_cod, razon_social from proveedores where comprobante_habitual = 'RXH' and suspension_4ta_fecha is null order by id limit 1`)[0];
     try {
       const page = await abrir("logistica", `/logistica/proveedores?q=${encodeURIComponent(ruc)}`);
       await page.locator("main").getByRole("button", { name: new RegExp(escRe(razon)) }).first().click();

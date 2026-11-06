@@ -28,7 +28,7 @@ truncate public.adelantos, public.adjuntos, public.asiento_lineas, public.asient
   restart identity;
 SQL
   # Los mismos de cargar-datos.sh, en el mismo orden.
-  cat base.sql excel.sql tipo_material.sql cuentas_items.sql historico.sql prod1_historico.sql prod1_envio.sql
+  cat base.sql excel.sql tipo_material.sql cuentas_items.sql historico.sql prod1_historico.sql prod1_envio.sql suspensiones_4ta.sql
   cat <<'SQL'
 -- Lo que el Admin ajustó en las empresas (excel.sql las crea solo con nombre y RUC).
 set local app.skip_audit = 'on';

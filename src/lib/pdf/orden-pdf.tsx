@@ -19,7 +19,11 @@ const s = StyleSheet.create({
 
 // OC: solo qué y cuánto se pide (los precios se definen en la cotización).
 // OS: lleva precios, porque es como se le comunican al proveedor (casi nunca cambian).
+/** Lo que se factura de la línea (sin lo retenido por garantía). */
+const neto = (it: VOcItem) => Number(it.parcial ?? Number(it.pu_partida) * Number(it.cantidad));
+
 export function OrdenDoc({ orden, items }: { orden: VOrden; items: VOcItem[] }) {
+  const retenido = items.reduce((a, it) => a + Number(it.retenido ?? 0), 0);
   const conPrecios = orden.tipo === "OS";
   const titulo = orden.tipo === "OC" ? "ORDEN DE COMPRA" : "ORDEN DE SERVICIO";
   return (
@@ -56,14 +60,17 @@ export function OrdenDoc({ orden, items }: { orden: VOrden; items: VOcItem[] }) 
             <Text style={s.cU}>{it.unidad}</Text>
             <Text style={s.cQ}>{qty(it.cantidad)}</Text>
             {conPrecios && <Text style={s.cP}>{precio(it.pu_efectivo ?? it.pu_partida)}</Text>}
-            {conPrecios && <Text style={s.cT}>{money(it.parcial ?? Number(it.pu_partida) * Number(it.cantidad))}</Text>}
+            {conPrecios && <Text style={s.cT}>{money(neto(it) + Number(it.retenido ?? 0))}</Text>}
           </View>
         ))}
+        {conPrecios && retenido > 0.005 && (
+          <View style={[s.row, { justifyContent: "flex-end", marginTop: 8 }]}>
+            <Text>Retención por garantía − S/ {money(retenido)}</Text>
+          </View>
+        )}
         {conPrecios && (
           <View style={[s.row, { justifyContent: "flex-end", marginTop: 8 }]}>
-            <Text style={{ fontFamily: "Helvetica-Bold" }}>
-              Total S/ {money(items.reduce((a, it) => a + Number(it.parcial ?? Number(it.pu_partida) * Number(it.cantidad)), 0))}
-            </Text>
+            <Text style={{ fontFamily: "Helvetica-Bold" }}>Total S/ {money(items.reduce((a, it) => a + neto(it), 0))}</Text>
           </View>
         )}
       </Page>

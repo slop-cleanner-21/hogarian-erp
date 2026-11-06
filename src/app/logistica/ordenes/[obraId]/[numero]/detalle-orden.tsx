@@ -50,8 +50,10 @@ import {
 import { abrirBlob, useEsPwa } from "@/components/visor";
 import { CORRECCION_TAREA, HistorialRechazos, type RechazoVer } from "@/components/historial-rechazos";
 import { Plegable } from "@/components/plegable";
+import Link from "next/link";
 import { ContratoOS, type DatosContrato } from "./contrato-os";
-import { retencion4ta, suspensionVigente } from "@/lib/retencion";
+import { retenidoDe } from "@/lib/garantia";
+import { faltaSuspension, retencion4ta, suspensionVigente } from "@/lib/retencion";
 import { ItemsOrden } from "@/components/items-orden";
 import { SelectorDiseno } from "@/components/selector-diseno";
 import type { DisenoItems } from "@/lib/diseno";
@@ -95,6 +97,7 @@ export function DetalleOrden({
   retencionProveedor = { pct: 8, suspension: null },
   contrato,
   historico = false,
+  retenidaEn = null,
 }: {
   orden: VOrden;
   items: VOcItem[];
@@ -145,6 +148,8 @@ export function DetalleOrden({
   contrato?: DatosContrato;
   /** Orden cargada del Excel: no exige contrato, guía ni archivos. */
   historico?: boolean;
+  /** La OS de retenciones en que se devolvió su garantía. */
+  retenidaEn?: string | null;
 }) {
   const pwa = useEsPwa();
   const router = useRouter();
@@ -159,7 +164,7 @@ export function DetalleOrden({
 
   // OS: el precio de referencia es el presupuestado. Al enviar, Tesorería recibe aviso de las diferencias.
   const difOS =
-    orden.tipo === "OS"
+    orden.tipo === "OS" && !manoObra
       ? {
           sobre: items.filter((i) => Number(i.pu_efectivo) > Number(i.pu_partida) + 0.0001).length,
           bajo: items.filter((i) => Number(i.pu_efectivo) < Number(i.pu_partida) - 0.0001).length,
@@ -249,7 +254,9 @@ export function DetalleOrden({
             it,
             pu: it.pu_cotizado,
             sobre: it.alerta === "SOBREPRECIO",
-            parcial: it.parcial,
+            // Antes de la garantía: la línea es cantidad × P.U.; lo retenido se resta en el total.
+            parcial: Number(it.parcial ?? 0) + Number(it.retenido ?? 0),
+            retenido: Number(it.retenido ?? 0),
             aprobado: it.pu_aprobado != null,
           };
         const p = precios.get(it.id)!;
@@ -263,12 +270,20 @@ export function DetalleOrden({
           sobre,
           aprobado: p.aprobado,
           parcial: pu == null ? null : pu * Number(it.cantidad),
+          retenido: pu == null ? 0 : retenidoDe(pu * Number(it.cantidad), Number(it.ret_garantia_pct ?? 0)),
         };
       }),
     [items, precios, editable],
   );
 
-  const total = lineas.reduce((a, l) => a + (l.parcial ?? 0), 0);
+  const retenido = lineas.reduce((a, l) => a + l.retenido, 0);
+  const total = lineas.reduce((a, l) => a + (l.parcial ?? 0), 0) - retenido;
+  // Recibo de más de S/ 1,500 aún sin registrar: con la constancia a tiempo, no se le retiene.
+  const avisoSuspension =
+    !manoObra &&
+    contrato?.comprobante === "RXH" &&
+    (orden.estado === "EMITIDA" || orden.estado === "PRECIOS_CONFIRMADOS") &&
+    faltaSuspension(editable ? total : Number(orden.total), retencionProveedor.suspension, hoyISO());
   const faltanPrecios = lineas.some((l) => l.pu == null);
   const sinAprobar = lineas.filter((l) => l.sobre && !l.aprobado).length;
   const sinComprobante = items.filter((i) => i.comprobante_id == null);
@@ -447,6 +462,11 @@ export function DetalleOrden({
           </dl>
         </section>
 
+        {avisoSuspension && (
+          <section className="rounded-panel bg-warn-bg p-4">
+            <p className="font-semibold text-warn">Sin suspensión de 4ta: pídele la constancia al proveedor</p>
+          </section>
+        )}
         {rechazoAbierto && orden.estado !== "ANULADA" && (
           <section role="alert" aria-label="Rechazo de Tesorería" className="rounded-panel bg-danger-bg p-4 text-danger">
             <p className="font-semibold">
@@ -692,6 +712,18 @@ export function DetalleOrden({
         )}
 
         <section className="num flex flex-col gap-1 rounded-panel bg-surface p-4">
+          {retenido > 0.005 && (
+            <>
+              <div className="flex justify-between text-ink-2">
+                <span>Subtotal</span>
+                <span>{soles((editable ? total : Number(orden.total)) + retenido)}</span>
+              </div>
+              <div className="flex justify-between text-ink-2">
+                <span>Retención por garantía</span>
+                <span>− {soles(retenido)}</span>
+              </div>
+            </>
+          )}
           <div className="flex items-baseline justify-between">
             <span className="font-semibold">Total</span>
             <span className="rotulo text-[30px] font-semibold leading-none">
@@ -720,6 +752,14 @@ export function DetalleOrden({
             <div className="flex justify-between text-ink-2">
               <span>Pagado</span>
               <span>{soles(orden.pagado)}</span>
+            </div>
+          )}
+          {retenidaEn && (
+            <div className="flex justify-between text-ink-2">
+              <span>Garantía devuelta en</span>
+              <Link href={`/logistica/ordenes/${orden.obra_id}/${encodeURIComponent(retenidaEn)}?tipo=OS`} className="font-medium text-primary">
+                OS {retenidaEn}
+              </Link>
             </div>
           )}
         </section>

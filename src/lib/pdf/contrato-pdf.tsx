@@ -42,6 +42,8 @@ export type DatosContrato = {
   empresa?: { razonSocial: string | null; direccion: string | null };
   /** Logo de la empresa (URL de un PNG), arriba del contrato. */
   logo?: string | null;
+  /** OS de retenciones: las OS cuya garantía devuelve. */
+  retenidas?: { numero: string; fecha: string | null; retenido: number }[];
 };
 
 /** Arriba del contrato: el logo de la empresa (sin logo, nada). */
@@ -66,7 +68,47 @@ const fechaLarga = (iso: string) => {
   return `${d} de ${MESES[m - 1]} de ${y}`;
 };
 
+const fechaCorta = (iso: string) => iso.slice(0, 10).split("-").reverse().join("/");
+
 const parcial = (it: VOcItem) => Number(it.parcial ?? Number(it.pu_efectivo ?? it.pu_partida) * Number(it.cantidad));
+/** La línea antes de la garantía: cantidad × P.U. */
+const bruto = (it: VOcItem) => parcial(it) + Number(it.retenido ?? 0);
+
+/** Debajo de los ítems: lo retenido por garantía (si hay) y el total que se factura. */
+function Totales({ etiqueta, total, retenido }: { etiqueta: string; total: number; retenido: number }) {
+  return (
+    <>
+      {retenido > 0.005 && (
+        <>
+          <View style={s.total}>
+            <Text style={s.cD}>Subtotal</Text>
+            <Text style={s.cT}>S/ {money(total + retenido)}</Text>
+          </View>
+          <View style={s.total}>
+            <Text style={s.cD}>Retención por garantía</Text>
+            <Text style={s.cT}>− S/ {money(retenido)}</Text>
+          </View>
+        </>
+      )}
+      <View style={s.total}>
+        <Text style={s.cD}>{etiqueta}</Text>
+        <Text style={s.cT}>S/ {money(total)}</Text>
+      </View>
+    </>
+  );
+}
+
+/** Cláusula de la garantía: quién retiene, a quién y por cuánto se emite el comprobante. */
+function Garantia({ retiene, a, total, retenido }: { retiene: string; a: string; total: number; retenido: number }) {
+  if (retenido <= 0.005) return null;
+  return (
+    <Text style={[s.p, { marginTop: 3 }]}>
+      {retiene} retiene S/ {money(retenido)} del valor de los servicios como garantía de su correcta ejecución, por lo que {a} emitirá
+      su comprobante por S/ {money(total)}. Esa retención se devuelve a {a} después del cierre de la obra, mediante una orden de
+      servicio de retenciones.
+    </Text>
+  );
+}
 
 function Puntos({ children }: { children: string[] }) {
   return (
@@ -89,17 +131,39 @@ function Puntos({ children }: { children: string[] }) {
  */
 export function ContratoDoc({ orden, items, datos }: { orden: VOrden; items: VOcItem[]; datos?: DatosContrato }) {
   const total = items.reduce((a, it) => a + parcial(it), 0);
+  const retenido = items.reduce((a, it) => a + Number(it.retenido ?? 0), 0);
+  const retenidas = datos?.retenidas;
   const doc = orden.proveedor_ruc ?? "";
   const dni = doc.length === 8;
   // Sin comprobante elegido (OS anteriores): por el documento, RUC 20 factura; DNI o RUC 10 recibo por honorarios.
   const empresa = datos?.comprobante ? datos.comprobante === "FACTURA" : doc.length === 11 && doc.startsWith("20");
-  if (empresa) return <ContratoComercial orden={orden} items={items} datos={datos} total={total} />;
+  if (empresa && !retenidas) return <ContratoComercial orden={orden} items={items} datos={datos} total={total} retenido={retenido} />;
   const comprobante = "recibo por honorarios electrónico";
 
   const clausulas: { titulo: string; cuerpo: ReactNode }[] = [
     {
       titulo: "Objeto",
-      cuerpo: (
+      cuerpo: retenidas ? (
+        <>
+          <Text style={s.p}>
+            EL COMITENTE devuelve a EL LOCADOR, cerrada la obra {orden.obra}, lo que le retuvo por garantía en las siguientes órdenes de
+            servicio, ya pagadas. La devolución consta en la orden de servicio N° {orden.numero}, que forma parte de este contrato:
+          </Text>
+          <View style={s.head}>
+            <Text style={s.cD}>Orden de servicio</Text>
+            <Text style={s.cP}>Fecha</Text>
+            <Text style={s.cT}>Retenido</Text>
+          </View>
+          {retenidas.map((o) => (
+            <View key={o.numero} style={s.line} wrap={false}>
+              <Text style={s.cD}>OS {o.numero}</Text>
+              <Text style={s.cP}>{o.fecha ? fechaCorta(o.fecha) : ""}</Text>
+              <Text style={s.cT}>S/ {money(o.retenido)}</Text>
+            </View>
+          ))}
+          <Totales etiqueta="Total" total={total} retenido={0} />
+        </>
+      ) : (
         <>
           <Text style={s.p}>
             EL LOCADOR se obliga a prestar a EL COMITENTE, por su cuenta y con autonomía, los siguientes servicios en la obra{" "}
@@ -118,13 +182,10 @@ export function ContratoDoc({ orden, items, datos }: { orden: VOrden; items: VOc
               <Text style={s.cU}>{it.unidad}</Text>
               <Text style={s.cQ}>{qty(it.cantidad)}</Text>
               <Text style={s.cP}>S/ {precio(it.pu_efectivo ?? it.pu_partida)}</Text>
-              <Text style={s.cT}>S/ {money(parcial(it))}</Text>
+              <Text style={s.cT}>S/ {money(bruto(it))}</Text>
             </View>
           ))}
-          <View style={s.total}>
-            <Text style={s.cD}>Total</Text>
-            <Text style={s.cT}>S/ {money(total)}</Text>
-          </View>
+          <Totales etiqueta="Total" total={total} retenido={retenido} />
         </>
       ),
     },
@@ -138,12 +199,20 @@ export function ContratoDoc({ orden, items, datos }: { orden: VOrden; items: VOc
       titulo: "Retribución y forma de pago",
       cuerpo: (
         <>
-          <Text style={s.p}>
-            La retribución total es de S/ {money(total)}, que corresponde al 100 % de la orden de servicio y cubre todos los costos
-            de EL LOCADOR (personal, herramientas, traslados y cualquier otro gasto). EL COMITENTE la pagará por transferencia
-            bancaria, previa conformidad del servicio y entrega del {comprobante} con el concepto indicado en la cláusula
-            siguiente.
-          </Text>
+          {retenidas ? (
+            <Text style={s.p}>
+              El monto a devolver es de S/ {money(total)}. EL COMITENTE lo pagará por transferencia bancaria, previa entrega del{" "}
+              {comprobante} con el concepto indicado en la cláusula siguiente.
+            </Text>
+          ) : (
+            <Text style={s.p}>
+              La retribución total es de S/ {money(total + retenido)}, que corresponde al 100 % de la orden de servicio y cubre todos los
+              costos de EL LOCADOR (personal, herramientas, traslados y cualquier otro gasto). EL COMITENTE la pagará por transferencia
+              bancaria, previa conformidad del servicio y entrega del {comprobante} con el concepto indicado en la cláusula
+              siguiente.
+            </Text>
+          )}
+          <Garantia retiene="EL COMITENTE" a="EL LOCADOR" total={total} retenido={retenido} />
           <Text style={[s.p, { marginTop: 3 }]}>
             EL COMITENTE retendrá el impuesto a la renta de cuarta categoría cuando corresponda según ley (recibos de más de S/
             1,500), salvo que EL LOCADOR le acredite la suspensión de retenciones vigente. La retención forma parte del pago.
@@ -327,7 +396,7 @@ function Firmas({ orden, datos, empresa, proveedor }: { orden: VOrden; datos?: D
  * Contrato comercial de prestación de servicios (proveedor con factura): sin concepto del comprobante; el pago
  * descuenta la detracción si el servicio está en el SPOT. Plantilla base: el área legal la valida.
  */
-function ContratoComercial({ orden, items, datos, total }: { orden: VOrden; items: VOcItem[]; datos?: DatosContrato; total: number }) {
+function ContratoComercial({ orden, items, datos, total, retenido }: { orden: VOrden; items: VOcItem[]; datos?: DatosContrato; total: number; retenido: number }) {
   const doc = orden.proveedor_ruc ?? "";
   const clausulas: { titulo: string; cuerpo: ReactNode }[] = [
     {
@@ -352,13 +421,10 @@ function ContratoComercial({ orden, items, datos, total }: { orden: VOrden; item
               <Text style={s.cU}>{it.unidad}</Text>
               <Text style={s.cQ}>{qty(it.cantidad)}</Text>
               <Text style={s.cP}>S/ {precio(it.pu_efectivo ?? it.pu_partida)}</Text>
-              <Text style={s.cT}>S/ {money(parcial(it))}</Text>
+              <Text style={s.cT}>S/ {money(bruto(it))}</Text>
             </View>
           ))}
-          <View style={s.total}>
-            <Text style={s.cD}>Total (incluye IGV)</Text>
-            <Text style={s.cT}>S/ {money(total)}</Text>
-          </View>
+          <Totales etiqueta="Total (incluye IGV)" total={total} retenido={retenido} />
         </>
       ),
     },
@@ -368,11 +434,12 @@ function ContratoComercial({ orden, items, datos, total }: { orden: VOrden; item
       cuerpo: (
         <>
           <Text style={s.p}>
-            El precio total es de S/ {money(total)}, incluido el IGV, por el 100 % de la orden de servicio. Es a suma alzada y cubre
+            El precio total es de S/ {money(total + retenido)}, incluido el IGV, por el 100 % de la orden de servicio. Es a suma alzada y cubre
             todos los costos de EL CONTRATISTA (personal, materiales menores, herramientas, equipos, traslados, seguros y tributos).
             LA EMPRESA lo pagará por transferencia bancaria, previa conformidad del servicio y entrega de la factura electrónica
             correspondiente.
           </Text>
+          <Garantia retiene="LA EMPRESA" a="EL CONTRATISTA" total={total} retenido={retenido} />
           <Text style={[s.p, { marginTop: 3 }]}>
             Si el servicio está sujeto al Sistema de Pago de Obligaciones Tributarias (detracciones), LA EMPRESA depositará el
             porcentaje que corresponda en la cuenta de detracciones de EL CONTRATISTA en el Banco de la Nación y le pagará el saldo;

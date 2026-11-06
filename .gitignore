@@ -53,6 +53,7 @@ playwright-report/
 
 # seed generado desde el Excel (RUCs y cuentas bancarias reales)
 supabase/seed/excel.sql
+supabase/seed/suspensiones_4ta.sql
 tests/audit/dl/
 tests/audit/*.log
 tests/audit/state.json

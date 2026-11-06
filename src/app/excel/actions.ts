@@ -27,7 +27,7 @@ async function leerDatos(db: ReturnType<typeof createAdminClient>): Promise<Dato
     todas((a, b) => db.from("proveedor_cuentas").select("proveedor_id, banco, cuenta_bancaria").order("proveedor_id").range(a, b)),
     todas((a, b) => db.from("partidas").select("id, codigo, obra_id, etapa, requerimiento, item_id, cantidad, pu").order("id").range(a, b)),
     todas((a, b) => db.from("ordenes_compra").select("obra_id, numero, tipo, estado, fecha, historico, proveedor_id").order("obra_id").order("numero").range(a, b)),
-    todas((a, b) => db.from("oc_items").select("id, obra_id, numero_oc, partida_id, cantidad, pu_cotizado, pu_aprobado, comprobante_id, precio_fijado_at").order("id").range(a, b)),
+    todas((a, b) => db.from("oc_items").select("id, obra_id, numero_oc, partida_id, cantidad, pu_cotizado, pu_aprobado, comprobante_id, precio_fijado_at, ret_garantia_pct").order("id").range(a, b)),
     todas((a, b) => db.from("pago_aplicaciones").select("id, comprobante_id, obra_id, numero_oc, pago_id").order("id").range(a, b)),
   ]);
   const [comprobantes, pagos] = await Promise.all([
@@ -87,14 +87,16 @@ async function leerDatos(db: ReturnType<typeof createAdminClient>): Promise<Dato
       const tolerancia = o.tipo === "OS" && !o.historico ? 0 : Number(item.get(p.item_id)?.tolerancia_pct ?? 0);
       const cotizado = num(l.pu_cotizado);
       const superaHoy = p.pu !== null && cotizado !== null && cotizado > Number(p.pu) * (1 + tolerancia);
+      // El Excel lleva lo que se factura: con garantía, el P.U. neto.
+      const neto = (pu: number | null) => (pu === null ? null : Number((pu * (1 - Number(l.ret_garantia_pct) / 100)).toFixed(4)));
       return [
         {
           id: l.id,
           codigo: p.codigo,
           fecha: o.fecha,
           cantidad: Number(l.cantidad),
-          pu: num(l.pu_cotizado),
-          aprobado: num(l.pu_aprobado) ?? (l.precio_fijado_at && superaHoy ? cotizado : null),
+          pu: neto(num(l.pu_cotizado)),
+          aprobado: neto(num(l.pu_aprobado) ?? (l.precio_fijado_at && superaHoy ? cotizado : null)),
           orden: o.numero,
           ruc: proveedor.get(o.proveedor_id)?.ruc_o_cod ?? "",
           tipo: delApp ? (TIPO[delApp.tipo] ?? "OTRO") : null,

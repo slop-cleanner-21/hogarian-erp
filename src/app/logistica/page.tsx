@@ -16,11 +16,14 @@ import { RecordarFiltros } from "@/components/recordar-filtros";
 import { SelectorDiseno } from "@/components/selector-diseno";
 import { CLASE_FIJO, cookieDiseno, cookieFijar, esAgrupado, grupoDe, leerDiseno, leerFijar, ordenGrupos, totalesPorGrupo } from "@/lib/diseno";
 import { todas } from "@/lib/paginar";
+import type { DatosBorrador } from "@/lib/borrador-orden";
+import { ListaBorradores, type FilaBorrador } from "./borradores";
 
 // Pendientes: lo que espera una acción de Logística (cotizar, facturar, enviar, constancia, entrega).
 // Una pestaña por estado. «Enviada» (EN_ENTREGA): ya se envió la constancia de pago al proveedor (prod 1 aún no
 // registra lo que llega). «Recibida»: las del Excel (y del MVP) con su entrega registrada. «Anulada».
 const TABS = {
+  bor: [],
   cot: ["EMITIDA"],
   prec: ["PRECIOS_CONFIRMADOS"],
   fact: ["FACTURADA"],
@@ -32,6 +35,8 @@ const TABS = {
   todas: null,
 } satisfies Record<string, EstadoOC[] | null>;
 const PESTANAS: Record<keyof typeof TABS, string> = {
+  // Aún no son órdenes: lo guardado en Nueva OC / OS, de cada usuario.
+  bor: "Borrador",
   cot: "Cotizando",
   prec: "Facturar",
   // Lo que les falta para ir a Tesorería: la guía (OC) o el contrato firmado (OS); con eso van solas.
@@ -136,6 +141,24 @@ export default async function OrdenesPage({ searchParams }: PageProps<"/logistic
         )
       : Promise.resolve([]),
   ]);
+  // Los borradores de esta cuenta (solo se ven los propios).
+  let borradores: FilaBorrador[] = [];
+  if (tab === "bor") {
+    let qb = supabase.from("orden_borradores").select("id, obra_id, datos, updated_at").eq("tipo", tipo).order("updated_at", { ascending: false }).limit(200);
+    if (obra) qb = qb.eq("obra_id", Number(obra));
+    const { data } = await qb;
+    borradores = (data ?? []).map((b) => {
+      const d = b.datos as unknown as DatosBorrador;
+      return {
+        id: b.id,
+        obraId: b.obra_id,
+        obra: (obras ?? []).find((o) => o.id === b.obra_id)?.nombre ?? "",
+        proveedor: (proveedores ?? []).find((p) => String(p.id) === d.proveedorId)?.razon_social ?? null,
+        partidas: d.sel.length,
+        actualizado: b.updated_at,
+      };
+    });
+  }
   const totalesGrupo = totalesPorGrupo(grupos.map((g) => ({ ...g, monto: Number(g.total) || 0 })));
 
   // Por etapa: lo que pide cada orden filtrada en cada etapa, y por etapa cuántas órdenes y cuánto suman.
@@ -471,7 +494,7 @@ export default async function OrdenesPage({ searchParams }: PageProps<"/logistic
           param="tab"
           current={tab}
           quitar={["estado"]}
-          // Nueve pestañas: en dos filas, con nombres cortos, para que se vean todas a 360 px.
+          // Diez pestañas: en dos filas, con nombres cortos, para que se vean todas a 360 px.
           porFila={5}
           options={(Object.entries(TABS) as [keyof typeof TABS, EstadoOC[] | null][]).map(([value]) => ({
             value,
@@ -481,7 +504,9 @@ export default async function OrdenesPage({ searchParams }: PageProps<"/logistic
         <SearchBox placeholder="N°, proveedor, obra o ítem" />
         </div>
         {error && <p role="alert" className="text-danger">{error.message}</p>}
-        {porEtapa ? (
+        {tab === "bor" ? (
+          <ListaBorradores tipo={tipo} borradores={borradores} />
+        ) : porEtapa ? (
           (ordenes ?? []).length ? vistaPorEtapa(ordenes ?? []) : !error && sinOrdenes
         ) : agrupado ? (
           (ordenes ?? []).length ? porGrupo(ordenes ?? []) : !error && sinOrdenes
@@ -508,7 +533,7 @@ export default async function OrdenesPage({ searchParams }: PageProps<"/logistic
           {(ordenes ?? []).length === 0 && !error && <li className="px-4 py-10 text-center text-ink-3">Sin órdenes</li>}
         </Lista>
         )}
-        <VerMas visibles={ordenes?.length ?? 0} limite={limite} />
+        {tab !== "bor" && <VerMas visibles={ordenes?.length ?? 0} limite={limite} />}
       </main>
       <ButtonLink
         href={`/logistica/ordenes/nueva?tipo=${tipo}${obra ? `&obra=${obra}` : ""}`}
