@@ -1,7 +1,7 @@
 import type { Metadata } from "next";
 import { TopBar, UserMenu } from "@/components/shell";
 import { rutaEnProd1 } from "@/lib/prod1";
-import { createClient, requireSesion } from "@/lib/supabase/server";
+import { createClient, misRoles, requireSesion } from "@/lib/supabase/server";
 import { eventosDe, porDefecto } from "@/lib/avisos";
 import { ActivarPush, MarcarLeidas } from "./avisos-cliente";
 import { PreferenciasAvisos } from "./preferencias";
@@ -24,7 +24,7 @@ export default async function AvisosPage() {
   ]);
   // Qué avisos puede elegir su rol, con lo que eligió (o el defecto: los suyos, sí; los de los demás, no).
   const elegida = new Map((elegidas ?? []).map((e) => [e.tipo, e]));
-  const eventos = eventosDe(sesion.rol);
+  const eventos = eventosDe(await misRoles());
   const preferencias = eventos.map((e) => ({ tipo: e.tipo, label: e.label, area: e.area, ...porDefecto(e.propio), ...(elegida.get(e.tipo) ?? {}) }));
   const hayNuevos = (avisos ?? []).some((a) => !a.leida_at);
 

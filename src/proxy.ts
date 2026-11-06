@@ -87,6 +87,8 @@ export async function proxy(request: NextRequest) {
     if (!ok) return NextResponse.redirect(new URL(RUTA_ACCESO, request.url));
   }
 
+  // La ruta pedida, para volver a ella al cambiar de rol (requireSesion). La pone siempre el proxy: no se puede inventar.
+  request.headers.set("x-prod1-ruta", `${path}${request.nextUrl.search}`);
   let response = NextResponse.next({ request });
 
   const supabase = createServerClient(

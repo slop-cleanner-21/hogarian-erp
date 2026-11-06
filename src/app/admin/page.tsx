@@ -12,10 +12,11 @@ export const metadata: Metadata = { title: "Usuarios" };
 export default async function UsuariosPage() {
   const sesion = await requireSesionVigente(["ADMIN"]);
   const db = createAdminClient();
-  const [cuentas, { data: perfiles, error }, { data: privados }] = await Promise.all([
+  const [cuentas, { data: perfiles, error }, { data: privados }, { data: conRoles }] = await Promise.all([
     todasLasCuentas(db),
     db.from("perfiles").select("user_id, nombre, nombres, apellidos, rol"),
     db.from("perfil_privado").select("user_id, dni, telefono"),
+    db.from("perfil_roles").select("user_id, rol"),
   ]);
   if (error) throw new Error(error.message);
   const perfil = new Map(perfiles.map((p) => [p.user_id, p]));
@@ -30,6 +31,7 @@ export default async function UsuariosPage() {
       dni: privado.get(u.id)?.dni ?? "",
       telefono: privado.get(u.id)?.telefono ?? "",
       rol: (perfil.get(u.id)?.rol ?? null) as Rol | null,
+      otrosRoles: (conRoles ?? []).filter((r) => r.user_id === u.id && r.rol !== perfil.get(u.id)?.rol).map((r) => r.rol as Rol),
       activo: activa(u.banned_until),
       ultimoIngreso: u.last_sign_in_at ?? null,
       yo: u.id === sesion.userId,

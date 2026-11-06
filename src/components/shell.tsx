@@ -21,9 +21,14 @@ import { CLAVE_ANTERIOR } from "./recordar-ruta";
 import { destinoDe } from "@/lib/vistas";
 import Link from "next/link";
 import { usePathname, useRouter, useSearchParams } from "next/navigation";
-import { useState, type ReactNode } from "react";
+import { useEffect, useState, useTransition, type ReactNode } from "react";
 import { cn } from "@/lib/format";
+import { exportarExcel } from "@/app/excel/actions";
+import { cambiarRol } from "@/app/rol/actions";
+import { ROLES_PROD1 } from "@/lib/prod1";
+import { createClient } from "@/lib/supabase/client";
 import type { Rol } from "@/lib/types";
+import { ROL_LABEL } from "@/lib/usuarios";
 import { Sheet } from "./ui/sheet";
 import { ThemeSwitch } from "./theme-switch";
 import { HuellaSheet, marcarSalida } from "./huella";
@@ -195,9 +200,28 @@ export function UserMenu({ id, nombre, rol }: { id: string; nombre: string; rol:
   const [contrasena, setContrasena] = useState(false);
   const [firma, setFirma] = useState(false);
   const [huella, setHuella] = useState(false);
+  const [roles, setRoles] = useState<Rol[]>([]);
+  const [errorRol, setErrorRol] = useState<string | null>(null);
+  const [cambiando, startCambio] = useTransition();
+  const [exportando, startExport] = useTransition();
+  const [errorExcel, setErrorExcel] = useState<string | null>(null);
   const router = useRouter();
   const path = usePathname();
   const actual = moduloActual(path);
+  // Sus roles, al abrir el menú (casi todos tienen uno solo: no se muestra nada).
+  useEffect(() => {
+    if (!open) return;
+    let vigente = true;
+    void createClient()
+      .from("perfil_roles")
+      .select("rol")
+      .then(({ data }) => {
+        if (vigente) setRoles(ROLES_PROD1.filter((r) => data?.some((d) => d.rol === r)));
+      });
+    return () => {
+      vigente = false;
+    };
+  }, [open]);
   const disponibles = (Object.keys(MODULOS) as Modulo[]).filter(
     (m) => rol === "ADMIN" || MODULOS[m].roles.includes(rol),
   );
@@ -216,6 +240,26 @@ export function UserMenu({ id, nombre, rol }: { id: string; nombre: string; rol:
         <div className="flex flex-col gap-1 p-3">
           <ThemeSwitch />
           <div className="h-2" />
+          {roles.length > 1 && (
+            <section aria-label="Rol" className="flex flex-col gap-1 border-b border-line pb-2">
+              {roles.map((r) => (
+                <button
+                  key={r}
+                  type="button"
+                  disabled={cambiando}
+                  aria-current={r === rol || undefined}
+                  onClick={() => {
+                    if (r === rol) return setOpen(false);
+                    startCambio(async () => setErrorRol(await cambiarRol(r)));
+                  }}
+                  className={cn("flex h-12 w-full items-center rounded-control px-3", r === rol ? "bg-sunken font-semibold" : "active:bg-ink/8")}
+                >
+                  {ROL_LABEL[r]}
+                </button>
+              ))}
+              {errorRol && <p role="alert" className="px-3 text-danger">{errorRol}</p>}
+            </section>
+          )}
           {disponibles.length > 1 &&
             disponibles.map((m) => (
               <Link
@@ -252,6 +296,27 @@ export function UserMenu({ id, nombre, rol }: { id: string; nombre: string; rol:
             >
               Mi firma
             </button>
+          )}
+          {(["LOGISTICA", "TESORERIA", "GERENCIA", "ADMIN"] as Rol[]).includes(rol) && (
+            <>
+              <button
+                type="button"
+                disabled={exportando}
+                onClick={() =>
+                  startExport(async () => {
+                    setErrorExcel(null);
+                    const r = await exportarExcel();
+                    if ("error" in r) return setErrorExcel(r.error);
+                    window.location.assign(r.url);
+                    setOpen(false);
+                  })
+                }
+                className="flex h-12 w-full items-center rounded-control px-3 active:bg-ink/8 disabled:text-ink-3"
+              >
+                {exportando ? "Generando Excel…" : "Exportar Excel"}
+              </button>
+              {errorExcel && <p role="alert" className="px-3 text-danger">{errorExcel}</p>}
+            </>
           )}
           <button
             type="button"

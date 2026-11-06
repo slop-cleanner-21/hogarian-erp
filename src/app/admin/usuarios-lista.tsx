@@ -25,6 +25,8 @@ export type Usuario = {
   dni: string;
   telefono: string;
   rol: Rol | null;
+  /** Los demás roles de la persona (el de arriba es con el que trabaja ahora). */
+  otrosRoles: Rol[];
   activo: boolean;
   ultimoIngreso: string | null;
   yo: boolean;
@@ -36,7 +38,7 @@ export function UsuariosLista({ usuarios }: { usuarios: Usuario[] }) {
   const [q, setQ] = useState("");
   const [abierto, setAbierto] = useState<Usuario | "nuevo" | null>(null);
   const filtro = sinTildes(q.trim());
-  const visibles = filtro ? usuarios.filter((u) => sinTildes(`${u.nombre} ${u.email} ${u.rol ? ROL_LABEL[u.rol] : ""}`).includes(filtro)) : usuarios;
+  const visibles = filtro ? usuarios.filter((u) => sinTildes(`${u.nombre} ${u.email} ${[u.rol, ...u.otrosRoles].map((r) => (r ? ROL_LABEL[r] : "")).join(" ")}`).includes(filtro)) : usuarios;
 
   return (
     <>
@@ -55,7 +57,7 @@ export function UsuariosLista({ usuarios }: { usuarios: Usuario[] }) {
                 <span className="truncate text-[14px] text-ink-3">{u.email}</span>
               </span>
               <span className="flex shrink-0 flex-col items-end gap-0.5">
-                <span className="text-[14px] text-ink-2">{u.rol ? ROL_LABEL[u.rol] : "Sin perfil"}</span>
+                <span className="text-right text-[14px] text-ink-2">{u.rol ? [u.rol, ...u.otrosRoles].map((r) => ROL_LABEL[r]).join(" · ") : "Sin perfil"}</span>
                 {!u.activo && <span className="rounded-full bg-danger-bg px-2 text-[13px] font-semibold leading-5 text-danger">Desactivado</span>}
                 {u.activo && u.rol && !ROLES_PROD1.includes(u.rol) && <span className="text-[13px] text-ink-3">Sin acceso</span>}
               </span>
@@ -81,11 +83,31 @@ const opcionesRol = (actual: Rol | null) =>
   [...ROLES_PROD1, ...(actual && !ROLES_PROD1.includes(actual) ? [actual] : [])].map((r) => ({ value: r, label: ROL_LABEL[r] }));
 
 // DNI: 8 dígitos; obligatorio en Gerencia (va con su firma en los contratos).
-const dniValido = (dni: string, rol: string | null) => (dni.trim() === "" ? rol !== "GERENCIA" : /^\d{8}$/.test(dni.trim()));
+const dniValido = (dni: string, gerencia: boolean) => (dni.trim() === "" ? !gerencia : /^\d{8}$/.test(dni.trim()));
 
-function CampoDni({ dni, setDni, rol }: { dni: string; setDni: (v: string) => void; rol: string | null }) {
+/** Los demás roles de la persona (cambia entre ellos desde su menú). */
+function CampoOtrosRoles({ rol, otros, setOtros }: { rol: string | null; otros: Rol[]; setOtros: (v: Rol[]) => void }) {
   return (
-    <Field label={rol === "GERENCIA" ? "DNI" : "DNI (opcional)"}>
+    <fieldset className="flex flex-col">
+      <legend className="pb-1 text-[15px] font-medium">Otros roles</legend>
+      {ROLES_PROD1.filter((r) => r !== rol).map((r) => (
+        <label key={r} className="flex min-h-11 cursor-pointer items-center justify-between gap-3">
+          <span>{ROL_LABEL[r]}</span>
+          <input
+            type="checkbox"
+            checked={otros.includes(r)}
+            onChange={(e) => setOtros(e.target.checked ? [...otros, r] : otros.filter((x) => x !== r))}
+            className="h-6 w-6 shrink-0 accent-primary"
+          />
+        </label>
+      ))}
+    </fieldset>
+  );
+}
+
+function CampoDni({ dni, setDni, gerencia }: { dni: string; setDni: (v: string) => void; gerencia: boolean }) {
+  return (
+    <Field label={gerencia ? "DNI" : "DNI (opcional)"}>
       <Input value={dni} onChange={(e) => setDni(e.target.value.replace(/\D/g, "").slice(0, 8))} inputMode="numeric" autoComplete="off" className="num" />
     </Field>
   );
@@ -205,6 +227,9 @@ function NuevoUsuario({ onClose }: { onClose: () => void }) {
   const [dni, setDni] = useState("");
   const [telefono, setTelefono] = useState("");
   const [rol, setRol] = useState<string | null>(null);
+  const [otros, setOtros] = useState<Rol[]>([]);
+  const otrosRoles = otros.filter((r) => r !== rol);
+  const gerencia = rol === "GERENCIA" || otrosRoles.includes("GERENCIA");
   const [modo, setModo] = useState<"link" | "contrasena">("link");
   const [contrasena, setContrasena] = useState(() => contrasenaAlAzar());
   const [creado, setCreado] = useState<Acceso | null>(null);
@@ -221,6 +246,7 @@ function NuevoUsuario({ onClose }: { onClose: () => void }) {
         dni,
         telefono,
         rol: (rol ?? "") as Rol,
+        otrosRoles,
         acceso: modo,
         contrasena: modo === "contrasena" ? contrasena : "",
       });
@@ -249,7 +275,7 @@ function NuevoUsuario({ onClose }: { onClose: () => void }) {
               !email.trim() ||
               !rol ||
               (modo === "contrasena" && contrasena.length < MIN_CONTRASENA) ||
-              !dniValido(dni, rol) ||
+              !dniValido(dni, gerencia) ||
               !celularValido(telefono)
             }
           >
@@ -270,7 +296,8 @@ function NuevoUsuario({ onClose }: { onClose: () => void }) {
             <Field label="Rol">
               <SearchSelect label="Rol" value={rol} onChange={setRol} options={opcionesRol(null)} placeholder="Elegir rol" />
             </Field>
-            <CampoDni dni={dni} setDni={setDni} rol={rol} />
+            <CampoOtrosRoles rol={rol} otros={otrosRoles} setOtros={setOtros} />
+            <CampoDni dni={dni} setDni={setDni} gerencia={gerencia} />
             <CampoCelular telefono={telefono} setTelefono={setTelefono} />
             <ElegirAcceso acceso={modo} setAcceso={setModo} />
             {/* Sin <label> envolvente: los botones de al lado no deben tomar su nombre. */}
@@ -319,6 +346,9 @@ function FichaUsuario({ u, onClose }: { u: Usuario; onClose: () => void }) {
   const [dni, setDni] = useState(u.dni);
   const [telefono, setTelefono] = useState(u.telefono ? celularLegible(u.telefono) : "");
   const [rol, setRol] = useState<string | null>(u.rol);
+  const [otros, setOtros] = useState<Rol[]>(u.otrosRoles);
+  const otrosRoles = otros.filter((r) => r !== rol);
+  const gerencia = rol === "GERENCIA" || otrosRoles.includes("GERENCIA");
   const [nueva, setNueva] = useState<Acceso | null>(null);
   const [confirmar, setConfirmar] = useState<"contrasena" | "link" | "activo" | null>(null);
   const [error, setError] = useState<string | null>(null);
@@ -328,6 +358,7 @@ function FichaUsuario({ u, onClose }: { u: Usuario; onClose: () => void }) {
     apellidos.trim() !== u.apellidos ||
     email.trim().toLowerCase() !== u.email ||
     rol !== u.rol ||
+    [...otrosRoles].sort().join() !== [...u.otrosRoles].sort().join() ||
     dni.trim() !== u.dni ||
     (normalizarCelular(telefono) ?? "-") !== u.telefono;
 
@@ -341,7 +372,7 @@ function FichaUsuario({ u, onClose }: { u: Usuario; onClose: () => void }) {
       router.refresh();
     });
 
-  const guardar = () => correr(() => editarUsuario({ id: u.id, nombres, apellidos, email, dni, telefono, rol: rol ?? "" }), onClose);
+  const guardar = () => correr(() => editarUsuario({ id: u.id, nombres, apellidos, email, dni, telefono, rol: rol ?? "", otrosRoles }), onClose);
   const restablecer = () =>
     startTransition(async () => {
       setError(null);
@@ -369,7 +400,7 @@ function FichaUsuario({ u, onClose }: { u: Usuario; onClose: () => void }) {
         <Button
           size="lg"
           onClick={guardar}
-          disabled={pending || !cambios || nombres.trim().length < 2 || !email.trim() || !rol || !dniValido(dni, rol) || !celularValido(telefono)}
+          disabled={pending || !cambios || nombres.trim().length < 2 || !email.trim() || !rol || !dniValido(dni, gerencia) || !celularValido(telefono)}
         >
           Guardar
         </Button>
@@ -383,7 +414,8 @@ function FichaUsuario({ u, onClose }: { u: Usuario; onClose: () => void }) {
         <Field label="Rol">
           <SearchSelect label="Rol" value={rol} onChange={setRol} options={opcionesRol(u.rol)} placeholder="Elegir rol" />
         </Field>
-        <CampoDni dni={dni} setDni={setDni} rol={rol} />
+        <CampoOtrosRoles rol={rol} otros={otrosRoles} setOtros={setOtros} />
+        <CampoDni dni={dni} setDni={setDni} gerencia={gerencia} />
         <CampoCelular telefono={telefono} setTelefono={setTelefono} />
         <p className="num text-[14px] text-ink-3">Último ingreso: {u.ultimoIngreso ? fecha(u.ultimoIngreso) : "nunca"}</p>
         {nueva && <EntregaAcceso acceso={nueva} nombre={u.nombre} email={u.email} telefono={u.telefono} />}

@@ -21,9 +21,10 @@ const OPCIONALES: Rol[] = ["ADMIN", "GERENCIA"];
 
 export type EventoDeRol = EventoAviso & { propio: boolean };
 
-/** Los avisos que el rol puede elegir: los suyos (`propio`, llegan por defecto) y, el Admin y Gerencia, los demás. */
-export function eventosDe(rol: Rol): EventoDeRol[] {
-  return EVENTOS_AVISO.filter((e) => e.roles.includes(rol) || OPCIONALES.includes(rol)).map((e) => ({ ...e, propio: e.roles.includes(rol) }));
+/** Los avisos que la persona puede elegir: los de sus roles (`propio`, llegan por defecto) y, el Admin y Gerencia, los demás. */
+export function eventosDe(roles: Rol[]): EventoDeRol[] {
+  const propio = (e: EventoAviso) => e.roles.some((r) => roles.includes(r));
+  return EVENTOS_AVISO.filter((e) => propio(e) || roles.some((r) => OPCIONALES.includes(r))).map((e) => ({ ...e, propio: propio(e) }));
 }
 
 /** Lo que vale sin haber elegido nada. */

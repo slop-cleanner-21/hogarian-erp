@@ -149,7 +149,7 @@ function documentoPng({ titulo, subtitulo, filas, marca, ancho = 700, alto = 600
 }
 
 async function subir(c, bucket, path, buffer) {
-  ok(await c.storage.from(bucket).upload(path, buffer, { contentType: "image/png", upsert: true }), `subir ${path}`);
+  ok(await admin.storage.from(bucket).upload(path, buffer, { contentType: "image/png", upsert: true }), `subir ${path}`);
   return path;
 }
 
@@ -301,7 +301,7 @@ const enviarLink = (numero) => rpc(logistica, "marcar_cotizacion_enviada", { p_o
 
 /** El proveedor abre el link y envía sus precios (`factor` sobre el P.U. del presupuesto, por línea). */
 async function cotizar(numero, factor = () => 0.98) {
-  const { token_cotizacion } = ok(await logistica.from("ordenes_compra").select("token_cotizacion").eq("obra_id", obraId).eq("numero", numero).single(), "token");
+  const { token_cotizacion } = ok(await admin.from("ordenes_compra").select("token_cotizacion").eq("obra_id", obraId).eq("numero", numero).single(), "token");
   const cot = await rpc(anon, "get_cotizacion", { p_token: token_cotizacion });
   if (!cot.disponible) throw new Error(`El link de la ${numero} no está disponible`);
   const lineas = await lineasDe(numero);

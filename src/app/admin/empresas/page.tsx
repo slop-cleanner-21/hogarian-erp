@@ -10,11 +10,15 @@ export const metadata: Metadata = { title: "Empresas" };
 export default async function EmpresasPage() {
   const sesion = await requireSesionVigente(["ADMIN"]);
   const db = createAdminClient();
-  const [{ data: empresas, error }, { data: gerentes }] = await Promise.all([
+  const [{ data: empresas, error }, { data: conGerencia }] = await Promise.all([
     db.from("empresas").select("id, nombre, razon_social, ruc, direccion, firmante_id").order("nombre"),
-    db.from("perfiles").select("user_id, nombre").eq("rol", "GERENCIA").order("nombre"),
+    // Todos los que tienen Gerencia, aunque ahora trabajen con otro de sus roles.
+    db.from("perfil_roles").select("user_id").eq("rol", "GERENCIA"),
   ]);
   if (error) throw new Error(error.message);
+  const { data: gerentes } = conGerencia?.length
+    ? await db.from("perfiles").select("user_id, nombre").in("user_id", conGerencia.map((g) => g.user_id)).order("nombre")
+    : { data: [] };
   const { data: privados } = gerentes?.length
     ? await db.from("perfil_privado").select("user_id, dni, firma_path").in("user_id", gerentes.map((g) => g.user_id))
     : { data: [] };

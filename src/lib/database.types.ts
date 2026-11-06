@@ -2004,6 +2004,22 @@ export type Database = {
         };
         Relationships: [];
       };
+      perfil_roles: {
+        Row: {
+          rol: Database["public"]["Enums"]["rol"];
+          user_id: string;
+        };
+        ComputedFields: never;
+        Insert: {
+          rol: Database["public"]["Enums"]["rol"];
+          user_id: string;
+        };
+        Update: {
+          rol?: Database["public"]["Enums"]["rol"];
+          user_id?: string;
+        };
+        Relationships: [];
+      };
       perfiles: {
         Row: {
           apellidos: string | null;
@@ -3955,6 +3971,7 @@ export type Database = {
         Args: { p_comprobante_id: number; p_destino: string };
         Returns: undefined;
       };
+      cambiar_rol: { Args: { p_rol: string }; Returns: undefined };
       cerrar_entrega: {
         Args: { p_motivo: string; p_numero: string; p_obra_id: number };
         Returns: undefined;

@@ -21,6 +21,15 @@ código del MVP se toca lo mínimo, para que los cherry-picks entren sin conflic
 | **Ingeniero de Operaciones** | Exactamente lo mismo que el Jefe: solo ver el seguimiento. Para la base es un Jefe (`rol_actual()` / `rol_en()` lo tratan como `JEFE_OPERACIONES`, migración `prod1_ing_operaciones`), así hereda todas sus restricciones; en `perfiles` queda su rol (`OPERACIONES`), para migrar al MVP. |
 | Admin | Todo lo anterior y **Usuarios** (`/admin`, desde su menú). |
 
+**Una persona puede tener varios roles** (migración `prod1_varios_roles`), por ejemplo Tesorería y Gerencia. Trabaja con uno
+a la vez y cambia desde su menú; así las reglas de cada rol siguen iguales (varias son restricciones, y sumar permisos las
+rompería). `perfil_roles` guarda todos sus roles y `perfiles.rol` el de ahora; los asigna solo el Admin («Otros roles» en su
+ficha) y `cambiar_rol` revisa en la base que sea uno de los suyos. Una pantalla de otro de sus roles (un aviso, un link) ofrece
+cambiar con un toque y la abre (`/rol`). Lo que mira a la persona usa todos sus roles: los avisos le llegan por todos, puede
+firmar por una empresa si uno es Gerencia (mientras firme, no se le puede quitar) y el DNI es obligatorio si tiene Gerencia. Si
+tiene la app abierta en dos dispositivos, el otro toma el cambio al renovar su sesión (hasta 1 h); mientras, la base le niega
+lo del rol anterior.
+
 Contabilidad, Residente y RRHH **no entran**. Sus roles siguen en la base
 (para migrar al MVP), pero `requireSesion` los manda a `/sin-acceso` (`src/lib/prod1.ts`).
 
@@ -146,6 +155,15 @@ Contabilidad, Residente y RRHH **no entran**. Sus roles siguen en la base
   las acciones de cuentas del Admin (`src/lib/auditoria.ts`). Pantalla con pestañas Sesiones / Cambios, filtros
   (usuario, fecha, acción, qué) y CSV. «Sistema» = sin usuario (SQL directo o el proveedor desde su link). Las
   cargas masivas (Excel, seeds) no se auditan (`app.skip_audit`).
+- **Exportar Excel** (menú de Logística, Tesorería, Gerencia y Admin; `src/lib/excel-libro.ts`): el mismo `CONTROL DE COSTOS`
+  .xlsm con lo que se registró en la app, con sus fórmulas, macros y hojas, y Excel recalcula al abrirlo. No se arma uno nuevo: se
+  toma el original (la plantilla, bucket privado `excel`; tiene RUCs y cuentas reales, no va en el repo) y se escriben solo las
+  celdas de datos: es lo inverso de `scripts/extract_excel.py`. Entran las órdenes con precios confirmados en adelante (no las
+  anuladas), los ítems, proveedores, obras y partidas nuevos y, en las del Excel, lo que cambió (precios, comprobante y pago
+  registrados en la app). La línea N de la carga es la N-ésima fila válida de GASTOEJEC: **la plantilla debe ser el mismo archivo
+  con el que se generó `excel.sql`** (`npm run excel:plantilla -- <ruta>`). Si una hoja se llena (partidas 10,000, compras 15,951,
+  proveedores 500, obras 50), lo dice. Pesa más de lo que una respuesta del servidor permite: se guarda y se baja con un enlace
+  de 2 minutos. Queda en la auditoría. El Jefe y el Ingeniero de Operaciones no lo tienen (lleva lo financiero).
 - **Ítems:** los crea Gerencia (Gerencia › Ítems, la misma lista que la de Logística). Al crearlo puede elegir
   la **cuenta contable** del ítem (la del asiento de compra), opcional; por eso Gerencia lee el plan de cuentas.
   Logística ve el catálogo sin «Nuevo» y sigue clasificando el tipo de material o la especialidad.
@@ -371,8 +389,11 @@ Contabilidad, Residente y RRHH **no entran**. Sus roles siguen en la base
 
 Los dos pueden correr a la vez.
 
-- **Reinicio de datos:** `npx supabase db reset` (carga también `usuarios_locales.sql`, solo local), y luego `db:demo-entregas`, `db:simular`, `db:demo-archivos`,
-  `db:demo-fotos`, `db:demo-requerimientos` y `ERP_PASS=erp12345 npm run db:demo-tesoreria`.
+- **Reinicio de datos:** `npx supabase db reset` (carga también `usuarios_locales.sql`, solo local), `ERP_PASS=erp12345 npm run db:demos`
+  y la plantilla del export (`npm run excel:plantilla -- <ruta>`). Las pruebas leen datos de las demos al cargarse: sin ellas la
+  suite dice «0 pruebas». `db:demos` (`scripts/demos-locales.sh`) cambia por un rato las funciones de rol por las del MVP, porque
+  las demos usan cuentas que en prod 1 no entran, y siempre las restaura al terminar.
+- **Excel nuevo:** `python -I scripts/extract_excel.py <ruta>.xlsm supabase/seed/excel.sql`, reinicio de datos y su plantilla.
 - **Pruebas:** `ERP_DEMO=… ERP_PASS=erp12345 npx playwright test` contra `:3100`. La base de las pruebas es
   `supabase_db_erp-prod1`. `tests/e2e/flujo.spec.ts` recorre el flujo entero solo por las pantallas (sin seeds;
   SQL solo para comprobar y limpiar): obra, presupuesto, proveedor, OC con guía y OS con recibo por honorarios,

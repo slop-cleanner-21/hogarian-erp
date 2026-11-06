@@ -3,7 +3,7 @@
 import { revalidatePath } from "next/cache";
 import { z } from "zod";
 import { eventosDe, porDefecto } from "@/lib/avisos";
-import { createClient, requireSesion } from "@/lib/supabase/server";
+import { createClient, misRoles, requireSesion } from "@/lib/supabase/server";
 
 const Suscripcion = z.object({
   endpoint: z.string().url(),
@@ -57,8 +57,8 @@ export async function borrarAvisos(ids?: number[]): Promise<string | null> {
  * defecto (los de su rol llegan; los de los demás, no).
  */
 export async function guardarPreferencia(tipo: string, avisar: boolean, celular: boolean): Promise<string | null> {
-  const { userId, rol } = await requireSesion();
-  const evento = eventosDe(rol).find((e) => e.tipo === tipo);
+  const { userId } = await requireSesion();
+  const evento = eventosDe(await misRoles()).find((e) => e.tipo === tipo);
   if (!evento) return "Ese aviso no es para tu rol";
   const elegido = { avisar: !!avisar, celular: !!avisar && !!celular };
   const defecto = porDefecto(evento.propio);

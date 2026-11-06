@@ -5,6 +5,7 @@ import { createAdminClient } from "@/lib/supabase/admin";
 
 /** Eventos que la app registra en la auditoría (los cambios de tablas los registra la base sola). */
 export type EventoApp =
+  | { tabla: "excel"; accion: "EXPORTAR_EXCEL"; registro: string; actor: string; detalle?: Record<string, unknown> }
   | { tabla: "sesion"; accion: "LOGIN" | "LOGIN_FALLIDO" | "LOGOUT" | "CAMBIO_CONTRASENA" | "DESBLOQUEO" | "DESBLOQUEO_FALLIDO" | "CAPTCHA_IP" | "CAMBIO_CONTRASENA_FALLIDO" }
   | { tabla: "usuarios"; accion: "CREAR_USUARIO" | "EDITAR_USUARIO" | "RESTABLECER_CONTRASENA" | "DESACTIVAR" | "REACTIVAR" | "GENERAR_LINK" | "BIENVENIDA" };
 

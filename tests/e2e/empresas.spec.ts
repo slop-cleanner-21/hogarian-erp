@@ -10,6 +10,8 @@ test.describe("@admin empresas", () => {
     const [id, nombre, antes] = sql(`select id, nombre, row_to_json(e)::text from empresas e where nombre = 'ARISANT'`)[0];
     const [gerenteId, gerente] = sql(`select user_id, nombre from perfiles where rol = 'GERENCIA' order by user_id limit 1`)[0];
     const admin = sql1(`select id from auth.users where email = '${ROLES.admin}'`);
+    // Parte sin RUC (fuera de lo que se mira en la auditoría).
+    sql(`update empresas set ruc = null where id = ${id}`);
     const desde = sql1("select coalesce(max(id), 0) from audit_log");
     try {
       const page = await abrir("admin", "/admin/empresas");

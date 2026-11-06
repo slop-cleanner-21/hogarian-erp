@@ -39,13 +39,13 @@ export default defineConfig({
     {
       name: "m390",
       dependencies: ["sesiones"],
-      testIgnore: [/sesiones\.setup\.ts/, /flujo\.spec\.ts/, /concurrencia\.spec\.ts/],
+      testIgnore: [/sesiones\.setup\.ts/, /flujo\.spec\.ts/, /concurrencia\.spec\.ts/, /roles\.spec\.ts/, /excel\.spec\.ts/],
       use: { ...movil, browserName: "chromium", viewport: { width: 390, height: 844 }, colorScheme: "light" },
     },
     {
       name: "m360",
       dependencies: ["sesiones"],
-      testIgnore: [/sesiones\.setup\.ts/, /flujo\.spec\.ts/, /concurrencia\.spec\.ts/],
+      testIgnore: [/sesiones\.setup\.ts/, /flujo\.spec\.ts/, /concurrencia\.spec\.ts/, /roles\.spec\.ts/, /excel\.spec\.ts/],
       use: {
         ...movil,
         browserName: "chromium",
@@ -60,7 +60,14 @@ export default defineConfig({
     {
       name: "flujo",
       dependencies: ["m390", "m360"],
-      testMatch: /(flujo|concurrencia)\.spec\.ts/,
+      testMatch: /(flujo|concurrencia|roles)\.spec\.ts/,
+      use: { ...movil, browserName: "chromium", viewport: { width: 390, height: 844 }, colorScheme: "light" },
+    },
+    // El Excel exportado se compara con toda la base: cuando ya nadie la cambia.
+    {
+      name: "excel",
+      dependencies: ["flujo"],
+      testMatch: /excel\.spec\.ts/,
       use: { ...movil, browserName: "chromium", viewport: { width: 390, height: 844 }, colorScheme: "light" },
     },
   ],

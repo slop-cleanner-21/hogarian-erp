@@ -25,6 +25,7 @@ NS_PKG = '{http://schemas.openxmlformats.org/package/2006/relationships}'
 RUC_EMPRESA = {
     'ARIANT': '20607590304',        # confirmado en un RxH
     'MARBELEN': '20607600881',      # confirmado en una factura
+    'ARISANT': '20615368963',       # lo dio Gerencia (06/11/2026)
 }
 RUBROS = ['MATERIAL', 'MANO OBRA', 'SUBCONTRATO', 'LOCACION', 'PROYECTO', 'FINALIZACION', 'OTRO']
 # PROVEED.D -> tipo_comprobante (None = sin comprobante habitual)

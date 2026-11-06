@@ -48,6 +48,9 @@ paso, local sigue igual: accesos rápidos y contraseña de la demo. (El túnel s
    `demo` ni los scripts `db:demo-*`.
 5. Respaldos: activar los diarios del plan (o *Point in Time Recovery*).
 
+Con cada Excel nuevo, también su plantilla para el export (el mismo archivo):
+`node --env-file=.env.produccion.local scripts/subir-plantilla-excel.mjs <ruta>.xlsm`.
+
 Para volver a cargar el Excel en una base ya en uso: `scripts/produccion/recargar-datos.sh`, en una sola transacción (si
 falla, no cambia nada). Borra lo operativo y corre los mismos seeds; conserva cuentas, auditoría, catálogos, parámetros y
 lo que el Admin puso en las empresas. Antes, un respaldo con `pg_dump`. Los links de cotización cambian y no borra archivos

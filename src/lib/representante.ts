@@ -22,7 +22,7 @@ export async function representanteContratos(
 
   let elegido: string | null = emp?.firmante_id ?? null;
   if (!elegido) {
-    const { data: gerentes } = await db.from("perfiles").select("user_id").eq("rol", "GERENCIA");
+    const { data: gerentes } = await db.from("perfil_roles").select("user_id").eq("rol", "GERENCIA");
     if (!gerentes?.length) return { representante: null, empresa };
     const { data: ultimo } = await db
       .from("perfil_privado")

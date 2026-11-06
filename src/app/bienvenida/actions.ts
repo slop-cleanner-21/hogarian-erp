@@ -24,7 +24,7 @@ export async function completarBienvenida(token: string, d: DatosBienvenida): Pr
   if (apellidos.length < 2) return { error: "Ingresa tus apellidos" };
   const dni = String(d.dni ?? "").trim();
   if (!/^(\d{8})?$/.test(dni)) return { error: "El DNI tiene 8 dígitos" };
-  if (inv.rol === "GERENCIA" && !dni) return { error: "Ingresa tu DNI: va en los contratos que firmas" };
+  if (inv.gerencia && !dni) return { error: "Ingresa tu DNI: va en los contratos que firmas" };
   const telefono = normalizarCelular(String(d.telefono ?? ""));
   if (telefono === null) return { error: "Celular no válido" };
   const invalida = contrasenaValida(String(d.clave ?? ""));

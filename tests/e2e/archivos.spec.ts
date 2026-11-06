@@ -33,7 +33,8 @@ test.describe("@archivos imagen de un archivo guardado", () => {
 
     // Vuelve a responder: «Reintentar» trae la pantalla con enlaces nuevos y la imagen se ve.
     await page.unroute(bloquear);
-    await aviso.getByRole("button", { name: "Reintentar" }).click();
+    // (Si el pedido de enlaces nuevos que ya iba en camino llega antes, la imagen vuelve sola y el botón ya no está.)
+    await aviso.getByRole("button", { name: "Reintentar" }).click({ timeout: 3_000 }).catch(() => {});
     const imagen = page.getByRole("img", { name: `Factura ${factura}` });
     await expect(imagen).toBeVisible({ timeout: 20_000 });
     await imagen.scrollIntoViewIfNeeded();

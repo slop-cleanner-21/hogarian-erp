@@ -1,169 +1,247 @@
+import crypto from "node:crypto";
 import fs from "node:fs";
-import path from "node:path";
-import type { Locator } from "@playwright/test";
+import type { Browser, Page } from "@playwright/test";
 import { expect, test } from "./fixtures";
-import { sql, sql1 } from "./lib";
+import { sql, sql1, sqlScript } from "./lib";
 
-// Comprobaciones funcionales por rol que antes se hacían a mano (auditorías r8/r9). Solo lectura:
-// no se envía ningún formulario. Los datos se toman de la base al correr cada prueba.
-//   ERP_DEMO=… ERP_PASS=… npx playwright test --grep @roles
+// Una persona con varios roles (migración prod1_varios_roles): trabaja con uno a la vez (perfiles.rol) y cambia desde su
+// menú entre los suyos (perfil_roles), que asigna solo el Admin. Lo que mira a la persona usa todos sus roles: avisos,
+// firmante de una empresa y DNI obligatorio. Corre en el proyecto «flujo», sin nadie más tocando las empresas.
 
-/** Contraste WCAG de cada elemento contra el fondo que se pinta debajo (con opacidades). */
-const contrastes = (loc: Locator) =>
-  loc.evaluateAll((els) => {
-    const cv = document.createElement("canvas");
-    cv.width = cv.height = 1;
-    const cx = cv.getContext("2d", { willReadFrequently: true })!;
-    const pinta = (c: string) => {
-      cx.fillStyle = "#000";
-      cx.fillStyle = c;
-      cx.fillRect(0, 0, 1, 1);
-    };
-    const pix = () => [...cx.getImageData(0, 0, 1, 1).data].slice(0, 3);
-    const lum = (rgb: number[]) => {
-      const [r, g, b] = rgb.map((v) => (v /= 255) <= 0.03928 ? v / 12.92 : ((v + 0.055) / 1.055) ** 2.4);
-      return 0.2126 * r + 0.7152 * g + 0.0722 * b;
-    };
-    return els
-      .filter((el) => el.getBoundingClientRect().width > 0)
-      .map((el) => {
-        const cadena: Element[] = [];
-        for (let e: Element | null = el; e; e = e.parentElement) cadena.unshift(e);
-        cx.clearRect(0, 0, 1, 1);
-        pinta("#fff");
-        let opacidad = 1;
-        for (const e of cadena) {
-          const cs = getComputedStyle(e);
-          if (cs.backgroundColor !== "rgba(0, 0, 0, 0)") pinta(cs.backgroundColor);
-          opacidad *= parseFloat(cs.opacity);
-        }
-        const fondo = lum(pix());
-        cx.globalAlpha = opacidad;
-        pinta(getComputedStyle(el).color);
-        cx.globalAlpha = 1;
-        const [a, b] = [lum(pix()), fondo].sort((x, y) => y - x);
-        return {
-          texto: (el as HTMLElement).innerText.trim().slice(0, 30),
-          px: parseFloat(getComputedStyle(el).fontSize),
-          ratio: Math.round(((a + 0.05) / (b + 0.05)) * 100) / 100,
-        };
+const SB = "http://127.0.0.1:55321";
+const env = Object.fromEntries(
+  fs
+    .readFileSync(".env.local", "utf8")
+    .split(/\r?\n/)
+    .filter((l) => /^[A-Z_]+=/.test(l))
+    .map((l) => [l.slice(0, l.indexOf("=")), l.slice(l.indexOf("=") + 1).replace(/^["']|["']$/g, "")]),
+);
+const SECRETA = env.SUPABASE_SECRET_KEY;
+const CLAVE = () => process.env.ERP_PASS!;
+
+async function cuentaTemporal() {
+  const clave = crypto.randomUUID().slice(0, 8);
+  const email = `e2e-roles-${clave}@erp.local`;
+  // Un nombre por cuenta: las pruebas corren a la vez.
+  const nombre = `E2E Roles ${clave}`;
+  const r = await fetch(`${SB}/auth/v1/admin/users`, {
+    method: "POST",
+    headers: { apikey: SECRETA, Authorization: `Bearer ${SECRETA}`, "Content-Type": "application/json" },
+    body: JSON.stringify({ email, email_confirm: true }),
+  });
+  const id = ((await r.json()) as { id: string }).id;
+  sql(`insert into perfiles (user_id, nombre, rol) values ('${id}', '${nombre}', 'TESORERIA'); select fijar_contrasena('${id}', '${CLAVE()}')`);
+  return {
+    id,
+    email,
+    nombre,
+    borrar: () => {
+      sql(`delete from notificaciones where user_id = '${id}'`);
+      sql(`delete from audit_log where (tabla = 'sesion' and detalle->>'email' = '${email}') or user_id = '${id}' or registro like '%${id}%'`);
+      sql(`delete from auth.users where id = '${id}'`);
+      sql(`delete from audit_log where registro like '%${id}%'`);
+    },
+  };
+}
+
+async function entrar(browser: Browser, info: { project: { use: object } }, email: string) {
+  const ctx = await browser.newContext({ ...info.project.use });
+  const page = await ctx.newPage();
+  await page.goto("/acceso");
+  if (page.url().includes("/acceso")) {
+    await page.locator('input[name="clave"]').fill(process.env.ERP_DEMO!);
+    await page.getByRole("button", { name: "Entrar" }).click();
+    await page.waitForURL((u) => !u.pathname.startsWith("/acceso"));
+  }
+  await page.goto("/login");
+  await page.locator('input[name="email"]').fill(email);
+  await page.locator('input[name="password"]').fill(CLAVE());
+  await page.getByRole("button", { name: "Ingresar", exact: true }).click();
+  await page.waitForURL((u) => !u.pathname.startsWith("/login"));
+  return { ctx, page };
+}
+
+const abrirMenu = async (page: Page) => {
+  await page.getByRole("button", { name: "Usuario" }).click();
+  return page.getByRole("region", { name: "Rol" });
+};
+
+/** Sus roles, y con cuál trabaja. */
+const roles = (id: string) => sql(`select rol from perfil_roles where user_id = '${id}' order by rol::text`).map(([r]) => r);
+const activo = (id: string) => sql1(`select rol from perfiles where user_id = '${id}'`);
+
+/** Una sentencia con la sesión de la persona, revertida. */
+const como = (id: string, sentencia: string, rolDb = "authenticated") =>
+  sqlScript(`begin;
+    select set_config('request.jwt.claims', '{"sub":"${id}","role":"${rolDb}"}', true) is null;
+    set local role ${rolDb};
+    ${sentencia};
+    rollback;`);
+
+test.describe("@admin @roles varios roles", () => {
+  test("el Admin le da un segundo rol y la persona cambia entre ellos; los avisos le llegan por los dos", async ({ abrir, browser }, info) => {
+    test.setTimeout(120_000);
+    const c = await cuentaTemporal();
+    try {
+      await test.step("el Admin agrega Gerencia, que pide el DNI", async () => {
+        const admin = await abrir("admin", "/admin");
+        await admin.getByLabel("Buscar usuario").fill(c.email);
+        const fila = admin.locator("main").getByRole("button", { name: new RegExp(c.email.replaceAll(".", "\\.")) });
+        await fila.click();
+        const ficha = admin.getByRole("dialog", { name: c.nombre });
+        await ficha.getByRole("group", { name: "Otros roles" }).getByLabel("Gerencia").check();
+        await expect(ficha.getByRole("button", { name: "Guardar" }), "sin DNI").toBeDisabled();
+        await ficha.getByLabel(/^DNI/).fill("41234567");
+        await ficha.getByRole("button", { name: "Guardar" }).click();
+        await expect(ficha).toBeHidden();
+        await expect(fila).toContainText("Tesorería · Gerencia");
+        expect(roles(c.id)).toEqual(["GERENCIA", "TESORERIA"]);
+        expect(activo(c.id), "sigue trabajando como estaba").toBe("TESORERIA");
       });
-  });
 
-/** Tarjetas de entrega (EntregasPartida): con foto son botón con miniatura; sin foto, un div. */
-const tarjetas = (raiz: Locator) =>
-  raiz.locator(".w-24.shrink-0").evaluateAll((cs) =>
-    cs.map((c) => ({ boton: c.tagName === "BUTTON", img: !!c.querySelector("img"), svg: c.querySelectorAll("svg").length, gris: !!c.querySelector(".bg-sunken") })),
-  );
+      const { ctx, page } = await entrar(browser, info, c.email);
+      await test.step("entra con su rol y pasa a Gerencia desde el menú", async () => {
+        await page.waitForURL(/\/tesoreria/);
+        const menu = await abrirMenu(page);
+        await expect(menu.getByRole("button", { name: "Tesorería" })).toHaveAttribute("aria-current", "true");
+        await menu.getByRole("button", { name: "Gerencia" }).click();
+        await page.waitForURL(/\/gerencia\/obras/);
+        expect(activo(c.id)).toBe("GERENCIA");
+        // El token ya lo tomó: las pantallas son las de Gerencia, también al recargar.
+        await page.reload();
+        await expect(page).toHaveURL(/\/gerencia\/obras/);
+        await abrirMenu(page);
+        await expect(page.getByRole("button", { name: "Mi firma" })).toBeVisible();
+      });
 
-test.describe("@roles @logistica", () => {
-  test("detalle: OS de valorización sin Entregas; OC recibida con sus entregas", async ({ abrir }) => {
-    const [osObra, osNum] = sql("select obra_id, numero from ordenes_compra where valorizacion_id is not null and estado='RECIBIDA' order by obra_id, numero limit 1")[0];
-    // OC recibida cuyas entregas tienen todas foto: cada entrega se ve como tarjeta bajo su ítem.
-    const [ocObra, ocNum, lineas, entregas] = sql(
-      "select o.obra_id, o.numero, (select count(*) from v_oc_items i where i.obra_id=o.obra_id and i.numero_oc=o.numero), " +
-        "(select count(*) from entregas e where e.obra_id=o.obra_id and e.numero_oc=o.numero) from ordenes_compra o " +
-        "where o.tipo='OC' and o.estado='RECIBIDA' and o.valorizacion_id is null " +
-        "and exists (select 1 from entregas e where e.obra_id=o.obra_id and e.numero_oc=o.numero) " +
-        "and not exists (select 1 from entregas e where e.obra_id=o.obra_id and e.numero_oc=o.numero and not exists (select 1 from entrega_fotos f where f.entrega_id=e.id)) " +
-        "order by o.obra_id desc, o.numero limit 1",
-    )[0];
+      await test.step("los avisos de Tesorería le llegan aunque trabaje como Gerencia, y puede elegirlos", async () => {
+        sql(`select notificar('TESORERIA', 'E2E_ROLES', 'E2E roles', null, '/tesoreria')`);
+        try {
+          expect(sql1(`select count(*) from notificaciones where user_id = '${c.id}' and tipo = 'E2E_ROLES'`)).toBe("1");
+        } finally {
+          sql(`delete from notificaciones where tipo = 'E2E_ROLES'`);
+        }
+        await page.goto("/avisos");
+        await page.getByRole("button", { name: "Elegir avisos" }).click();
+        const aviso = page.getByRole("dialog", { name: "Elegir avisos" }).getByRole("listitem", { name: "Llegó una orden por pagar" });
+        await expect(aviso.getByRole("switch", { name: "Avisar" }), "es de uno de sus roles: llega por defecto").toHaveAttribute("aria-checked", "true");
+      });
 
-    const page = await abrir("logistica", `/logistica/ordenes/${osObra}/${osNum}`);
-    await expect(page.locator("main")).toBeVisible();
-    await expect(page.locator('section[aria-label="Entregas"]'), `OS ${osObra}/${osNum} de valorización`).toHaveCount(0);
+      await test.step("una pantalla de su otro rol (un aviso, un link) ofrece cambiar y la abre", async () => {
+        await page.goto("/tesoreria?q=e2e");
+        await page.waitForURL(/\/rol\?a=TESORERIA/);
+        await expect(page.getByRole("heading", { name: "Esta pantalla es de Tesorería" })).toBeVisible();
+        expect(activo(c.id), "no cambia sin que lo toque").toBe("GERENCIA");
+        await page.getByRole("button", { name: "Cambiar a Tesorería" }).click();
+        await page.waitForURL(/\/tesoreria\?q=e2e/);
+        expect(activo(c.id)).toBe("TESORERIA");
+      });
 
-    await page.goto(`/logistica/ordenes/${ocObra}/${ocNum}`);
-    const sec = page.locator('section[aria-label="Entregas"]');
-    await expect(sec, `OC ${ocObra}/${ocNum} recibida`).toBeVisible();
-    await expect(sec.locator(":scope > ul > li"), "ítems de la OC").toHaveCount(Number(lineas));
-    await expect(sec.locator(".w-24.shrink-0"), "entregas (SQL)").toHaveCount(Number(entregas));
-  });
-});
+      await test.step("una pantalla de un rol que no tiene, no", async () => {
+        await page.goto("/logistica");
+        await page.waitForURL(/\/tesoreria/);
+        expect(activo(c.id)).toBe("TESORERIA");
+      });
 
-test.describe("@roles @logistica", () => {
-  test("campana con número: 12 px y contraste ≥ 4.5", async ({ abrir }) => {
-    const page = await abrir("logistica", "/logistica");
-    // Sin avisos sin leer en la demo: se simula el conteo en la respuesta (no se escribe nada).
-    await page.context().route("**/sb/rest/v1/notificaciones*", async (route) => {
-      if (route.request().method() !== "HEAD") return route.continue();
-      const r = await route.fetch();
-      await route.fulfill({ response: r, headers: { ...r.headers(), "content-range": "*/7" } });
-    });
-    await page.reload();
-    const num = page.locator('a[href="/avisos"] span.num').first();
-    await expect(num).toHaveText("7");
-    const [c] = await contrastes(num);
-    expect(c.px, "tamaño del número").toBe(12);
-    expect(c.ratio, "contraste del número").toBeGreaterThanOrEqual(4.5);
-  });
-});
-
-test.describe("@roles @gerencia", () => {
-  test("seguimiento: la misma vista que el del Jefe de Operaciones", async ({ abrir }) => {
-    const obra = sql1("select obra_id from entregas group by 1 order by count(*) desc limit 1");
-    const ruta = (base: string) => `${base}?obra=${obra}&grupo=MATERIALES`;
-    const ger = await abrir("gerencia", ruta("/gerencia/presupuesto"));
-    const jefe = await abrir("jefe", ruta("/operaciones"));
-    await expect(ger.locator("header").first()).toContainText("Seguimiento");
-    await expect(ger.getByRole("tab")).toHaveText(["Materiales", "Mano de obra", "Subcontratos"]);
-    await expect(ger.getByRole("link", { name: "Seguimiento", exact: true })).toBeVisible();
-    // Lo mismo en las dos: el contenido de la pantalla (sin la barra superior ni la inferior).
-    const texto = async (p: typeof ger) => (await p.locator("main").innerText()).replace(/\s+/g, " ");
-    expect(await texto(ger)).toBe(await texto(jefe));
-  });
-});
-
-test.describe("@roles @tesoreria", () => {
-  test("entrada: cada empresa con su logo que carga (o, si no tiene logo propio, su inicial)", async ({ abrir }) => {
-    const page = await abrir("tesoreria", "/tesoreria?area=");
-    const empresas = page.locator("main ul.grid-cols-2 > li:not(.col-span-2) > a");
-    await expect(empresas.first()).toBeVisible();
-    const fichas = await empresas.evaluateAll((as) =>
-      Promise.all(
-        as.map(async (a) => {
-          const img = a.querySelector("img");
-          await img?.decode().catch(() => {});
-          return {
-            nombre: a.lastChild?.textContent?.trim() ?? "",
-            img: !!img,
-            carga: !!img && img.complete && img.naturalWidth > 0,
-            inicial: img ? "" : (a.firstElementChild as HTMLElement).innerText.trim(),
-          };
-        }),
-      ),
-    );
-    const conLogo = (n: string) => ["png", "svg", "webp"].some((x) => fs.existsSync(path.resolve(`public/empresas/${n.toLowerCase()}.${x}`)));
-    expect(fichas.length, "empresas en la entrada").toBeGreaterThan(1);
-    for (const f of fichas) {
-      if (conLogo(f.nombre)) expect(f.carga, `${f.nombre}: <img> que carga`).toBe(true);
-      else expect({ img: f.img, inicial: f.inicial }, `${f.nombre}: su inicial, sin <img>`).toEqual({ img: false, inicial: f.nombre.charAt(0) });
+      await test.step("el Admin le quita Gerencia: el menú ya no ofrece cambiar", async () => {
+        sql(`delete from perfil_roles where user_id = '${c.id}' and rol = 'GERENCIA'`);
+        await page.reload();
+        await abrirMenu(page);
+        await expect(page.getByRole("button", { name: "Cambiar contraseña" })).toBeVisible();
+        await expect(page.getByRole("region", { name: "Rol" })).toHaveCount(0);
+      });
+      await ctx.close();
+    } finally {
+      c.borrar();
     }
   });
-});
 
-test.describe("@roles @jefe", () => {
-  test("plan y entregas: sin foto sin recuadro gris; con foto miniatura que abre el visor", async ({ abrir }) => {
-    const porFoto = (con: boolean) =>
-      sql(
-        `select e.obra_id, p.grupo from entregas e join oc_items i on i.id=e.oc_item_id join v_seguimiento_partida p on p.partida_id=i.partida_id ` +
-          `where ${con ? "" : "not "}exists (select 1 from entrega_fotos f where f.entrega_id=e.id) group by 1, 2 order by count(*) limit 1`,
-      )[0];
-    const [sinObra, sinGrupo] = porFoto(false);
-    const [conObra, conGrupo] = porFoto(true);
+  test("la base: solo pasa a sus roles, nadie se los asigna por la API y cada rol sigue con sus permisos", async () => {
+    const c = await cuentaTemporal();
+    const otra = await cuentaTemporal();
+    try {
+      expect(() => como(c.id, `select cambiar_rol('GERENCIA')`), "un rol que no tiene").toThrow(/No tienes ese rol/);
+      expect(() => como(c.id, `select cambiar_rol('ADMIN')`)).toThrow(/No tienes ese rol/);
+      expect(() => como(c.id, `insert into perfil_roles (user_id, rol) values ('${c.id}', 'ADMIN')`), "asignarse un rol").toThrow(/permission denied/);
+      expect(() => como(c.id, `update perfil_roles set rol = 'ADMIN' where user_id = '${c.id}'`)).toThrow(/permission denied/);
+      expect(() => como(c.id, `delete from perfil_roles where user_id = '${c.id}'`)).toThrow(/permission denied/);
+      expect(() => como(c.id, `select cambiar_rol('TESORERIA')`, "anon"), "sin sesión").toThrow(/permission denied/);
+      // Por el perfil tampoco.
+      como(c.id, `update perfiles set rol = 'ADMIN' where user_id = '${c.id}'`);
+      expect(activo(c.id)).toBe("TESORERIA");
 
-    const page = await abrir("jefe", `/operaciones?obra=${sinObra}&grupo=${sinGrupo}`);
-    const sin = (await tarjetas(page.locator("main"))).filter((t) => !t.img);
-    expect(sin.length, `obra ${sinObra}: entregas sin foto`).toBeGreaterThan(0);
-    expect(sin.filter((t) => t.boton || t.svg || t.gris), "sin foto: ni botón, ni ícono, ni recuadro gris").toEqual([]);
+      expect(
+        como(c.id, `select count(*) from perfil_roles`).at(-1),
+        "cada uno ve solo los suyos",
+      ).toEqual(["1"]);
 
-    await page.goto(`/operaciones?obra=${conObra}&grupo=${conGrupo}`);
-    const mini = page.locator("main button.w-24.shrink-0").filter({ has: page.locator("img") }).first();
-    await mini.scrollIntoViewIfNeeded();
-    await expect.poll(() => mini.locator("img").evaluate((i: HTMLImageElement) => i.complete && i.naturalWidth > 0), "miniatura cargada").toBe(true);
-    await mini.click();
-    const visor = page.locator('dialog[open][aria-label="Fotos"]');
-    await expect(visor).toBeVisible();
-    await expect.poll(() => visor.locator("img").first().evaluate((i: HTMLImageElement) => i.complete && i.naturalWidth > 0), "foto en el visor").toBe(true);
+      sql(`insert into perfil_roles (user_id, rol) values ('${c.id}', 'GERENCIA'), ('${c.id}', 'CONTABILIDAD')`);
+      expect(() => como(c.id, `select cambiar_rol('CONTABILIDAD')`), "un rol sin módulo en prod 1").toThrow(/No tienes ese rol/);
+      // Un rol a la vez: como Gerencia no tiene lo de Tesorería, aunque también lo sea.
+      expect(como(c.id, `select cambiar_rol('GERENCIA'); select rol_actual()`).at(-1)).toEqual(["GERENCIA"]);
+      expect(() => como(c.id, `select cambiar_rol('GERENCIA'); select exigir_rol('TESORERIA')`)).toThrow(/No tienes permiso/);
+      expect(como(c.id, `select exigir_rol('TESORERIA'); select rol_actual()`).at(-1), "y como Tesorería sí").toEqual(["TESORERIA"]);
+
+      // El rol con el que trabaja siempre está entre los suyos, aunque se cambie por fuera de la app.
+      sql(`update perfiles set rol = 'LOGISTICA' where user_id = '${otra.id}'`);
+      expect(roles(otra.id)).toEqual(["LOGISTICA", "TESORERIA"]);
+    } finally {
+      c.borrar();
+      otra.borrar();
+    }
+  });
+
+  test("firma por una empresa con Gerencia como segundo rol; sin elegir otro firmante no se le puede quitar", async ({ abrir }) => {
+    const c = await cuentaTemporal();
+    const [id, antes] = sql(`select id, coalesce(firmante_id::text, '') from empresas where nombre = 'ARISANT'`)[0];
+    try {
+      sql(`insert into perfil_roles (user_id, rol) values ('${c.id}', 'GERENCIA');
+           insert into perfil_privado (user_id, dni) values ('${c.id}', '41234567');`);
+      const empresas = await abrir("admin", "/admin/empresas");
+      await empresas.locator("main li button").filter({ hasText: "ARISANT" }).click();
+      const hoja = empresas.getByRole("dialog", { name: "ARISANT" });
+      await hoja.getByRole("button", { name: "Firma los contratos", exact: true }).click();
+      await empresas.getByRole("listbox", { name: "Firma los contratos" }).getByRole("option").filter({ hasText: c.nombre }).first().click();
+      await hoja.getByRole("button", { name: "Guardar" }).click();
+      await expect(hoja).toBeHidden();
+      expect(sql1(`select firmante_id from empresas where id = ${id}`)).toBe(c.id);
+
+      const admin = await abrir("admin", "/admin");
+      await admin.getByLabel("Buscar usuario").fill(c.email);
+      await admin.locator("main").getByRole("button", { name: new RegExp(c.email.replaceAll(".", "\\.")) }).click();
+      const ficha = admin.getByRole("dialog", { name: c.nombre });
+      await ficha.getByRole("group", { name: "Otros roles" }).getByLabel("Gerencia").uncheck();
+      await ficha.getByRole("button", { name: "Guardar" }).click();
+      await expect(ficha.getByRole("alert")).toHaveText(/Firma por ARISANT/);
+      expect(roles(c.id)).toEqual(["GERENCIA", "TESORERIA"]);
+    } finally {
+      sql(`update empresas set firmante_id = ${antes ? `'${antes}'` : "null"} where id = ${id}`);
+      sql(`delete from audit_log where tabla = 'empresas' and registro = '${id}' and created_at > now() - interval '5 minutes'`);
+      c.borrar();
+    }
+  });
+
+  test("el link de bienvenida pide el DNI si Gerencia es uno de sus roles", async () => {
+    const c = await cuentaTemporal();
+    try {
+      sql(`insert into perfil_roles (user_id, rol) values ('${c.id}', 'GERENCIA')`);
+      expect(() =>
+        sqlScript(`begin;
+          insert into invitaciones (user_id, token_hash, expira_at) values ('${c.id}', 'e2e-roles', now() + interval '1 day');
+          select bienvenida_completar('e2e-roles', 'Nombre', 'Apellido', '', '', 'Clave12345x');
+          rollback;`),
+      ).toThrow(/Ingresa tu DNI/);
+    } finally {
+      c.borrar();
+    }
+  });
+
+  test("con un solo rol nada cambia: sin opciones en el menú ni pantalla de cambio", async ({ abrir }) => {
+    const page = await abrir("logistica", "/rol?a=GERENCIA&volver=/gerencia/obras");
+    await page.waitForURL((u) => !u.pathname.startsWith("/rol"));
+    await page.goto("/logistica");
+    await abrirMenu(page);
+    await expect(page.getByRole("button", { name: "Cambiar contraseña" })).toBeVisible();
+    await expect(page.getByRole("region", { name: "Rol" })).toHaveCount(0);
   });
 });

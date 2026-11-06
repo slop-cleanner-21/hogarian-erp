@@ -26,7 +26,7 @@ export default async function BienvenidaPage({ params }: PageProps<"/bienvenida/
         <FormularioBienvenida
           token={token}
           email={inv.email}
-          dniObligatorio={inv.rol === "GERENCIA"}
+          dniObligatorio={inv.gerencia}
           inicial={{ nombres: inv.nombres, apellidos: inv.apellidos, dni: inv.dni, telefono: inv.telefono ? celularLegible(inv.telefono) : "" }}
         />
       ) : (

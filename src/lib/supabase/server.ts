@@ -1,5 +1,5 @@
 import { createServerClient } from "@supabase/ssr";
-import { cookies } from "next/headers";
+import { cookies, headers } from "next/headers";
 import { redirect } from "next/navigation";
 import { cache } from "react";
 import type { Database } from "@/lib/database.types";
@@ -59,10 +59,25 @@ export async function requireSesionVigente(roles?: Rol[]): Promise<Sesion> {
   return { ...sesion, rol };
 }
 
+/** Todos los roles de la persona (con el que trabaja ahora es `sesion.rol`). */
+export const misRoles = cache(async (): Promise<Rol[]> => {
+  const { data } = await (await createClient()).from("perfil_roles").select("rol");
+  return (data ?? []).map((r) => r.rol as Rol).filter(rolEnProd1);
+});
+
+/** Una pantalla que no es de su rol: si es de otro de sus roles, un toque para pasar a él; si no, a su inicio. */
+async function sinPermiso(roles: Rol[]): Promise<never> {
+  const mios = await misRoles();
+  const otro = roles.find((r) => mios.includes(r)) ?? (mios.includes("ADMIN") ? "ADMIN" : null);
+  if (!otro) redirect("/");
+  const ruta = (await headers()).get("x-prod1-ruta") ?? "/";
+  redirect(`/rol?a=${otro}&volver=${encodeURIComponent(ruta)}`);
+}
+
 export async function requireSesion(roles?: Rol[]): Promise<Sesion> {
   const sesion = await getSesion();
   if (!sesion) redirect("/login");
   if (sesion === "sin-perfil" || !rolEnProd1(sesion.rol)) redirect("/sin-acceso");
-  if (roles && sesion.rol !== "ADMIN" && !roles.includes(sesion.rol)) redirect("/");
+  if (roles && sesion.rol !== "ADMIN" && !roles.includes(sesion.rol)) await sinPermiso(roles);
   return sesion;
 }

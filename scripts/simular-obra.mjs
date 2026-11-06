@@ -157,7 +157,7 @@ function contratoPng({ numero, proveedor, ruc, monto, fecha }) {
 }
 
 async function subir(c, path, buffer) {
-  ok(await c.storage.from("documentos").upload(path, buffer, { contentType: "image/png", upsert: true }), `subir ${path}`);
+  ok(await admin.storage.from("documentos").upload(path, buffer, { contentType: "image/png", upsert: true }), `subir ${path}`);
   return path;
 }
 
@@ -306,7 +306,7 @@ async function simularOrden({ tipo, lineas, proveedorId, destino, diaBase, opcio
     await rpc(logistica, "marcar_cotizacion_enviada", { p_obra_id: obraId, p_numero: numero });
     f.cotEnviada = dia(diaBase, 11);
     if (destino !== "LINK") {
-      const { token_cotizacion } = ok(await logistica.from("ordenes_compra").select("token_cotizacion").eq("obra_id", obraId).eq("numero", numero).single(), "token");
+      const { token_cotizacion } = ok(await admin.from("ordenes_compra").select("token_cotizacion").eq("obra_id", obraId).eq("numero", numero).single(), "token");
       const cot = await rpc(anon, "get_cotizacion", { p_token: token_cotizacion });
       if (!cot.disponible) throw new Error(`Link no disponible para ${numero}`);
       await rpc(anon, "enviar_cotizacion", { p_token: token_cotizacion, p_precios: precios });

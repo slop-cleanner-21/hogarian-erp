@@ -49,8 +49,17 @@ const Datos = z.object({
 });
 /** El nombre completo (como lo arma la base). */
 const completo = (d: { nombres: string; apellidos: string }) => [d.nombres, d.apellidos].map((x) => x.trim()).filter(Boolean).join(" ");
-const conDni = (d: { rol: string; dni: string }) => d.rol !== "GERENCIA" || d.dni !== "";
+const conGerencia = (d: { rol: string; otrosRoles: string[] }) => d.rol === "GERENCIA" || d.otrosRoles.includes("GERENCIA");
+const conDni = (d: { rol: string; otrosRoles: string[]; dni: string }) => !conGerencia(d) || d.dni !== "";
 const SIN_DNI = "Ingresa el DNI: va en los contratos que firma Gerencia";
+
+/** Todos los roles de la persona: el principal y los demás (entre ellos cambia desde su menú). */
+async function guardarRoles(db: ReturnType<typeof createAdminClient>, id: string, rol: Rol, otros: Rol[]) {
+  const todos = [...new Set([rol, ...otros])];
+  const { error } = await db.from("perfil_roles").delete().eq("user_id", id).not("rol", "in", `(${todos.join(",")})`);
+  if (error) return error;
+  return (await db.from("perfil_roles").upsert(todos.map((r) => ({ user_id: id, rol: r })), { onConflict: "user_id,rol", ignoreDuplicates: true })).error;
+}
 
 /** DNI y celular van aparte del perfil (perfil_privado): solo los lee el servidor. */
 async function guardarPrivado(db: ReturnType<typeof createAdminClient>, id: string, dni: string, telefono: string) {
@@ -70,6 +79,8 @@ function mensaje(e: { message: string; code?: string } | null) {
 
 const Crear = Datos.extend({
   rol: Rol_,
+  /** Los demás roles de la persona. */
+  otrosRoles: z.array(Rol_).default([]),
   acceso: z.enum(["link", "contrasena"]),
   contrasena: z.string().default(""),
 })
@@ -96,10 +107,11 @@ export async function crearUsuario(input: z.input<typeof Crear>): Promise<Result
     .insert({ user_id: data.user.id, nombre: completo(p.data), nombres: p.data.nombres, apellidos: p.data.apellidos || null, rol: p.data.rol });
   // Con link, sin contraseña hasta que lo use (no puede entrar antes).
   const e4 = e2 || p.data.acceso === "link" ? null : (await db.rpc("fijar_contrasena", { p_user: data.user.id, p_clave: p.data.contrasena })).error;
-  if (e2 || e4) {
-    // Sin perfil o sin contraseña la cuenta no sirve: se deshace.
+  const e5 = e2 || e4 ? null : await guardarRoles(db, data.user.id, p.data.rol, p.data.otrosRoles);
+  if (e2 || e4 || e5) {
+    // Sin perfil, contraseña o roles la cuenta no sirve: se deshace.
     await db.auth.admin.deleteUser(data.user.id);
-    return fail((e2 ?? e4)!.message);
+    return fail((e2 ?? e4 ?? e5)!.message);
   }
   if (p.data.dni || p.data.telefono) {
     const e3 = await guardarPrivado(db, data.user.id, p.data.dni, p.data.telefono);
@@ -116,13 +128,13 @@ export async function crearUsuario(input: z.input<typeof Crear>): Promise<Result
     accion: "CREAR_USUARIO",
     registro: data.user.id,
     actor: sesion.userId,
-    detalle: { email: p.data.email, nombre: completo(p.data), rol: p.data.rol, acceso: p.data.acceso },
+    detalle: { email: p.data.email, nombre: completo(p.data), rol: p.data.rol, otros_roles: p.data.otrosRoles, acceso: p.data.acceso },
   });
   revalidatePath("/admin");
   return { ok: true, data: { id: data.user.id, acceso } };
 }
 
-const Editar = Datos.extend({ id: z.guid(), rol: z.string() }).refine(conDni, { message: SIN_DNI });
+const Editar = Datos.extend({ id: z.guid(), rol: z.string(), otrosRoles: z.array(Rol_).default([]) }).refine(conDni, { message: SIN_DNI });
 
 /** Nombre, correo y rol. El rol solo puede pasar a uno de prod 1 (o quedarse como estaba). */
 export async function editarUsuario(input: z.input<typeof Editar>): Promise<Result> {
@@ -134,6 +146,10 @@ export async function editarUsuario(input: z.input<typeof Editar>): Promise<Resu
   const rol = p.data.rol as Rol;
   if (rol !== actual.rol && !ROLES_PROD1.includes(rol)) return fail("Elige el rol");
   if (p.data.id === sesion.userId && rol !== "ADMIN") return fail("No puedes quitarte el rol de Administrador");
+  if (!conGerencia(p.data)) {
+    const { data: firma } = await db.from("empresas").select("nombre").eq("firmante_id", p.data.id).order("nombre").limit(1).maybeSingle();
+    if (firma) return fail(`Firma por ${firma.nombre}: elige otro firmante en Empresas antes de quitarle Gerencia`);
+  }
 
   const { data: u } = await db.auth.admin.getUserById(p.data.id);
   if (u.user && u.user.email !== p.data.email) {
@@ -143,6 +159,8 @@ export async function editarUsuario(input: z.input<typeof Editar>): Promise<Resu
   // El perfil pasa el rol y el nombre al token (trigger perfiles_a_token); en la base rigen al instante.
   const { error } = await db.from("perfiles").update({ nombres: p.data.nombres, apellidos: p.data.apellidos || null, rol }).eq("user_id", p.data.id);
   if (error) return fail(error.message);
+  const eRoles = await guardarRoles(db, p.data.id, rol, p.data.otrosRoles);
+  if (eRoles) return fail(eRoles.message);
   const e2 = await guardarPrivado(db, p.data.id, p.data.dni, p.data.telefono);
   if (e2) return fail(e2.message);
   await registrarEvento({
@@ -152,7 +170,7 @@ export async function editarUsuario(input: z.input<typeof Editar>): Promise<Resu
     actor: sesion.userId,
     detalle: {
       antes: { email: u.user?.email ?? null, nombre: actual.nombre, rol: actual.rol },
-      despues: { email: p.data.email, nombre: completo(p.data), rol },
+      despues: { email: p.data.email, nombre: completo(p.data), rol, otros_roles: p.data.otrosRoles },
     },
   });
   revalidatePath("/admin");

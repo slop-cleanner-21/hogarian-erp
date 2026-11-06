@@ -512,6 +512,8 @@ test.describe("@flujo flujo completo por las pantallas", () => {
       await expect(hoja).toBeHidden();
       await expect.poll(() => estado(obraId, os)).toBe("FACTURADA");
 
+      // La pantalla ya tomó la factura (si no, el campo se reemplaza al refrescarse y el archivo se pierde).
+      await expect(page.getByRole("button", { name: "Registrar comprobante" })).toHaveCount(0);
       await page.locator('#contrato input[type="file"]').setInputFiles(ARCHIVO);
       await expect.poll(() => estado(obraId, os), { timeout: 15_000 }).toBe("EN_TESORERIA");
     });

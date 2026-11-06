@@ -51,7 +51,7 @@ export async function recienUsado(token: string, userId: string | null): Promise
   return !!data?.usada_at && data.user_id === userId && Date.now() - new Date(data.usada_at).getTime() < 10 * 60_000;
 }
 
-export type Invitacion = { userId: string; email: string; nombres: string; apellidos: string; rol: string; dni: string; telefono: string; vence: string };
+export type Invitacion = { userId: string; email: string; nombres: string; apellidos: string; gerencia: boolean; dni: string; telefono: string; vence: string };
 
 /** La invitación del link, si todavía sirve (sin usar, sin vencer, cuenta activa). */
 export async function leerInvitacion(token: string): Promise<Invitacion | null> {
@@ -63,10 +63,11 @@ export async function leerInvitacion(token: string): Promise<Invitacion | null> 
     .eq("token_hash", hashToken(token))
     .maybeSingle();
   if (!inv || inv.usada_at || new Date(inv.expira_at) <= new Date()) return null;
-  const [{ data: u }, { data: perfil }, { data: privado }] = await Promise.all([
+  const [{ data: u }, { data: perfil }, { data: privado }, { data: gerencia }] = await Promise.all([
     db.auth.admin.getUserById(inv.user_id),
     db.from("perfiles").select("nombre, nombres, apellidos, rol").eq("user_id", inv.user_id).maybeSingle(),
     db.from("perfil_privado").select("dni, telefono").eq("user_id", inv.user_id).maybeSingle(),
+    db.from("perfil_roles").select("rol").eq("user_id", inv.user_id).eq("rol", "GERENCIA").maybeSingle(),
   ]);
   const activa = !u.user?.banned_until || new Date(u.user.banned_until) <= new Date();
   if (!u.user?.email || !activa || !perfil) return null;
@@ -75,7 +76,7 @@ export async function leerInvitacion(token: string): Promise<Invitacion | null> 
     email: u.user.email,
     nombres: perfil.nombres ?? perfil.nombre ?? "",
     apellidos: perfil.apellidos ?? "",
-    rol: perfil.rol,
+    gerencia: !!gerencia,
     dni: privado?.dni ?? "",
     telefono: privado?.telefono ?? "",
     vence: inv.expira_at,

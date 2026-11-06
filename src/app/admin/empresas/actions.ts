@@ -27,8 +27,8 @@ export async function guardarEmpresa(input: z.input<typeof Empresa>): Promise<Re
   if (sesion.rol !== "ADMIN") return { ok: false, error: "Solo el Administrador edita las empresas" };
   const db = createAdminClient(sesion.userId);
   if (p.data.firmanteId) {
-    const { data: f } = await db.from("perfiles").select("rol").eq("user_id", p.data.firmanteId).maybeSingle();
-    if (f?.rol !== "GERENCIA") return { ok: false, error: "El firmante debe ser de Gerencia" };
+    const { data: f } = await db.from("perfil_roles").select("rol").eq("user_id", p.data.firmanteId).eq("rol", "GERENCIA").maybeSingle();
+    if (!f) return { ok: false, error: "El firmante debe ser de Gerencia" };
   }
   const { error } = await db
     .from("empresas")
