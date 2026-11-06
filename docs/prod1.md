@@ -194,6 +194,12 @@ Contabilidad, Residente y RRHH **no entran**. Sus roles siguen en la base
 - **Logística › OC / OS:** arriba, como en Tesorería, el selector de obra (sin empresa) y «Filtros»
   con cuántos hay activos; la hoja (`FiltrosHoja`, la misma de Pagos) tiene orden, estado, fecha, monto,
   proveedor, varias etapas, varios tipos de material y sobreprecio. El buscador va bajo las pestañas.
+- **Cambiar el presupuesto y las órdenes** (migración `prod1_precios_fijos`): en cotización la orden sigue al presupuesto. Desde
+  que se aprueban los precios queda fijo con qué P.U. y tolerancia se comparó (`oc_items.precio_fijado_at`, `pu_fijado`,
+  `tol_fijada`; lo hace un disparador al salir de EMITIDA) y cambiar el presupuesto ya no la mueve; si vuelve a cotización (rechazo
+  por precios), se suelta. En los dos casos Logística recibe un aviso en esa orden («Cambió el presupuesto de la OC N: rige para su
+  cotización» o «… sus precios no cambian», con el ítem y los dos precios). Las anuladas no avisan. En el Excel exportado una línea
+  así va como sobreprecio aprobado, para que sus fórmulas no la dejen en cero.
 - **Buscador de OC / OS:** por N°, proveedor, obra o **ítem** (sin importar tildes ni mayúsculas; «cemento sol» halla «CEMENTO
   PORTLAND SOL»). El ítem es la columna `items_busqueda` de `v_ordenes`, una subconsulta que solo se calcula si el filtro la usa:
   medido por la API, pasa de 4-6 ms a 11-16 ms. No usar una función por fila: era 15 a 40 veces más lenta. Al rehacer una vista,
@@ -201,7 +207,8 @@ Contabilidad, Residente y RRHH **no entran**. Sus roles siguen en la base
 - **Nueva OC / OS:** sin desplegables de «Ordenar por» ni de «Regular o adicional» (siempre por etapa);
   las partidas adicionales llevan la etiqueta «Adicional N».
 - **Avisos** (campana; `notificar`, solo a las cuentas activas del rol):
-  - Logística: cotización recibida (a la orden), rechazo de Tesorería (a la orden), adicional (a Nueva OC / OS);
+  - Logística: cotización recibida (a la orden), rechazo de Tesorería (a la orden), adicional (a Nueva OC / OS), precio del
+    presupuesto cambiado (a cada orden con esa partida);
   - Tesorería: **orden nueva por pagar** («Nueva OC N por pagar · obra», con el proveedor) y orden reenviada corregida
     (al pago); OS con precios distintos al presupuesto;
   - Jefe e Ingeniero de Operaciones: presupuesto publicado (a su seguimiento).

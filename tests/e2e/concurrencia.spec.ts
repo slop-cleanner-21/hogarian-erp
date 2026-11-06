@@ -332,7 +332,7 @@ test.describe("@avisos cada uno elige sus avisos", () => {
       const log = await abrir("logistica", "/avisos");
       await log.getByRole("button", { name: "Elegir avisos" }).click();
       const hojaLog = log.getByRole("dialog", { name: "Elegir avisos" });
-      await expect(hojaLog.getByRole("listitem")).toHaveText([/proveedor envió su cotización/, /Tesorería rechazó/, /adicional/]);
+      await expect(hojaLog.getByRole("listitem")).toHaveText([/proveedor envió su cotización/, /Tesorería rechazó/, /adicional/, /precio del presupuesto/]);
       for (const s of await hojaLog.getByRole("switch", { name: "Avisar" }).all()) await expect(s).toHaveAttribute("aria-checked", "true");
 
       const page = await abrir("admin", "/avisos");

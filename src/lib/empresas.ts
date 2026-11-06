@@ -2,8 +2,8 @@
 const LOGOS: Record<string, string> = {
   MARBELEN: "/empresas/marbelen.webp",
   ARIANT: "/empresas/ariant.webp",
-  ARISANT: "/empresas/arisant.svg",
-  HOGARIAN: "/empresas/hogarian.svg",
+  ARISANT: "/empresas/arisant.webp",
+  HOGARIAN: "/empresas/hogarian.webp",
 };
 
 export const logoEmpresa = (nombre: string): string | null => LOGOS[nombre.trim().toUpperCase()] ?? null;

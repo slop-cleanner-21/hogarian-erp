@@ -26,8 +26,8 @@ async function leerDatos(db: ReturnType<typeof createAdminClient>): Promise<Dato
     todas((a, b) => db.from("proveedores").select("id, ruc_o_cod, razon_social, comprobante_habitual, comprobante_excel").order("id").range(a, b)),
     todas((a, b) => db.from("proveedor_cuentas").select("proveedor_id, banco, cuenta_bancaria").order("proveedor_id").range(a, b)),
     todas((a, b) => db.from("partidas").select("id, codigo, obra_id, etapa, requerimiento, item_id, cantidad, pu").order("id").range(a, b)),
-    todas((a, b) => db.from("ordenes_compra").select("obra_id, numero, estado, fecha, historico, proveedor_id").order("obra_id").order("numero").range(a, b)),
-    todas((a, b) => db.from("oc_items").select("id, obra_id, numero_oc, partida_id, cantidad, pu_cotizado, pu_aprobado, comprobante_id").order("id").range(a, b)),
+    todas((a, b) => db.from("ordenes_compra").select("obra_id, numero, tipo, estado, fecha, historico, proveedor_id").order("obra_id").order("numero").range(a, b)),
+    todas((a, b) => db.from("oc_items").select("id, obra_id, numero_oc, partida_id, cantidad, pu_cotizado, pu_aprobado, comprobante_id, precio_fijado_at").order("id").range(a, b)),
     todas((a, b) => db.from("pago_aplicaciones").select("id, comprobante_id, obra_id, numero_oc, pago_id").order("id").range(a, b)),
   ]);
   const [comprobantes, pagos] = await Promise.all([
@@ -82,6 +82,11 @@ async function leerDatos(db: ReturnType<typeof createAdminClient>): Promise<Dato
       const c = l.comprobante_id ? comprobante.get(l.comprobante_id) : undefined;
       const delApp = c && !c.historico ? c : undefined;
       const ops = (l.comprobante_id ? operaciones.get(`c${l.comprobante_id}`) : undefined) ?? operaciones.get(`o${l.obra_id}/${l.numero_oc}`);
+      // El Excel compara cada compra con el presupuesto de hoy. Si Gerencia lo bajó después de aprobar los precios, la orden
+      // no cambió: va como sobreprecio aprobado, para que el Excel no la deje en cero.
+      const tolerancia = o.tipo === "OS" ? 0 : Number(item.get(p.item_id)?.tolerancia_pct ?? 0);
+      const cotizado = num(l.pu_cotizado);
+      const superaHoy = p.pu !== null && cotizado !== null && cotizado > Number(p.pu) * (1 + tolerancia);
       return [
         {
           id: l.id,
@@ -89,7 +94,7 @@ async function leerDatos(db: ReturnType<typeof createAdminClient>): Promise<Dato
           fecha: o.fecha,
           cantidad: Number(l.cantidad),
           pu: num(l.pu_cotizado),
-          aprobado: num(l.pu_aprobado),
+          aprobado: num(l.pu_aprobado) ?? (l.precio_fijado_at && superaHoy ? cotizado : null),
           orden: o.numero,
           ruc: proveedor.get(o.proveedor_id)?.ruc_o_cod ?? "",
           tipo: delApp ? (TIPO[delApp.tipo] ?? "OTRO") : null,

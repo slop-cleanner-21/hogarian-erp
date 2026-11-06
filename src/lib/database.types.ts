@@ -1434,8 +1434,11 @@ export type Database = {
           numero_oc: string;
           obra_id: number;
           partida_id: number;
+          precio_fijado_at: string | null;
           pu_aprobado: number | null;
           pu_cotizado: number | null;
+          pu_fijado: number | null;
+          tol_fijada: number | null;
         };
         ComputedFields: never;
         Insert: {
@@ -1447,8 +1450,11 @@ export type Database = {
           numero_oc: string;
           obra_id: number;
           partida_id: number;
+          precio_fijado_at?: string | null;
           pu_aprobado?: number | null;
           pu_cotizado?: number | null;
+          pu_fijado?: number | null;
+          tol_fijada?: number | null;
         };
         Update: {
           aprobado_por?: string | null;
@@ -1459,8 +1465,11 @@ export type Database = {
           numero_oc?: string;
           obra_id?: number;
           partida_id?: number;
+          precio_fijado_at?: string | null;
           pu_aprobado?: number | null;
           pu_cotizado?: number | null;
+          pu_fijado?: number | null;
+          tol_fijada?: number | null;
         };
         Relationships: [
           {
