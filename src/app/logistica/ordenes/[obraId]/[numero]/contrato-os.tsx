@@ -1,6 +1,6 @@
 "use client";
 
-import { Download, Eye, Pencil, Send, Share2 } from "lucide-react";
+import { Check, Download, Eye, Pencil, Send, Share2 } from "lucide-react";
 import { useRouter } from "next/navigation";
 import { useState, useTransition, type ReactNode } from "react";
 import { BotonCopiar, copiarTexto } from "@/components/copiar";
@@ -92,26 +92,19 @@ export function ContratoOS({
       setError(null);
       const blob = await generar();
       const file = new File([blob], nombre, { type: "application/pdf" });
-      if (navigator.canShare?.({ files: [file] })) {
-        const ok = await navigator
-          .share({ files: [file], text: texto(), title: `Contrato OS ${orden.numero}` })
-          .then(() => true)
-          .catch(() => false);
-        if (ok) marcarEnviado();
-      } else descargar(blob);
+      if (navigator.canShare?.({ files: [file] })) await navigator.share({ files: [file], text: texto(), title: `Contrato OS ${orden.numero}` }).catch(() => {});
+      else descargar(blob);
     });
 
   const whatsapp = () => {
     const destino = contactoWa ? telefonoIntl(contactoWa.telefono) : "";
     window.open(`https://wa.me/${destino}?text=${encodeURIComponent(texto())}`, "_blank");
-    marcarEnviado();
   };
 
   const telegram = async () => {
     await copiarTexto(texto());
     setAviso("Mensaje copiado: pégalo en el chat");
     window.open(`https://t.me/+${telefonoIntl(contactoTg!.telefono)}`, "_blank");
-    marcarEnviado();
   };
 
   const guardar = () =>
@@ -209,6 +202,12 @@ export function ContratoOS({
             <Send size={20} /> Telegram
           </Button>
         </div>
+      )}
+      {/* Abrir WhatsApp o compartir no prueba que se envió: lo confirma Logística. */}
+      {!firmado && !orden.contrato_enviado_at && (
+        <Button onClick={marcarEnviado} disabled={pending || editando}>
+          <Check size={18} /> Confirmar envío
+        </Button>
       )}
       {aviso && <p className="px-1 text-[15px] text-ink-2">{aviso}</p>}
       {error && (

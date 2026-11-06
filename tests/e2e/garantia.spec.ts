@@ -177,6 +177,34 @@ test.describe("@logistica pantallas de garantía y borradores", () => {
     }
   });
 
+  test("contrato: abrir WhatsApp no lo marca como enviado, lo confirma Logística", async ({ abrir }, info) => {
+    test.skip(info.project.name !== "m390", "escribe en la base");
+    const fila = sql(
+      `select o.obra_id, o.numero from ordenes_compra o
+        where o.tipo = 'OS' and o.estado = 'PRECIOS_CONFIRMADOS' and not o.historico and not o.es_retencion and o.contrato_enviado_at is null
+          and not exists (select 1 from adjuntos a where a.tipo = 'CONTRATO' and a.obra_id = o.obra_id and a.numero_oc = o.numero)
+        order by o.obra_id, o.numero limit 1`,
+    )[0];
+    test.skip(!fila, "sin OS con el contrato por enviar");
+    const [obra, numero] = fila;
+    try {
+      const page = await abrir("logistica", `/logistica/ordenes/${obra}/${encodeURIComponent(numero)}?tipo=OS`);
+      await page.evaluate(() => {
+        window.open = (() => null) as typeof window.open;
+      });
+      const contrato = page.getByRole("region", { name: "Contrato" });
+      await expect(contrato).toContainText("Sin enviar");
+      await contrato.getByRole("button", { name: "WhatsApp" }).click();
+      await expect(contrato).toContainText("Sin enviar");
+      expect(sql1(`select contrato_enviado_at is null from ordenes_compra where obra_id = ${obra} and numero = '${numero}'`)).toBe("t");
+      await contrato.getByRole("button", { name: "Confirmar envío" }).click();
+      await expect(contrato).toContainText("Enviado el");
+      await expect(contrato.getByRole("button", { name: "Confirmar envío" })).toHaveCount(0);
+    } finally {
+      sql(`update ordenes_compra set contrato_enviado_at = null where obra_id = ${obra} and numero = '${numero}'`);
+    }
+  });
+
   test("las diez pestañas de OC / OS caben en dos filas", async ({ abrir }) => {
     const page = await abrir("logistica", "/logistica?tipo=OS&tab=bor");
     await expect(page.getByRole("tab", { name: "Borrador" })).toHaveAttribute("aria-selected", "true");
@@ -233,6 +261,7 @@ test.describe("@logistica pantallas de garantía y borradores", () => {
       const numero = decodeURIComponent(new URL(page.url()).pathname.split("/").pop()!);
       await expect(page.locator("main")).toContainText("Contrato de locación");
       await expect(page.locator("main")).toContainText(`Retenciones de la obra ${nombre}`);
+
       expect(sql1(`select retenida_en from ordenes_compra where obra_id = ${obra} and numero = 'E2E-P'`)).toBe(numero);
       expect(sql1(`select total from v_ordenes where obra_id = ${obra} and numero = '${numero}'`)).toBe("100.00");
 

@@ -119,7 +119,7 @@ Contabilidad, Residente y RRHH **no entran**. Sus roles siguen en la base
 - **Recepción: pendiente.** Nadie registra lo que llega todavía; se definirá después. Las entregas
   históricas del Excel se siguen viendo. Una orden pasa a «Enviada» (estado EN_ENTREGA) cuando Logística confirma que envió la
   constancia de pago al proveedor («Confirmar envío»: abrir WhatsApp o compartir no lo prueba) y ahí se queda. El mensaje nombra la
-  factura, no el N° de la orden, que es de control interno; su detalle avisa «Los residentes aún no pueden marcar
+  factura, no el N° de la orden, que es de control interno. El contrato de una OS igual: «Enviado» solo con su «Confirmar envío»; su detalle avisa «Los residentes aún no pueden marcar
   las entregas».
 - **Logística › OC / OS:** una pestaña por estado, con nombres cortos y en dos filas para que se vean
   todas a 360 px (Borrador, Cotizando, Facturar, Guía en OC o Contrato en OS, Tesorería, Pagada / Enviada, Recibida (las del
