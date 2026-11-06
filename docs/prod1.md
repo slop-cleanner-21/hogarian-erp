@@ -278,7 +278,8 @@ Contabilidad, Residente y RRHH **no entran**. Sus roles siguen en la base
     `hook_sin_correo`): ni códigos ni recuperación que se puedan pedir y adivinar; los enlaces de las sesiones los
     genera y canjea el servidor (códigos de 10 caracteres, 5 minutos).
   - «Cerrar sesión» cierra solo la de ese dispositivo. Una sesión cerrada no da nada aunque su token siga vigente.
-  - `/sb` (local) pide la contraseña de la demo y solo deja pasar la clave pública; sin esa contraseña no pasa ningún
+  - `/sb` (local) no reenvía las cookies a Supabase: no las usa y, con más de 8 KB (en localhost llegan también las del MVP), su
+    puerta de entrada responde «Bad request» a todo. Pide la contraseña de la demo y solo deja pasar la clave pública; sin esa contraseña no pasa ningún
     POST salvo las dos rutas públicas (`/cotizar/<token>/enviar`, `/acceso/entrar`).
   - **Túnel: dado de baja** (04/11/2026). No se vuelve a abrir: para probar en el celular, la URL de Vercel.
   - Cabeceras: sin incrustar en otro sitio, `nosniff`, `Referrer-Policy`; los XML / SVG de `/sb` en sandbox.

@@ -82,6 +82,25 @@ test.describe("@excel exportar el Excel", () => {
     }
   });
 
+  test("se baja aunque el navegador tenga muchas cookies (en localhost llegan también las del MVP)", async ({ abrir }, info) => {
+    test.setTimeout(120_000);
+    test.skip(!hayPlantilla(), "sin plantilla: npm run excel:plantilla");
+    const carpeta = fs.mkdtempSync(path.join(os.tmpdir(), "erp-excel-"));
+    try {
+      const page = await abrir("gerencia", "/gerencia/obras");
+      // Más de los 8 KB que acepta la puerta de entrada de Supabase.
+      await page.context().addCookies(
+        [0, 1, 2].map((i) => ({ name: `e2e_grande_${i}`, value: "x".repeat(3500), url: info.project.use.baseURL ?? "http://localhost:3100" })),
+      );
+      await page.reload();
+      await exportar(page, path.join(carpeta, "exportado.xlsm"));
+      expect(fs.statSync(path.join(carpeta, "exportado.xlsm")).size).toBeGreaterThan(1_000_000);
+    } finally {
+      fs.rmSync(carpeta, { recursive: true, force: true });
+      sql(`delete from audit_log where accion = 'EXPORTAR_EXCEL'`);
+    }
+  });
+
   test("Tesorería y Gerencia también lo tienen; el Jefe de Operaciones no", async ({ abrir }) => {
     for (const [rol, ruta] of [["tesoreria", "/tesoreria"], ["gerencia", "/gerencia/obras"]] as const) {
       const page = await abrir(rol, ruta);

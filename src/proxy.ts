@@ -49,7 +49,11 @@ async function guardarSb(request: NextRequest) {
   }
   const bearer = request.headers.get("authorization")?.replace(/^Bearer\s+/i, "");
   if (bearer && bearer !== anon && (bearer.startsWith("sb_secret_") || rolDelJwt(bearer) !== "authenticated")) return denegar();
-  const res = NextResponse.next();
+  // Supabase se autentica con su clave y el token, no con cookies. En localhost llegan también las del MVP, y por encima
+  // de 8 KB su puerta de entrada responde «Bad request» a todo (descargas, campana, avisos en vivo).
+  const cabeceras = new Headers(request.headers);
+  cabeceras.delete("cookie");
+  const res = NextResponse.next({ request: { headers: cabeceras } });
   // Archivos de Storage servidos con el origen de la app: sin adivinar el tipo y, salvo los PDF (el visor del
   // navegador no los mostraría), en sandbox: un XML o HTML subido por un interno no corre con la sesión de la app.
   // (headers() de next.config no llega a las respuestas reescritas.)
