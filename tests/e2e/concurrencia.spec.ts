@@ -338,8 +338,12 @@ test.describe("@avisos cada uno elige sus avisos", () => {
       const page = await abrir("admin", "/avisos");
       await page.getByRole("button", { name: "Elegir avisos" }).click();
       const hoja = page.getByRole("dialog", { name: "Elegir avisos" });
-      await expect(hoja.getByRole("heading", { level: 3 })).toHaveText(["Logística", "Tesorería", "Operaciones"]);
-      for (const s of await hoja.getByRole("switch", { name: "Avisar" }).all()) await expect(s).toHaveAttribute("aria-checked", "false");
+      await expect(hoja.getByRole("heading", { level: 3 })).toHaveText(["Logística", "Tesorería", "Operaciones", "Administración"]);
+      // Los de los demás, apagados; el suyo (las sugerencias), encendido.
+      for (const area of ["Logística", "Tesorería", "Operaciones"]) {
+        for (const s of await hoja.getByRole("region", { name: area }).getByRole("switch", { name: "Avisar" }).all()) await expect(s).toHaveAttribute("aria-checked", "false");
+      }
+      await expect(hoja.getByRole("listitem", { name: "Llegó una sugerencia" }).getByRole("switch", { name: "Avisar" })).toHaveAttribute("aria-checked", "true");
       // Se suma a «Llegó una orden por pagar»: en la campana, sin celular; luego también al celular.
       const evento = hoja.getByRole("listitem", { name: "Llegó una orden por pagar" });
       await expect(evento.getByRole("switch", { name: "Al celular" })).toBeDisabled();

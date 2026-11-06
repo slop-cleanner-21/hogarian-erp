@@ -6,6 +6,7 @@ import { createClient } from "@/lib/supabase/server";
 
 export const TABLA_LABEL: Record<string, string> = {
   sesion: "Sesión",
+  sugerencias: "Sugerencia",
   huellas: "Huella",
   usuarios: "Cuenta de usuario",
   ordenes_compra: "Orden",

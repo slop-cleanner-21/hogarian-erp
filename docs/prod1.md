@@ -119,6 +119,11 @@ Contabilidad, Residente y RRHH **no entran**. Sus roles siguen en la base
   factura con su archivo, PDF de la orden, contrato, guía de remisión, pagos con voucher, rechazos y entregas.
   Para eso Gerencia lee guías, pagos, rechazos, facturas y vouchers (antes solo Logística, Contabilidad y
   Tesorería). El Jefe de Operaciones no entra a la consulta.
+- **Sugerencias:** un botón en el encabezado de todas las pantallas (va en `TopBar`, porque varias no llevan menú de usuario), para
+  todos los roles: error, mejora o preferencia de diseño, con hasta 5 capturas (también se pegan en la computadora) y, solas, la
+  pantalla y el link desde donde se escribe. Al Admin le llega un aviso y las ve en Admin › Sugerencias, con un enlace a esa
+  pantalla. Tabla `sugerencias` y bucket `sugerencias`: solo las lee el servidor; cada uno sube a su carpeta y se escribe por
+  `enviar_sugerencia`, que solo acepta archivos propios.
 - **Usuarios (solo el Admin):** crea cuentas (nombres y apellidos, correo, rol de prod 1, DNI y celular), cambia nombres,
   apellidos, correo, rol, DNI y celular, restablece la contraseña (genera otra temporal),
   desactiva y reactiva. Lo hace el servidor con la clave secreta (`src/lib/supabase/admin.ts`); el registro

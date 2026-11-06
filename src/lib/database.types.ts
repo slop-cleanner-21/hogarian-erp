@@ -2687,6 +2687,43 @@ export type Database = {
           },
         ];
       };
+      sugerencias: {
+        Row: {
+          capturas: string[];
+          created_at: string;
+          id: number;
+          pantalla: string | null;
+          rol: string;
+          ruta: string | null;
+          texto: string;
+          tipo: string;
+          user_id: string | null;
+        };
+        ComputedFields: never;
+        Insert: {
+          capturas?: string[];
+          created_at?: string;
+          id?: never;
+          pantalla?: string | null;
+          rol: string;
+          ruta?: string | null;
+          texto: string;
+          tipo: string;
+          user_id?: string | null;
+        };
+        Update: {
+          capturas?: string[];
+          created_at?: string;
+          id?: never;
+          pantalla?: string | null;
+          rol?: string;
+          ruta?: string | null;
+          texto?: string;
+          tipo?: string;
+          user_id?: string | null;
+        };
+        Relationships: [];
+      };
       tipos_material: {
         Row: {
           codigo: string;
@@ -4075,6 +4112,16 @@ export type Database = {
       enviar_si_lista: {
         Args: { p_numero: string; p_obra_id: number };
         Returns: boolean;
+      };
+      enviar_sugerencia: {
+        Args: {
+          p_capturas: string[];
+          p_pantalla: string;
+          p_ruta: string;
+          p_texto: string;
+          p_tipo: string;
+        };
+        Returns: number;
       };
       es_residente: { Args: Record<PropertyKey, never>; Returns: boolean };
       exigir_rol: { Args: { p_roles: string[] }; Returns: undefined };

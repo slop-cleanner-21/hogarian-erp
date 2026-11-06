@@ -129,6 +129,7 @@ async function limpiar(inicio) {
     delete from proveedor_tipos_material where proveedor_id in (select id from _v);
     delete from proveedores where id in (select id from _v);
     delete from items where descripcion like 'E2E CEMENTO FLUJO %' or descripcion like 'E2E PINTURA FLUJO %';
+    delete from sugerencias where created_at >= ${desde} and user_id in (${lista(uids)});
     delete from notificaciones where created_at >= ${desde}
       and (titulo like '%E2E%' or cuerpo like '%E2E%' or href ~ '(/|=)(${obras.join("|") || "0"})(/|$|&)');
     commit;`);
@@ -181,7 +182,9 @@ try {
     playwright(clave, "--project=sesiones") &&
     playwright(clave, "tests/e2e/flujo.spec.ts", "--project=flujo", "--no-deps") &&
     // El export, dentro de Vercel (memoria, tiempo, descarga directa de Supabase): en local eso no se puede probar.
-    playwright(clave, "tests/e2e/excel.spec.ts", "--project=excel", "--no-deps");
+    playwright(clave, "tests/e2e/excel.spec.ts", "--project=excel", "--no-deps") &&
+    // Una sugerencia con captura: la subida al almacenamiento de la nube.
+    playwright(clave, "tests/e2e/sugerencias.spec.ts", "--project=m390", "--no-deps", "-g", "Logística manda");
 } finally {
   await limpiar(inicio);
 }

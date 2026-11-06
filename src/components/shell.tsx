@@ -6,6 +6,7 @@ import {
   Building2,
   ClipboardList,
   Hammer,
+  Lightbulb,
   Package,
   Search,
   TrendingUp,
@@ -24,6 +25,7 @@ import { usePathname, useRouter, useSearchParams } from "next/navigation";
 import { useEffect, useState, useTransition, type ReactNode } from "react";
 import { cn } from "@/lib/format";
 import { exportarExcel } from "@/app/excel/actions";
+import { BotonSugerencia } from "./sugerencia";
 import { cambiarRol } from "@/app/rol/actions";
 import { ROLES_PROD1 } from "@/lib/prod1";
 import { createClient } from "@/lib/supabase/client";
@@ -85,6 +87,7 @@ const MODULOS: Record<ClaveModulo, { label: string; roles: Rol[]; nav: NavItem[]
       { href: "/admin", label: "Usuarios", icon: Users, match: (p) => p === "/admin" },
       { href: "/admin/empresas", label: "Empresas", icon: Building2 },
       { href: "/admin/auditoria", label: "Auditoría", icon: History },
+      { href: "/admin/sugerencias", label: "Sugerencias", icon: Lightbulb },
     ],
   },
 };
@@ -189,6 +192,7 @@ export function TopBar({
           <span className="w-4" />
         )}
         <h1 className="rotulo flex-1 truncate text-[27px] font-semibold leading-[1.2]">{title}</h1>
+        <BotonSugerencia />
         {right}
       </div>
     </header>
