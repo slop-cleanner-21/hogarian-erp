@@ -32,8 +32,10 @@ const OBRA_OS = `E2E FLUJO OS ${sufijo}`;
 const PROVEEDOR_OS = `E2E PROVEEDOR FLUJO OS ${sufijo}`;
 const RUC_OS = `10${sufijo}${String((Date.now() + 7) % 1000).padStart(3, "0")}`;
 const PU_SERVICIO = 2000;
-// RHE de más de S/ 1,500: retiene el 8 % del proveedor (el de un proveedor nuevo).
-const RETENCION = PU_SERVICIO * 0.08;
+// Con 5 % de garantía se factura el neto; de ese RHE de más de S/ 1,500 se retiene el 8 % del proveedor (el de uno nuevo).
+const GARANTIA = PU_SERVICIO * 0.05;
+const NETO_SERVICIO = PU_SERVICIO - GARANTIA;
+const RETENCION = NETO_SERVICIO * 0.08;
 const hoyLima = () => new Date().toLocaleDateString("en-CA", { timeZone: "America/Lima" });
 const masDias = (iso: string, d: number) => new Date(new Date(`${iso}T12:00:00Z`).getTime() + d * 864e5).toISOString().slice(0, 10);
 const sol = (n: number) => `S/ ${n.toLocaleString("en-US", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
@@ -461,6 +463,7 @@ test.describe("@flujo flujo completo por las pantallas", () => {
       await elegir(page, main, "Proveedor", PROVEEDOR_OS);
       await elegir(page, main, "Comprobante", "Recibo por honorarios");
       await main.getByLabel("Fecha de inicio").fill(masDias(hoyLima(), -3));
+      await main.getByLabel("Retención Subcontratos").fill("5");
       await page.getByRole("button", { name: "Confirmar" }).click();
       await page.getByRole("dialog").filter({ hasText: /^¿Emitir OS/ }).getByRole("button", { name: "Sí" }).click();
       await page.waitForURL(new RegExp(`/logistica/ordenes/${obraId}/`));
@@ -480,6 +483,9 @@ test.describe("@flujo flujo completo por las pantallas", () => {
       const prov = await proveedor(browser, info, link);
       await expect(prov.page.getByRole("heading", { name: `OS ${os}` })).toBeVisible();
       await prov.page.getByLabel(`Precio unitario ${SERVICIO}`).fill(String(PU_SERVICIO));
+      // Ve lo que se le retiene y el total por el que facturará.
+      await expect(prov.page.locator("main")).toContainText(`Retención por garantía− ${sol(GARANTIA)}`);
+      await expect(prov.page.locator("main")).toContainText(`Total${sol(NETO_SERVICIO)}`);
       await prov.page.getByRole("button", { name: "Enviar cotización" }).click();
       await expect(prov.page.getByRole("status")).toHaveText("Cotización enviada");
       await prov.ctx.close();
@@ -517,9 +523,13 @@ test.describe("@flujo flujo completo por las pantallas", () => {
       await expect(hoja.getByRole("button", { name: "Tipo de comprobante" })).toHaveText(/Recibo por honorarios/);
       await hoja.getByLabel("Serie").fill("E001");
       await hoja.getByLabel("Número").fill(sufijo);
-      await hoja.getByLabel("Total").fill(String(PU_SERVICIO));
-      await expect(hoja.getByLabel("Retención 4ta (8 %)")).toHaveValue(sol(RETENCION));
       await hoja.locator('input[type="file"]').setInputFiles(ARCHIVO);
+      // Por el 100 % no: lo retenido se pagaría dos veces.
+      await hoja.getByLabel("Total").fill(String(PU_SERVICIO));
+      await expect(hoja.getByRole("status", { name: "Lo que falta" })).toContainText(`total de ${sol(NETO_SERVICIO)}, sin la retención por garantía`);
+      await expect(hoja.getByRole("button", { name: /^Registrar/ })).toBeDisabled();
+      await hoja.getByLabel("Total").fill(String(NETO_SERVICIO));
+      await expect(hoja.getByLabel("Retención 4ta (8 %)")).toHaveValue(sol(RETENCION));
       await hoja.getByRole("button", { name: /^Registrar/ }).click();
       await expect(hoja).toBeHidden();
       await expect.poll(() => estado(obraId, os)).toBe("FACTURADA");
@@ -530,16 +540,17 @@ test.describe("@flujo flujo completo por las pantallas", () => {
       await expect.poll(() => estado(obraId, os), { timeout: 15_000 }).toBe("EN_TESORERIA");
     });
 
-    await test.step("Tesorería paga el neto (total menos la retención)", async () => {
+    await test.step("Tesorería paga el neto (sin la garantía ni la retención de 4ta)", async () => {
       const page = await abrir("tesoreria", `/tesoreria/pago/${obraId}/${os}`);
-      await expect(page.getByRole("textbox", { name: "Monto", exact: true })).toHaveValue(sol(PU_SERVICIO - RETENCION));
+      await expect(page.locator("main")).toContainText(`Retención por garantía− ${sol(GARANTIA)}`);
+      await expect(page.getByRole("textbox", { name: "Monto", exact: true })).toHaveValue(sol(NETO_SERVICIO - RETENCION));
       await elegir(page, page.locator("main"), "Banco", "BCP");
       await page.getByRole("textbox", { name: "N° de operación", exact: true }).fill(`OS${sufijo}`);
       await page.locator('main input[type="file"]').setInputFiles(ARCHIVO);
       await page.getByRole("button", { name: "Aprobar pago" }).click();
       await page.getByRole("dialog", { name: "¿Aprobar pago?" }).getByRole("button", { name: "Sí" }).click();
       await expect.poll(() => estado(obraId, os), { timeout: 15_000 }).toBe("PAGADA");
-      expect(sql1(`select monto from pagos where numero_operacion = 'OS${sufijo}'`)).toBe((PU_SERVICIO - RETENCION).toFixed(2));
+      expect(sql1(`select monto from pagos where numero_operacion = 'OS${sufijo}'`)).toBe((NETO_SERVICIO - RETENCION).toFixed(2));
       expect(
         sql1(`select c.retencion from comprobantes c where c.id = (select comprobante_id from oc_items where obra_id = ${obraId} and numero_oc = '${os}' limit 1)`),
       ).toBe(RETENCION.toFixed(2));
@@ -550,7 +561,7 @@ test.describe("@flujo flujo completo por las pantallas", () => {
       await expect(page.locator("header")).toContainText("Orden de servicio");
       await expect(page.locator("header")).toContainText("Pagada");
       await expect(page.locator("main")).toContainText(`Retención 4ta− ${sol(RETENCION)}`);
-      await expect(page.getByRole("region", { name: "Pagos" })).toContainText(sol(PU_SERVICIO - RETENCION));
+      await expect(page.getByRole("region", { name: "Pagos" })).toContainText(sol(NETO_SERVICIO - RETENCION));
       const firmado = page.getByRole("region", { name: "Contrato" }).getByRole("link", { name: "Contrato firmado" });
       const r = await page.request.get((await firmado.getAttribute("href"))!);
       expect(r.status()).toBe(200);
