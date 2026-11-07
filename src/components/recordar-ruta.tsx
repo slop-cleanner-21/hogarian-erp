@@ -3,12 +3,9 @@
 import { usePathname, useRouter, useSearchParams } from "next/navigation";
 import { useEffect, useRef } from "react";
 import { guardar, leer } from "@/lib/recordar";
-import { COOKIE_ULTIMA } from "@/lib/ultima-ruta";
+import { COOKIE_ULTIMA, seRetoma } from "@/lib/ultima-ruta";
 
 const CLAVE = "ultima-ruta";
-
-// Pantallas que no se retoman: entrada, acceso y el link público del proveedor.
-const NO_RECORDAR = ["/login", "/acceso", "/cotizar", "/voucher-simulado", "/comprobante-simulado"];
 
 /** Pantalla anterior dentro de la app (para que «Volver» use el historial cuando lleva a ella). */
 export const CLAVE_ANTERIOR = "erp:pantalla-anterior";
@@ -29,8 +26,8 @@ export function RecordarRuta() {
     actual.current = nueva;
   }, [path, busqueda]);
   useEffect(() => {
-    if (path === "/" || NO_RECORDAR.some((p) => path.startsWith(p))) return;
     const ruta = busqueda ? `${path}?${busqueda}` : path;
+    if (!seRetoma(ruta)) return;
     guardar(CLAVE, ruta);
     document.cookie = `${COOKIE_ULTIMA}=${encodeURIComponent(ruta)}; path=/; max-age=${60 * 60 * 24 * 365}; samesite=lax`;
   }, [path, busqueda]);
@@ -45,7 +42,7 @@ export function RetomarRuta({ inicio, prefijos }: { inicio: string; prefijos: st
   const router = useRouter();
   useEffect(() => {
     const ultima = leer<string>(CLAVE);
-    const valida = ultima && (prefijos == null || prefijos.some((p) => ultima === p || ultima.startsWith(`${p}/`) || ultima.startsWith(`${p}?`)));
+    const valida = ultima && seRetoma(ultima) && (prefijos == null || prefijos.some((p) => ultima === p || ultima.startsWith(`${p}/`) || ultima.startsWith(`${p}?`)));
     router.replace(valida ? ultima : inicio);
   }, [router, inicio, prefijos]);
   return null;

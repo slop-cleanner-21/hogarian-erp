@@ -1,7 +1,7 @@
 import { cookies } from "next/headers";
 import { redirect } from "next/navigation";
 import { RetomarRuta } from "@/components/recordar-ruta";
-import { COOKIE_ULTIMA } from "@/lib/ultima-ruta";
+import { COOKIE_ULTIMA, seRetoma } from "@/lib/ultima-ruta";
 import { HOME_BY_ROL } from "@/lib/nav";
 import { requireSesion } from "@/lib/supabase/server";
 
@@ -9,8 +9,9 @@ export default async function Home() {
   const { rol } = await requireSesion();
   const inicio = HOME_BY_ROL[rol];
   // ADMIN entra a todos los módulos; los demás solo retoman pantallas de su módulo. Solo rutas internas.
+  // Nunca a una pantalla que no se retoma (una cookie vieja podía guardar el bloqueo y dejarlo en un bucle).
   const valida = (ruta: string) =>
-    ruta.startsWith("/") && !ruta.startsWith("//") && (rol === "ADMIN" || ruta === inicio || ruta.startsWith(`${inicio}/`) || ruta.startsWith(`${inicio}?`));
+    seRetoma(ruta) && (rol === "ADMIN" || ruta === inicio || ruta.startsWith(`${inicio}/`) || ruta.startsWith(`${inicio}?`));
 
   // Con la última pantalla en la cookie, se abre directo desde el servidor (sin pantalla en blanco).
   const cookie = (await cookies()).get(COOKIE_ULTIMA)?.value;
