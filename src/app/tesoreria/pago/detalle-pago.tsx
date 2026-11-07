@@ -98,6 +98,7 @@ export function DetallePago({
   carpetaVoucher,
   rechazos = [],
   sinAnular = null,
+  esRetencion = false,
   volverA = "/tesoreria",
   pantallaDiseno = "orden-tesoreria",
   entregas,
@@ -132,6 +133,8 @@ export function DetallePago({
   rechazos?: RechazoVer[];
   /** Por qué la factura no se puede anular al rechazar (pagos, asiento, otra orden). */
   sinAnular?: string | null;
+  /** OS de retenciones: su monto no se corrige, no se rechaza por precios. */
+  esRetencion?: boolean;
   /** Adónde lleva «Volver» (la bandeja de pagos o el presupuesto de obra). */
   volverA?: string | true;
   /** Pantalla con la que se recuerda el diseño de los ítems (pago de Tesorería o consulta). */
@@ -582,7 +585,7 @@ export function DetallePago({
                     ["PRECIOS", "Vuelve a cotización y factura nueva"],
                   ] as [Correccion, string][]
                 ).map(([c, detalle]) => {
-                  const deshabilitada = c !== "DATOS" && !puedeAnular;
+                  const deshabilitada = (c !== "DATOS" && !puedeAnular) || (c === "PRECIOS" && esRetencion);
                   return (
                     <label
                       key={c}

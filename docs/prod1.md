@@ -91,8 +91,8 @@ Contabilidad, Residente y RRHH **no entran**. Sus roles siguen en la base
   proveedor y obra (`crear_orden_retencion`): recibo por honorarios con el concepto «Retenciones de la obra X», una línea por
   partida con cantidad 1 y el monto como precio aprobado, para que el total sea lo retenido al céntimo. Sigue el recorrido normal,
   con su contrato de locación, que lista las OS retenidas. Cada OS devuelta queda marcada (`retenida_en`) y no se devuelve dos
-  veces; si la OS de retenciones se anula, vuelve a estar por devolver. Su monto no se cambia (ni tras un rechazo por precios) y su
-  P.U. no cuenta como precio del ítem. Lo retenido figura por pagar en el presupuesto hasta que entra en esa OS. Al cerrar la obra, Logística recibe el aviso con el monto.
+  veces; si la OS de retenciones se anula, vuelve a estar por devolver. Su monto no se cambia (Tesorería no la rechaza por precios) y su
+  P.U. no cuenta como precio del ítem. En el contexto de la orden, lo retenido figura por pagar hasta que entra en esa OS. Al cerrar la obra, Logística recibe el aviso con el monto.
   **Históricos** (migración `prod1_garantia_historica`, `fn_garantia_historica`): la mano de obra al 95 % del presupuesto está a su
   neto en el Excel. Precio, parcial, comprobantes y pagos no se tocan: `oc_items.pu_bruto` guarda el P.U. acordado y lo retenido es
   la diferencia, al céntimo (si la orden vuelve a cotización, pasa a llevarla como una nueva: P.U. al 100 % y el %). **Excepción:** en una obra donde ya se pagó el ítem «RETENCION 5%», la devolución se hizo a un proveedor

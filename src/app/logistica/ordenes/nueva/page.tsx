@@ -120,7 +120,7 @@ export default async function NuevaOrdenPage({ searchParams }: PageProps<"/logis
 
   return (
     <>
-      <RecordarFiltros clave="nueva" base={["tipo"]} ignorar={["req", "borrador"]} />
+      <RecordarFiltros clave={`nueva-${tipo}`} base={["tipo"]} ignorar={["req", "borrador"]} />
       <NuevaOrden
       key={`${obraId ?? 0}-${sp.req ?? ""}-${borrador?.id ?? ""}`}
       usuario={userId}

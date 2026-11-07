@@ -215,6 +215,7 @@ export async function vistaOrden(
     contexto: <ContextoCompraDiferido contexto={contextoP} pantalla={modo} />,
     rechazos,
     sinAnular,
+    esRetencion: oc?.es_retencion === true,
     destino: { obraId, numero, ordenPagoId: null },
     bancoDefault: prov?.banco ?? null,
     carpetaVoucher: `pagos/${orden.empresa_id}/${obraId}-${numero}`,

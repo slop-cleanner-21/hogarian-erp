@@ -6,6 +6,7 @@ import { useState, useTransition, type ReactNode } from "react";
 import { BotonCopiar, copiarTexto } from "@/components/copiar";
 import { IconoWhatsApp } from "@/components/iconos";
 import { Button } from "@/components/ui/button";
+import { Faltan } from "@/components/ui/faltan";
 import { abrirBlob, useEsPwa } from "@/components/visor";
 import { cn, fecha, money, telefonoIntl } from "@/lib/format";
 import type { VOcItem, VOrden } from "@/lib/types";
@@ -152,6 +153,7 @@ export function ContratoOS({
               aria-label="Concepto del recibo por honorarios"
               className="w-full rounded-field border border-line bg-surface p-3 text-[16px] leading-snug"
             />
+            <Faltan items={[glosa.trim().length < 5 && "concepto de al menos 5 letras"]} />
             <div className="flex gap-2">
               <Button
                 variant="secondary"

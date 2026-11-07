@@ -169,7 +169,7 @@ function HistorialFilas({ partidaId, unidad }: { partidaId: number; unidad: stri
           </span>
           <span className="num text-right">
             <span className="block">{money(f.parcial)}</span>
-            <span className="block text-[13px] text-ink-3">P.U. {precio(Number(f.parcial) / Number(f.cantidad))}</span>
+            <span className="block text-[13px] text-ink-3">P.U. {precio(f.parcial == null ? null : Number(f.parcial) / Number(f.cantidad))}</span>
           </span>
         </Link>
       ))}

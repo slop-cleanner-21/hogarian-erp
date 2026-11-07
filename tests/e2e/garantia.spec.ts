@@ -25,6 +25,7 @@ test.describe("@logistica retención por garantía en la base", () => {
     const prov = proveedorId();
     const log = uidDe("LOGISTICA");
     const jefe = uidDe("JEFE_OPERACIONES");
+    const tes = uidDe("TESORERIA");
     const filas = sqlScript(`begin;
       create function pg_temp.t(p_uid text, p_sql text) returns text language plpgsql as $f$
       declare r text;
@@ -75,6 +76,8 @@ test.describe("@logistica retención por garantía en la base", () => {
         update ordenes_compra set estado = 'FACTURADA' where obra_id = ${obra} and numero = v_d;
         return next 'sin_contrato|' || pg_temp.t('${log}', format($q$select enviar_a_tesoreria(${obra}, %L)$q$, v_d));
         return next 'no_sola|' || pg_temp.t('${log}', format($q$select enviar_si_lista(${obra}, %L)$q$, v_d));
+        update ordenes_compra set estado = 'EN_TESORERIA' where obra_id = ${obra} and numero = v_d;
+        return next 'rechazo_precios|' || pg_temp.t('${tes}', format($q$select rechazar_documento(${obra}, %L, null, 'e2e motivo', false, 'PRECIOS')$q$, v_d));
 
         update ordenes_compra set estado = 'ANULADA', motivo_anulacion = 'e2e' where obra_id = ${obra} and numero = v_d;
         return next 'anulada|' || ((select retenida_en from ordenes_compra where obra_id = ${obra} and numero = v_n) is null);
@@ -108,6 +111,7 @@ test.describe("@logistica retención por garantía en la base", () => {
     expect(Number(r.pu_hist || 0), "su P.U. es un monto: no cuenta como precio del ítem").not.toBe(Number(retenido));
     expect(r.sin_contrato).toMatch(/^error: Falta el contrato firmado de la OS/);
     expect(r.no_sola).toBe("false");
+    expect(r.rechazo_precios, "su monto no se corrige").toBe("error: El monto de una OS de retenciones no se corrige: rechaza por datos o por la factura");
     expect(r.anulada, "al anularla, vuelve a estar por devolver").toBe("true");
     expect(r.de_nuevo).toBe("true");
   });

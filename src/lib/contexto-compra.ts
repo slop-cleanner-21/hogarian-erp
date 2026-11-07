@@ -55,7 +55,7 @@ export async function contextoCompra(obraId: number, numero: string): Promise<Co
     }
     if (l.numero_oc === numero) {
       const e = estaOrden.get(l.partida_id!) ?? { monto: 0, cantidad: 0 };
-      e.monto += monto;
+      e.monto += monto + retenido;
       e.cantidad += Number(l.cantidad ?? 0);
       estaOrden.set(l.partida_id!, e);
     }

@@ -79,7 +79,7 @@ function FichaEmpresa({ e, gerentes, onClose }: { e: EmpresaFicha; gerentes: Ger
       title={e.nombre}
       footer={
         <div className="flex flex-col gap-2">
-          <Faltan items={[!rucValido && "RUC de 11 dígitos"]} />
+          <Faltan items={[!rucValido && "RUC válido"]} />
           <Button size="lg" onClick={guardar} disabled={pending || !rucValido}>
             Guardar
           </Button>

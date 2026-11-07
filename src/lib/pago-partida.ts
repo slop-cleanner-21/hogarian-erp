@@ -10,7 +10,7 @@ export async function pagoPorPartida(obraId: number): Promise<Map<number, PagoPa
   const filas = await todas((a, b) =>
     supabase
       .from("v_oc_items_calc")
-      .select("partida_id, cantidad, parcial, estado, retenido, retenida_en")
+      .select("partida_id, cantidad, parcial, estado, es_retencion")
       .eq("obra_id", obraId)
       .in("estado", ["PAGADA", "EN_ENTREGA", "RECIBIDA", "EN_TESORERIA"])
       .range(a, b),
@@ -18,13 +18,11 @@ export async function pagoPorPartida(obraId: number): Promise<Map<number, PagoPa
   const m = new Map<number, PagoPartida>();
   for (const f of filas) {
     const p = m.get(f.partida_id!) ?? { pagado: 0, montoPagado: 0, porPagar: 0 };
-    // Lo retenido por garantía queda por pagar hasta que entre en su OS de retenciones.
-    const retenido = f.retenida_en ? 0 : Number(f.retenido ?? 0);
     if (PAGADAS.has(f.estado ?? "")) {
-      p.pagado += Number(f.cantidad ?? 0);
+      // La OS de retenciones devuelve dinero: su cantidad no es lo ejecutado.
+      if (!f.es_retencion) p.pagado += Number(f.cantidad ?? 0);
       p.montoPagado += Number(f.parcial ?? 0);
-      p.porPagar += retenido;
-    } else p.porPagar += Number(f.parcial ?? 0) + retenido;
+    } else p.porPagar += Number(f.parcial ?? 0);
     m.set(f.partida_id!, p);
   }
   return m;

@@ -205,7 +205,7 @@ function NuevoItemSheet({
       title={clase === "mat" ? "Nuevo material" : "Nuevo servicio"}
       footer={
         <div className="flex flex-col gap-2">
-          <Faltan items={[!descripcion.trim() && "descripción", !unidad && "unidad"]} />
+          <Faltan items={[!descripcion.trim() && "descripción", !unidad && "unidad", !!igual && "otro nombre: ya existe"]} />
           <Button size="lg" onClick={guardar} disabled={pending || !descripcion.trim() || !unidad || !!igual}>
             Guardar
           </Button>
