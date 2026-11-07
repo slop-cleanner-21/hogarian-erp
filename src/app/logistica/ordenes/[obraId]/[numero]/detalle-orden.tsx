@@ -285,9 +285,10 @@ export function DetalleOrden({
   const faltanPrecios = lineas.some((l) => l.pu == null);
   const sinAprobar = lineas.filter((l) => l.sobre && !l.aprobado).length;
   const sinComprobante = items.filter((i) => i.comprobante_id == null);
+  // Mientras no se mandó a Tesorería (y sin pagos). Su factura o recibo se anula con ella.
   const puedeAnular =
-    (orden.estado === "EMITIDA" || orden.estado === "PRECIOS_CONFIRMADOS") &&
-    items.every((i) => i.comprobante_id == null);
+    (orden.estado === "EMITIDA" || orden.estado === "PRECIOS_CONFIRMADOS" || orden.estado === "FACTURADA") && !(Number(orden.pagado) > 0);
+  const comprobantesAnular = [...new Set(items.map((i) => i.comprobante).filter((c): c is string => !!c))];
 
   const setPu = (id: number, patch: Partial<Precio>) =>
     setPrecios((prev) => new Map(prev).set(id, { ...prev.get(id)!, ...patch }));
@@ -938,6 +939,7 @@ export function DetalleOrden({
         open={anular}
         onClose={() => setAnular(false)}
         orden={orden}
+        comprobantes={comprobantesAnular}
       />
       {comprobante && (
         <ComprobanteSheet
@@ -963,10 +965,13 @@ function AnularSheet({
   open,
   onClose,
   orden,
+  comprobantes,
 }: {
   open: boolean;
   onClose: () => void;
   orden: VOrden;
+  /** Los que se anulan con la orden. */
+  comprobantes: string[];
 }) {
   const router = useRouter();
   const [motivo, setMotivo] = useState("");
@@ -1003,6 +1008,9 @@ function AnularSheet({
       }
     >
       <div className="flex flex-col gap-3 p-4">
+        {comprobantes.length > 0 && (
+          <p className="font-semibold text-danger">Se anula también {comprobantes.length === 1 ? "el comprobante" : "los comprobantes"} {comprobantes.join(", ")}</p>
+        )}
         <Field label="Motivo">
           <textarea
             value={motivo}

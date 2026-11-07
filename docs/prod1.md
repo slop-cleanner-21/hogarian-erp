@@ -257,6 +257,9 @@ Contabilidad, Residente y RRHH **no entran**. Sus roles siguen en la base
   por evento, «Avisar» (campana) y «Al celular» (push, solo si avisa). Los de su rol llegan por defecto, con celular;
   el Admin y Gerencia pueden sumarse a cualquier evento de los demás (por área), que arranca apagado y, al sumarse, sin
   celular: así no se les llena el teléfono. Solo se guarda lo que cambió del defecto.
+- **Anular una OC u OS** (Logística o Gerencia, menú de la orden): mientras no se mandó a Tesorería (Cotizando, Facturar, Guía /
+  Contrato, también tras un rechazo) y sin pagos. Su factura o recibo se anula con ella (si no está contabilizado ni cubre otras
+  órdenes) y su N° se puede registrar de nuevo en la orden correcta: la unicidad de los comprobantes solo cuenta los vigentes.
 - **Varias personas a la vez:** lo resuelve la base. Pagar, rechazar, enviar a Tesorería, registrar la factura, confirmar
   precios y anular bloquean la orden y revisan su estado: si dos actúan a la vez, la segunda espera y, si la orden ya
   cambió, recibe el error (un solo pago; o el pago o el rechazo; la cotización del proveedor, una vez). Las pantallas no

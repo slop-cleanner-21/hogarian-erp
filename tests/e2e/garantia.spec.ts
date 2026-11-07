@@ -58,6 +58,19 @@ test.describe("@logistica retención por garantía en la base", () => {
         v_c := pg_temp.t('${log}', format($q$select registrar_comprobante(${prov}, 'RXH', 'E777', '2', current_date, %s, null, 'e2e/x.pdf', array[%s]::bigint[], null)$q$, v_neto, v_item));
         return next 'recibo_neto|' || (v_c ~ '^[0-9]+$');
         return next 'corregir_100|' || pg_temp.t('${log}', format($q$select editar_comprobante(%s, 'RXH', 'E777', '2', current_date, %s, null, null, 'e2e')$q$, v_c, v_bruto + 2));
+        -- Facturada y aún sin mandar a Tesorería: se anula con su recibo, y el recibo se puede registrar en otra orden.
+        v_t := pg_temp.t('${log}', format($q$select crear_orden(${obra}, null, ${prov}, 'OS', '[{"partida_id":${partida},"cantidad":1,"ret_garantia_pct":5}]')$q$));
+        perform pg_temp.t('${log}', format($q$select confirmar_precios(${obra}, %L)$q$, v_t));
+        perform pg_temp.t('${log}', format($q$select registrar_comprobante(${prov}, 'RXH', 'E778', '1', current_date, %s, null, 'e2e/x.pdf', array[(select min(id) from oc_items where obra_id = ${obra} and numero_oc = %L)]::bigint[], null)$q$,
+          (select sum(parcial) from v_oc_items_calc where obra_id = ${obra} and numero_oc = v_t), v_t));
+        return next 'anular_facturada|' || pg_temp.t('${log}', format($q$select anular_orden(${obra}, %L, 'e2e: OS equivocada')$q$, v_t));
+        return next 'anulada_estado|' || (select estado || '|' || (select count(*) from comprobantes where serie = 'E778' and anulado_at is not null) from ordenes_compra where obra_id = ${obra} and numero = v_t);
+        v_t := pg_temp.t('${log}', format($q$select crear_orden(${obra}, null, ${prov}, 'OS', '[{"partida_id":${partida},"cantidad":1,"ret_garantia_pct":5}]')$q$));
+        perform pg_temp.t('${log}', format($q$select confirmar_precios(${obra}, %L)$q$, v_t));
+        return next 'recibo_de_nuevo|' || (pg_temp.t('${log}', format($q$select registrar_comprobante(${prov}, 'RXH', 'E778', '1', current_date, %s, null, 'e2e/x.pdf', array[(select min(id) from oc_items where obra_id = ${obra} and numero_oc = %L)]::bigint[], null)$q$,
+          (select sum(parcial) from v_oc_items_calc where obra_id = ${obra} and numero_oc = v_t), v_t)) ~ '^[0-9]+$');
+        update ordenes_compra set estado = 'EN_TESORERIA' where obra_id = ${obra} and numero = v_n;
+        return next 'anular_tesoreria|' || pg_temp.t('${log}', format($q$select anular_orden(${obra}, %L, 'e2e')$q$, v_n));
         update ordenes_compra set estado = 'PAGADA' where obra_id = ${obra} and numero = v_n;
         return next 'abierta|' || pg_temp.t('${log}', $q$select crear_orden_retencion(${obra}, null, ${prov})$q$);
         update obras set estado = 'CERRADA' where id = ${obra};
@@ -101,6 +114,10 @@ test.describe("@logistica retención por garantía en la base", () => {
     expect(r.recibo_100, "por el 100 % no: Tesorería pagaría lo retenido").toMatch(/^error: El comprobante debe ser por S\/ [\d,.]+ \(sin la retención por garantía\)$/);
     expect(r.recibo_neto).toBe("true");
     expect(r.corregir_100).toMatch(/^error: El comprobante debe ser por/);
+    expect(r.anular_facturada, "facturada, sin mandar a Tesorería: se anula").toBe("");
+    expect(r.anulada_estado, "con su recibo").toBe("ANULADA|1");
+    expect(r.recibo_de_nuevo, "el N° del recibo anulado no queda bloqueado").toBe("true");
+    expect(r.anular_tesoreria).toMatch(/ya se mandó a Tesorería: no se puede anular$/);
     expect(r.abierta).toBe("error: Las retenciones se devuelven con la obra cerrada");
     expect(r.jefe).toMatch(/^error/);
     expect(r.devolucion).toMatch(/^PRECIOS_CONFIRMADOS\|true\|RXH\|Retenciones de la obra /);
