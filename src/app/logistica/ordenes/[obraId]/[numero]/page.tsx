@@ -153,7 +153,9 @@ export default async function OrdenPage({ params }: PageProps<"/logistica/ordene
     <DetalleOrden
       manoObra={manoObra}
       // Precios nuevos (p. ej. el proveedor envió su cotización): el formulario parte de lo guardado.
-      key={(items ?? []).map((i) => `${i.id}:${i.pu_cotizado}:${i.pu_aprobado}`).join("|") + orden.estado}
+      // Solo si cambian los precios: un cambio de estado (p. ej. tras registrar la factura) no rearma la pantalla, que cerraría
+      // una hoja abierta con lo que se lleva escrito.
+      key={(items ?? []).map((i) => `${i.id}:${i.pu_cotizado}:${i.pu_aprobado}`).join("|")}
       orden={orden as VOrden}
       items={(items ?? []) as VOcItem[]}
       comprobanteHabitual={prov?.comprobante_habitual ?? null}
