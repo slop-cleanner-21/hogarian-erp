@@ -49,6 +49,11 @@ export async function crearOrden(input: z.input<typeof CrearOrden>): Promise<Res
   const p = CrearOrden.safeParse(input);
   if (!p.success) return fail(p.error.issues[0].message);
   const supabase = await db();
+  // Abierto en dos dispositivos: el segundo no emite otra orden con lo mismo.
+  if (p.data.borradorId) {
+    const { data: sigue } = await supabase.from("orden_borradores").select("id").eq("id", p.data.borradorId).maybeSingle();
+    if (!sigue) return fail("Este borrador ya se emitió o se eliminó");
+  }
   const { data, error } = await supabase.rpc("crear_orden", {
     p_obra_id: p.data.obraId,
     // Sin N°: la base pone el siguiente de la obra (nunca repite el de una anulada).
@@ -97,9 +102,16 @@ export async function guardarBorradorOrden(input: z.input<typeof BorradorOrden>)
   if (!p.success) return fail(p.error.issues[0].message);
   const supabase = await db();
   const fila = { tipo: p.data.tipo, obra_id: p.data.obraId, datos: p.data.datos };
-  const { data, error } = p.data.id
-    ? await supabase.from("orden_borradores").update({ ...fila, updated_at: new Date().toISOString() }).eq("id", p.data.id).select("id").single()
-    : await supabase.from("orden_borradores").insert(fila).select("id").single();
+  // Si ya no existe (se emitió en otro dispositivo), queda como uno nuevo: lo escrito no se pierde.
+  const previo = p.data.id
+    ? await supabase.from("orden_borradores").update({ ...fila, updated_at: new Date().toISOString() }).eq("id", p.data.id).select("id").maybeSingle()
+    : null;
+  if (previo?.error) return fail(previo.error.message);
+  if (previo?.data) {
+    revalidatePath("/logistica");
+    return { ok: true, data: previo.data.id };
+  }
+  const { data, error } = await supabase.from("orden_borradores").insert(fila).select("id").single();
   if (error) return fail(error.message);
   revalidatePath("/logistica");
   return { ok: true, data: data.id };

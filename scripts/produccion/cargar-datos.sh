@@ -19,6 +19,7 @@ SEEDS=(
   historico.sql       # órdenes pagadas del Excel: entregadas y recibidas
   prod1_historico.sql # marca de histórico
   prod1_envio.sql     # las facturadas completas pasan a Tesorería
+  suspensiones_4ta.sql # suspensiones de 4ta (datos reales; NO versionado)
 )
 # No van: usuarios_locales.sql, asignaciones.sql (residentes de prueba), demo.sql y los scripts db:demo-*.
 

@@ -34,7 +34,7 @@ export async function contextoCompra(obraId: number, numero: string): Promise<Co
       supabase.from("v_avance_partida").select("partida_id, etapa, descripcion, unidad, presupuestado, parcial").eq("obra_id", obraId).range(a, b),
     ),
     todas((a, b) =>
-      supabase.from("v_oc_items_calc").select("partida_id, numero_oc, parcial, cantidad, estado").eq("obra_id", obraId).neq("estado", "ANULADA").range(a, b),
+      supabase.from("v_oc_items_calc").select("partida_id, numero_oc, parcial, cantidad, estado, retenido, retenida_en").eq("obra_id", obraId).neq("estado", "ANULADA").range(a, b),
     ),
   ]);
 
@@ -44,10 +44,14 @@ export async function contextoCompra(obraId: number, numero: string): Promise<Co
   for (const l of lineas) {
     const a = porPartida.get(l.partida_id!);
     const monto = Number(l.parcial ?? 0);
+    // Lo retenido por garantía se le debe al proveedor hasta que entre en su OS de retenciones: no es saldo libre.
+    const retenido = l.retenida_en ? 0 : Number(l.retenido ?? 0);
     if (a) {
-      if (PAGADO.has(l.estado ?? "")) a.pagado += monto;
-      else if (l.estado === "EN_TESORERIA") a.porPagar += monto;
-      else a.enLogistica += monto;
+      if (PAGADO.has(l.estado ?? "")) {
+        a.pagado += monto;
+        a.porPagar += retenido;
+      } else if (l.estado === "EN_TESORERIA") a.porPagar += monto + retenido;
+      else a.enLogistica += monto + retenido;
     }
     if (l.numero_oc === numero) {
       const e = estaOrden.get(l.partida_id!) ?? { monto: 0, cantidad: 0 };

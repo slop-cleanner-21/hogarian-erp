@@ -330,7 +330,7 @@ export function ProveedorSheet({
                 </Field>
                 {p.suspension_4ta_fecha && (
                   <p className={cn("num text-[15px]", suspensionDelAnio(p.suspension_4ta_fecha, hoyISO()) ? "text-ok" : "font-semibold text-danger")}>
-                    {suspensionDelAnio(p.suspension_4ta_fecha, hoyISO()) ? "Vigente" : "Vencida"} hasta el 31/12/{p.suspension_4ta_fecha.slice(0, 4)}
+                    {suspensionDelAnio(p.suspension_4ta_fecha, hoyISO()) ? "Vigente hasta" : "Vencida"} el 31/12/{p.suspension_4ta_fecha.slice(0, 4)}
                   </p>
                 )}
                 <Field label="N° de operación">

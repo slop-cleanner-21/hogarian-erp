@@ -18,10 +18,10 @@ export function tonoPrecio(pu: number, referencia: number, maximo?: number | nul
   return "igual";
 }
 
-/** "+0.80 (+2.6 %)" */
+/** "+S/ 0.80 (+2.6 %)" */
 export function textoDiferencia(pu: number, referencia: number) {
   const dif = pu - referencia;
   const pct = referencia ? (dif / referencia) * 100 : 0;
   const signo = dif > 0 ? "+" : "";
-  return `${signo}${money(dif)} (${signo}${pct.toFixed(1)} %)`;
+  return `${dif < 0 ? "-" : signo}S/ ${money(Math.abs(dif))} (${signo}${pct.toFixed(1)} %)`;
 }

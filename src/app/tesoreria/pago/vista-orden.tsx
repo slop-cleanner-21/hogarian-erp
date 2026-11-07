@@ -83,6 +83,7 @@ export async function vistaOrden(
       supabase
         .from("v_oc_items_calc")
         .select("item_id, obra_id, numero_oc, fecha, pu_efectivo, pu_bruto")
+        .eq("es_retencion", false)
         .in("item_id", itemIds)
         .neq("estado", "ANULADA")
         .not("pu_efectivo", "is", null)

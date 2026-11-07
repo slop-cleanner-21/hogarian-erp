@@ -758,9 +758,12 @@ export function DetalleOrden({
             </div>
           )}
           {retenidaEn && (
-            <div className="flex justify-between text-ink-2">
-              <span>Garantía devuelta en</span>
-              <Link href={`/logistica/ordenes/${orden.obra_id}/${encodeURIComponent(retenidaEn)}?tipo=OS`} className="font-medium text-primary">
+            <div className="flex items-center justify-between text-ink-2">
+              <span>Garantía</span>
+              <Link
+                href={`/logistica/ordenes/${orden.obra_id}/${encodeURIComponent(retenidaEn)}?tipo=OS`}
+                className="flex min-h-11 items-center pl-3 font-medium text-primary"
+              >
                 OS {retenidaEn}
               </Link>
             </div>
@@ -1085,7 +1088,7 @@ function ComprobanteSheet({
         ) / 100
       : 0;
   // Con retención por garantía se factura el neto (la base rechaza otro total).
-  const netoMal = items.some((i) => sel.has(i.id!) && Number(i.retenido) > 0) && Math.abs(totalNum - sugerido) > 1;
+  const netoMal = items.some((i) => sel.has(i.id!) && Number(i.retenido) > 0) && Math.round(Math.abs(totalNum - sugerido) * 100) > 100;
   const [detraccion, setDetraccion] = useState<string>("");
   const detraccionNum = conDetraccion ? (detraccion === "" ? detraccionSugerida : Number(detraccion)) : 0;
   const [archivo, setArchivo] = useState<File | null>(null);

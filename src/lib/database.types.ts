@@ -3348,6 +3348,7 @@ export type Database = {
           created_at: string;
           cuenta_contable: string | null;
           descripcion: string;
+          es_retencion: boolean;
           estado: Database["public"]["Enums"]["estado_oc"];
           etapa: string;
           fecha: string;
@@ -3367,6 +3368,7 @@ export type Database = {
           pu_partida: number | null;
           requerimiento: string;
           ret_garantia_pct: number;
+          retenida_en: string | null;
           retenido: number | null;
           rubro: Database["public"]["Enums"]["rubro"];
           sobreprecio: boolean | null;

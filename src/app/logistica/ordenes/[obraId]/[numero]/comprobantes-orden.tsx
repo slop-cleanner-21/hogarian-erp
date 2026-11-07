@@ -8,7 +8,7 @@ import { Button } from "@/components/ui/button";
 import { Field, Input, NumberInput, inputClass } from "@/components/ui/field";
 import { SearchSelect } from "@/components/ui/search-select";
 import { Sheet } from "@/components/ui/sheet";
-import { cn, fecha, money, soles } from "@/lib/format";
+import { cn, fecha, soles } from "@/lib/format";
 import { retencion4ta, suspensionVigente } from "@/lib/retencion";
 import { createClient } from "@/lib/supabase/client";
 import { TIPO_COMPROBANTE_LABEL, type TipoComprobante } from "@/lib/types";
@@ -27,7 +27,7 @@ export type ComprobanteOrden = Datos & {
   historial: { id: number; anterior: Datos; nuevo: Datos; motivo: string | null; editadoAt: string; quien: string }[];
 };
 
-const resumen = (d: Datos) => `${TIPO_COMPROBANTE_LABEL[d.tipo]} ${d.serie}-${d.numero}, ${fecha(d.fecha_emision)}, ${money(d.total)}`;
+const resumen = (d: Datos) => `${TIPO_COMPROBANTE_LABEL[d.tipo]} ${d.serie}-${d.numero}, ${fecha(d.fecha_emision)}, ${soles(d.total)}`;
 
 /** Comprobantes de la orden: Logística los corrige (p. ej. tras un rechazo) y cada cambio queda en el historial. */
 export function ComprobantesOrden({
@@ -74,7 +74,7 @@ export function ComprobantesOrden({
               )}
               <div className="num flex gap-3 text-sm text-ink-2">
                 <span>{fecha(c.fecha_emision)}</span>
-                <span>{money(c.total)}</span>
+                <span>{soles(c.total)}</span>
               </div>
             </div>
             <div className="flex shrink-0">

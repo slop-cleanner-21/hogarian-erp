@@ -80,6 +80,7 @@ export default async function NuevaOrdenPage({ searchParams }: PageProps<"/logis
             .select("item_id, proveedor_id, fecha, pu_efectivo, pu_bruto")
             .in("item_id", itemIds.slice(k * 300, k * 300 + 300))
             .neq("estado", "ANULADA")
+            .eq("es_retencion", false)
             .order("id")
             .range(a, b),
         ),

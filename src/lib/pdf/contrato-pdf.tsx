@@ -138,7 +138,7 @@ export function ContratoDoc({ orden, items, datos }: { orden: VOrden; items: VOc
   // Sin comprobante elegido (OS anteriores): por el documento, RUC 20 factura; DNI o RUC 10 recibo por honorarios.
   const empresa = datos?.comprobante ? datos.comprobante === "FACTURA" : doc.length === 11 && doc.startsWith("20");
   if (empresa && !retenidas) return <ContratoComercial orden={orden} items={items} datos={datos} total={total} retenido={retenido} />;
-  const comprobante = "recibo por honorarios electrónico";
+  const comprobante = empresa ? "factura electrónica" : "recibo por honorarios electrónico";
 
   const clausulas: { titulo: string; cuerpo: ReactNode }[] = [
     {
@@ -201,7 +201,7 @@ export function ContratoDoc({ orden, items, datos }: { orden: VOrden; items: VOc
         <>
           {retenidas ? (
             <Text style={s.p}>
-              El monto a devolver es de S/ {money(total)}. EL COMITENTE lo pagará por transferencia bancaria, previa entrega del{" "}
+              El monto a devolver es de S/ {money(total)}. EL COMITENTE lo pagará por transferencia bancaria, previa entrega de su{" "}
               {comprobante} con el concepto indicado en la cláusula siguiente.
             </Text>
           ) : (

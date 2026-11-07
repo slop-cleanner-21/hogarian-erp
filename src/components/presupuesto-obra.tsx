@@ -172,7 +172,7 @@ export function OrdenesPartida({
           <span className="num text-right">{money(f.parcial)}</span>
           <span className="truncate text-ink-2">{f.proveedor}</span>
           <span className="num whitespace-nowrap text-right text-ink-2">
-            {qty(f.cantidad)} {unidad} × {money(f.pu_efectivo)}
+            {qty(f.cantidad)} {unidad} × {money(Number(f.parcial) / Number(f.cantidad))}
           </span>
           <span className="num text-ink-3">{fecha(f.fecha)}</span>
           <span className="text-right text-ink-3">{f.estado ? ESTADO_LABEL[f.estado] : ""}</span>

@@ -32,15 +32,19 @@ export default async function RetencionesPage({ searchParams }: PageProps<"/logi
         proveedorId: f.proveedor_id!,
         proveedor: f.proveedor ?? "",
         porDevolver: 0,
+        enDevolucion: 0,
         sinPagar: 0,
         devuelto: 0,
         ordenes: [],
       } satisfies GrupoRetencion);
     const monto = Number(f.retenido) || 0;
-    if (f.retenida_en) g.devuelto += monto;
+    // Devuelto recién cuando su OS de retenciones se pagó.
+    const devuelta = !!f.retenida_en && ["PAGADA", "EN_ENTREGA", "RECIBIDA"].includes(f.devolucion_estado ?? "");
+    if (devuelta) g.devuelto += monto;
+    else if (f.retenida_en) g.enDevolucion += monto;
     else if (f.pagada) g.porDevolver += monto;
     else g.sinPagar += monto;
-    g.ordenes.push({ numero: f.numero!, fecha: f.fecha, retenido: monto, pagada: !!f.pagada, retenidaEn: f.retenida_en });
+    g.ordenes.push({ numero: f.numero!, fecha: f.fecha, retenido: monto, pagada: !!f.pagada, retenidaEn: f.retenida_en, devuelta });
     grupos.set(k, g);
   }
   const todos = [...grupos.values()];
@@ -61,7 +65,7 @@ export default async function RetencionesPage({ searchParams }: PageProps<"/logi
         <dl className="num grid grid-cols-3 gap-2 rounded-panel bg-surface p-3 text-[14px]">
           {(
             [
-              ["Por devolver", visibles.reduce((a, g) => a + g.porDevolver, 0)],
+              ["Por devolver", visibles.reduce((a, g) => a + g.porDevolver + g.enDevolucion, 0)],
               ["Sin pagar", visibles.reduce((a, g) => a + g.sinPagar, 0)],
               ["Devuelto", visibles.reduce((a, g) => a + g.devuelto, 0)],
             ] as const

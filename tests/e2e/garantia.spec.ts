@@ -66,6 +66,11 @@ test.describe("@logistica retención por garantía en la base", () => {
         return next 'devuelve|' || (select total from v_ordenes where obra_id = ${obra} and numero = v_d);
         return next 'marcada|' || ((select retenida_en from ordenes_compra where obra_id = ${obra} and numero = v_n) = v_d);
         return next 'otra|' || pg_temp.t('${log}', $q$select crear_orden_retencion(${obra}, null, ${prov})$q$);
+        update ordenes_compra set estado = 'EMITIDA' where obra_id = ${obra} and numero = v_d;
+        return next 'monto_fijo|' || pg_temp.t('${log}', format($q$select guardar_precios(${obra}, %L, (select jsonb_agg(jsonb_build_object('item_id', id, 'pu', 5000, 'aprobado', true)) from oc_items where obra_id = ${obra} and numero_oc = %L))$q$, v_d, v_d));
+        update ordenes_compra set estado = 'PRECIOS_CONFIRMADOS' where obra_id = ${obra} and numero = v_d;
+        v_t := (select pu_hist::text from v_oc_items where obra_id = ${obra} and numero_oc = v_n);
+        return next 'pu_hist|' || coalesce(v_t, 'null');
 
         update ordenes_compra set estado = 'FACTURADA' where obra_id = ${obra} and numero = v_d;
         return next 'sin_contrato|' || pg_temp.t('${log}', format($q$select enviar_a_tesoreria(${obra}, %L)$q$, v_d));
@@ -99,6 +104,8 @@ test.describe("@logistica retención por garantía en la base", () => {
     expect(r.devuelve, "devuelve lo retenido, al céntimo").toBe(retenido);
     expect(r.marcada).toBe("true");
     expect(r.otra, "no se devuelve dos veces").toBe("error: Este proveedor no tiene retención por devolver en la obra");
+    expect(r.monto_fijo, "su monto es lo retenido").toBe("error: El monto de una OS de retenciones no se cambia");
+    expect(Number(r.pu_hist || 0), "su P.U. es un monto: no cuenta como precio del ítem").not.toBe(Number(retenido));
     expect(r.sin_contrato).toMatch(/^error: Falta el contrato firmado de la OS/);
     expect(r.no_sola).toBe("false");
     expect(r.anulada, "al anularla, vuelve a estar por devolver").toBe("true");
@@ -128,6 +135,21 @@ test.describe("@logistica garantía de las OS históricas", () => {
                select c.obra_id from v_oc_items_calc c where c.descripcion ilike 'RETENCION%' and c.estado in ('PAGADA', 'EN_ENTREGA', 'RECIBIDA'))`),
     ).toBe("0");
     expect(sql1("select count(*) from oc_items l join partidas p on p.id = l.partida_id join items i on i.id = p.item_id where i.descripcion ilike 'RETENCION%' and l.pu_bruto is not null"), "la devolución no es retención").toBe("0");
+
+    // De vuelta en cotización, lleva la retención como una nueva: P.U. al 100 % y el %.
+    const [obra, numero, id] = sql(
+      `select l.obra_id, l.numero_oc, l.id from oc_items l join ordenes_compra o on o.obra_id = l.obra_id and o.numero = l.numero_oc
+        where l.pu_bruto is not null and o.estado = 'PRECIOS_CONFIRMADOS' order by l.id limit 1`,
+    )[0];
+    const filas = sqlScript(`begin;
+      update ordenes_compra set estado = 'EMITIDA' where obra_id = ${obra} and numero = '${numero}';
+      select 'linea', l.pu_cotizado = c.pu_bruto_antes, l.pu_bruto is null, l.ret_garantia_pct from oc_items l
+        cross join (select (pu_partida) as pu_bruto_antes from v_oc_items_calc where id = ${id}) c where l.id = ${id};
+      update oc_items set pu_cotizado = round(pu_cotizado * 0.9, 4) where id = ${id};
+      select 'retenido', round(v.retenido / nullif(round(v.cantidad * v.pu_efectivo, 2), 0), 2) from v_oc_items_calc v where v.id = ${id};
+      rollback;`);
+    expect(filas.find((f) => f[0] === "linea")?.slice(1), "P.U. al 100 %, sin bruto aparte").toEqual(["t", "t", "5.00"]);
+    expect(filas.find((f) => f[0] === "retenido")?.[1], "sigue siendo el 5 %").toBe("0.05");
   });
 });
 
@@ -160,6 +182,10 @@ test.describe("@logistica pantallas de garantía y borradores", () => {
       const lista = page.getByRole("list", { name: "Borradores" });
       await expect(lista).toContainText(proveedor);
       expect(sql1(`select count(*) from orden_borradores where user_id = '${uid}' and tipo = 'OS'`)).toBe("1");
+      // El buscador también filtra los borradores.
+      await page.goto("/logistica?tipo=OS&tab=bor&q=zzzzqqq");
+      await expect(page.getByRole("list", { name: "Borradores" })).toContainText("Sin borradores");
+      await page.goto("/logistica?tipo=OS&tab=bor&q=");
 
       // Se puede empezar otra: Nueva arranca sin lo guardado.
       await page.goto(`/logistica/ordenes/nueva?tipo=OS&obra=${obra}`);
@@ -261,7 +287,8 @@ test.describe("@logistica pantallas de garantía y borradores", () => {
       await expect(fila).toContainText("S/ 100.00");
       await expect(page.locator("main dl")).toContainText("S/ 150.00");
       await fila.locator("summary").click();
-      await expect(fila.getByRole("button", { name: "Obra sin cerrar" })).toBeDisabled();
+      await expect(fila).toContainText("Obra sin cerrar");
+      await expect(fila.getByRole("button", { name: "Crear OS de retenciones" })).toHaveCount(0);
 
       sql(`update obras set estado = 'CERRADA' where id = ${obra}`);
       await page.reload();

@@ -9,7 +9,7 @@ import { Lista, Pila } from "@/components/lista";
 import { TopBar, UserMenu } from "@/components/shell";
 import { ButtonLink } from "@/components/ui/button";
 import { MONTOS, RANGOS_MONTO, TODOS, desdeFecha, filtro, limite as limiteDe, ordenDe } from "@/lib/filtros";
-import { cn, fecha, soles } from "@/lib/format";
+import { cn, fecha, matches, soles } from "@/lib/format";
 import { createClient, requireSesion } from "@/lib/supabase/server";
 import { ESTADO_LABEL, type EstadoOC } from "@/lib/types";
 import { RecordarFiltros } from "@/components/recordar-filtros";
@@ -147,17 +147,20 @@ export default async function OrdenesPage({ searchParams }: PageProps<"/logistic
     let qb = supabase.from("orden_borradores").select("id, obra_id, datos, updated_at").eq("tipo", tipo).order("updated_at", { ascending: false }).limit(200);
     if (obra) qb = qb.eq("obra_id", Number(obra));
     const { data } = await qb;
-    borradores = (data ?? []).map((b) => {
-      const d = b.datos as unknown as DatosBorrador;
-      return {
-        id: b.id,
-        obraId: b.obra_id,
-        obra: (obras ?? []).find((o) => o.id === b.obra_id)?.nombre ?? "",
-        proveedor: (proveedores ?? []).find((p) => String(p.id) === d.proveedorId)?.razon_social ?? null,
-        partidas: d.sel.length,
-        actualizado: b.updated_at,
-      };
-    });
+    borradores = (data ?? [])
+      .filter((b) => !proveedor || (b.datos as unknown as DatosBorrador).proveedorId === proveedor)
+      .map((b) => {
+        const d = b.datos as unknown as DatosBorrador;
+        return {
+          id: b.id,
+          obraId: b.obra_id,
+          obra: (obras ?? []).find((o) => o.id === b.obra_id)?.nombre ?? "",
+          proveedor: (proveedores ?? []).find((p) => String(p.id) === d.proveedorId)?.razon_social ?? null,
+          partidas: d.sel.length,
+          actualizado: b.updated_at,
+        };
+      })
+      .filter((b) => !q || matches(`${b.obra} ${b.proveedor ?? ""}`, q));
   }
   const totalesGrupo = totalesPorGrupo(grupos.map((g) => ({ ...g, monto: Number(g.total) || 0 })));
 
@@ -209,7 +212,7 @@ export default async function OrdenesPage({ searchParams }: PageProps<"/logistic
     const obrasF = [...new Set(facturadas.map((o) => o.obra_id))];
     const numerosF = [...new Set(facturadas.map((o) => o.numero))];
     const [{ data: ocs }, { data: guias }, { data: contratos }] = await Promise.all([
-      supabase.from("ordenes_compra").select("obra_id, numero, tipo, requiere_guia, es_retencion, historico").in("obra_id", obrasF).in("numero", numerosF),
+      supabase.from("ordenes_compra").select("obra_id, numero, tipo, requiere_guia, historico").in("obra_id", obrasF).in("numero", numerosF),
       supabase.from("guias").select("obra_id, numero_oc").in("estado", ["EMITIDA", "ANULACION_PENDIENTE"]).in("obra_id", obrasF).in("numero_oc", numerosF),
       supabase.from("adjuntos").select("obra_id, numero_oc").eq("tipo", "CONTRATO").in("obra_id", obrasF).in("numero_oc", numerosF),
     ]);
@@ -219,7 +222,7 @@ export default async function OrdenesPage({ searchParams }: PageProps<"/logistic
       const k = `${o.obra_id}-${o.numero}`;
       // Las históricas (Excel) no esperan contrato ni guía.
       if (o.historico) continue;
-      if (o.tipo === "OS" && !o.es_retencion && !conContrato.has(k)) falta.set(k, "Firmar contrato");
+      if (o.tipo === "OS" && !conContrato.has(k)) falta.set(k, "Firmar contrato");
       else if (o.tipo === "OC" && o.requiere_guia && !conGuia.has(k)) falta.set(k, "Subir guía");
     }
   }
@@ -426,7 +429,7 @@ export default async function OrdenesPage({ searchParams }: PageProps<"/logistic
   return (
     <>
       <TopBar
-        title={tipo === "OC" ? "Órdenes de compra" : "Órdenes de servicio"}
+        title={tipo}
         right={
           <>
             <SelectorDiseno pantalla="logistica" actual={diseno} fijo={fijo} />

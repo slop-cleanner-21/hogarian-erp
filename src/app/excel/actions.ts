@@ -88,7 +88,7 @@ async function leerDatos(db: ReturnType<typeof createAdminClient>): Promise<Dato
       const cotizado = num(l.pu_cotizado);
       const superaHoy = p.pu !== null && cotizado !== null && cotizado > Number(p.pu) * (1 + tolerancia);
       // El Excel lleva lo que se factura: con garantía, el P.U. neto (las históricas ya lo tienen).
-      const neto = (pu: number | null) => (pu === null || l.pu_bruto != null ? pu : Number((pu * (1 - Number(l.ret_garantia_pct) / 100)).toFixed(4)));
+      const neto = (pu: number | null) => (pu === null || l.pu_bruto != null ? pu : Number((pu * (1 - Number(l.ret_garantia_pct) / 100)).toFixed(8)));
       return [
         {
           id: l.id,

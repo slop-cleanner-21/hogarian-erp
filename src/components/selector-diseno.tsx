@@ -399,7 +399,7 @@ export function SelectorDiseno({
         type="button"
         onClick={() => setHoja(true)}
         aria-label={`Diseño: ${opciones.find((d) => d.value === elegido.diseno)?.label ?? ""}`}
-        className={cn("flex h-12 w-10 items-center justify-center rounded-control active:bg-ink/8", cargando && "opacity-50")}
+        className={cn("flex h-12 w-11 shrink-0 items-center justify-center rounded-control active:bg-ink/8", cargando && "opacity-50")}
       >
         <Icono size={21} />
       </button>

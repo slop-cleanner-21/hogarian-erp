@@ -360,7 +360,7 @@ export function NuevaOrden({
           )}
 
           {tipo === "OS" && (
-            <div className="grid grid-cols-2 gap-3">
+            <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
               <Field label="Comprobante">
                 <SearchSelect
                   label="Comprobante"
@@ -383,8 +383,8 @@ export function NuevaOrden({
                   className={cn(inicioInvalido && "border-danger")}
                 />
               </Field>
-              {inicioInvalido && <p className="col-span-2 text-danger">La fecha de inicio no puede ser posterior a la de fin ({fecha(hoyISO())})</p>}
-              {avisoSuspension && <p role="status" className="col-span-2 font-semibold text-warn">Sin suspensión de 4ta: pídele la constancia al proveedor</p>}
+              {inicioInvalido && <p className="text-danger sm:col-span-2">La fecha de inicio no puede ser posterior a la de fin ({fecha(hoyISO())})</p>}
+              {avisoSuspension && <p role="status" className="font-semibold text-warn sm:col-span-2">Sin suspensión de 4ta: pídele la constancia al proveedor</p>}
             </div>
           )}
 
@@ -417,7 +417,7 @@ export function NuevaOrden({
                   </span>
                 </label>
               ))}
-              {retenido > 0.005 && (
+              {retenido > 0.005 && !garantiaInvalida && (
                 <p className="flex justify-between text-ink-2">
                   <span>Se retiene</span>
                   <span className="num">{soles(retenido)}</span>
@@ -443,6 +443,7 @@ export function NuevaOrden({
                 <li key={p.id} className="flex items-center gap-2 border-b border-line py-2 pl-4 pr-1 last:border-0">
                   <div className="min-w-0 flex-1">
                     <div className="leading-snug">{p.descripcion}</div>
+                    <MarcaAdicional requerimiento={p.requerimiento} />
                     <div className={cn("num text-sm", mal ? "font-medium text-danger" : "text-ink-3")}>
                       máx {qty(p.saldo_cant)} {p.unidad}
                     </div>

@@ -20,7 +20,7 @@ create temp table _empresas on commit drop as select * from public.empresas;
 truncate public.adelantos, public.adjuntos, public.asiento_lineas, public.asientos, public.avance_fotos, public.avances,
   public.comprobantes, public.comprobantes_historial, public.cotizacion_accesos, public.datos_demo, public.detracciones,
   public.empresas, public.entrega_fotos, public.entregas, public.guias, public.items, public.notificaciones,
-  public.obra_etapas, public.obras, public.oc_items, public.ordenes_compra, public.ordenes_pago, public.pago_aplicaciones,
+  public.obra_etapas, public.obras, public.oc_items, public.orden_borradores, public.ordenes_compra, public.ordenes_pago, public.pago_aplicaciones,
   public.pagos, public.partidas, public.perfil_obras, public.proveedor_contactos, public.proveedor_cuentas,
   public.proveedor_tipos_material, public.proveedores, public.rechazos, public.requerimientos_obra,
   public.requerimientos_obra_items, public.retenciones, public.solicitud_adjuntos, public.solicitudes,
