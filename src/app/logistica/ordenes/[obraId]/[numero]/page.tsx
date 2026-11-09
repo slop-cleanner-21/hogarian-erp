@@ -35,6 +35,8 @@ export default async function OrdenPage({ params }: PageProps<"/logistica/ordene
   const { obraId, numero: raw } = await params;
   const numero = decodeURIComponent(raw);
   const supabase = await createClient();
+  // La retención de 4ta se hace al pagar: sus recibos aún sin pagar, con la suspensión vigente hoy.
+  await supabase.rpc("refrescar_retencion_orden", { p_obra_id: Number(obraId), p_numero: numero });
   // La orden dentro del presupuesto de la obra (en paralelo con lo demás).
   const contextoP = contextoCompra(Number(obraId), numero);
   contextoP.catch(() => {});

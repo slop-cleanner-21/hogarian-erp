@@ -4633,6 +4633,10 @@ export type Database = {
         Args: { p_numero: string; p_obra_id: number };
         Returns: string;
       };
+      refrescar_retencion_orden: {
+        Args: { p_numero: string; p_obra_id: number };
+        Returns: number;
+      };
       registrar_avance: {
         Args: {
           p_cantidad: number;

@@ -112,7 +112,11 @@ Contabilidad, Residente y RRHH **no entran**. Sus roles siguen en la base
   proveedor». **La calcula la base** (`fn_retencion_4ta`, migración `prod1_impuestos_base`): al
   registrar o corregir un comprobante rechaza cualquier otra («La retención de 4ta de este recibo es S/ …»), y en la
   pantalla se muestra calculada, sin editar. Corregir un comprobante sin cambiar tipo, fecha ni total la deja como
-  estaba. La suspensión solo se guarda con la constancia de verdad subida (`documentos/proveedores/`) o su N° de
+  estaba. **La retención se hace al pagar** (migración `prod1_retencion_al_pagar`): mientras el recibo no tenga pagos ni asiento, se
+  revisa con la fecha de hoy si la suspensión ya rige (al guardar o cambiar la suspensión del proveedor, y al abrir la orden en
+  Tesorería o en Logística: `refrescar_retencion_orden`; rige desde el día siguiente). Así, una suspensión subida después del
+  recibo le quita la retención antes de pagarlo. Un cambio de % no mueve la de un recibo ya registrado; los históricos y los
+  ya pagados no cambian. La suspensión solo se guarda con la constancia de verdad subida (`documentos/proveedores/`) o su N° de
   operación, y sin fecha futura, también por la API.
 - **Detracción** (SPOT): solo la llevan las facturas (OC y OS) de más de S/ 700 (700 exactos no), en los ítems que marca
   Gerencia; un recibo por honorarios nunca la lleva. La base la hace cumplir: si no corresponde (otro comprobante, bajo el mínimo o sin ítems que la lleven) no

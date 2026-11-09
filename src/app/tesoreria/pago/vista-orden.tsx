@@ -30,6 +30,9 @@ export async function vistaOrden(
   { modo, volverA, extraEntregas }: { modo: "tesoreria" | "consulta"; volverA: string | true; extraEntregas?: ReactNode },
 ): Promise<Props | null> {
   const supabase = await createClient();
+  // La retención de 4ta se hace al pagar: antes de mostrar el monto, sus recibos aún sin pagar con la suspensión vigente
+  // hoy (rige desde el día siguiente a su constancia). Solo al pagar: la consulta solo mira.
+  if (modo === "tesoreria") await supabase.rpc("refrescar_retencion_orden", { p_obra_id: obraId, p_numero: numero });
   const [{ data: orden }, { data: items, error: eItems }, { data: doc }, { data: oc }] = await Promise.all([
     supabase.from("v_ordenes").select("*").eq("obra_id", obraId).eq("numero", numero).maybeSingle(),
     supabase.from("v_oc_items").select("*").eq("obra_id", obraId).eq("numero_oc", numero).order("id"),
