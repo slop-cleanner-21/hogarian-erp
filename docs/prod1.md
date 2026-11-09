@@ -261,6 +261,10 @@ Contabilidad, Residente y RRHH **no entran**. Sus roles siguen en la base
   por evento, «Avisar» (campana) y «Al celular» (push, solo si avisa). Los de su rol llegan por defecto, con celular;
   el Admin y Gerencia pueden sumarse a cualquier evento de los demás (por área), que arranca apagado y, al sumarse, sin
   celular: así no se les llena el teléfono. Solo se guarda lo que cambió del defecto.
+- **Cambiar el proveedor de una OS** (sugerencia de Logística; menú de la orden, `cambiar_proveedor_orden`): hasta que se le envía el
+  contrato al maestro (en Cotizando o Facturar, sin contrato enviado ni firmado y sin comprobante). El link del anterior deja de
+  servir; en cotización, los precios vuelven al presupuesto y la cotización queda por enviar al nuevo. El comprobante pasa al
+  habitual del nuevo proveedor (recibo o factura).
 - **Anular una OC u OS** (Logística o Gerencia, menú de la orden): mientras no se mandó a Tesorería (Cotizando, Facturar, Guía /
   Contrato, también tras un rechazo) y sin pagos. Su factura o recibo se anula con ella (si no está contabilizado ni cubre otras
   órdenes) y su N° se puede registrar de nuevo en la orden correcta: la unicidad de los comprobantes solo cuenta los vigentes.

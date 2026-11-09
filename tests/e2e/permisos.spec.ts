@@ -130,6 +130,7 @@ const RPC: Record<string, string> = {
   contabilizar_comprobante: "CON",
   contabilizar_pago: "CON",
   crear_orden: "LOG",
+  cambiar_proveedor_orden: "LOG",
   crear_orden_pago: "CON",
   crear_orden_retencion: "LOG",
   crear_orden_valorizacion: "LOG",

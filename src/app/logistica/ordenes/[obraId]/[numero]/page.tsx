@@ -20,6 +20,7 @@ import { ContextoCompraDiferido } from "@/components/contexto-compra";
 import { cookieDiseno, leerDisenoItems } from "@/lib/diseno";
 import { contextoCompra } from "@/lib/contexto-compra";
 import { urlsComprobantes } from "@/lib/adjuntos";
+import { todas } from "@/lib/paginar";
 
 export async function generateMetadata({
   params,
@@ -149,8 +150,23 @@ export default async function OrdenPage({ params }: PageProps<"/logistica/ordene
     orden.tipo === "OS" ? representanteContratos(orden.empresa_id ?? null, { conFirma: false }) : Promise.resolve(null),
   ]);
 
+  // OS: el proveedor se puede cambiar hasta que se le envía el contrato (sin comprobante).
+  const cambiaProveedor =
+    orden.tipo === "OS" &&
+    !cot?.es_retencion &&
+    (orden.estado === "EMITIDA" || orden.estado === "PRECIOS_CONFIRMADOS") &&
+    !orden.contrato_enviado_at &&
+    !adjuntos.some((a) => a.tipo === "CONTRATO") &&
+    (items ?? []).every((i) => i.comprobante_id == null);
+  const proveedoresCambio = cambiaProveedor
+    ? (
+        await todas((a, b) => supabase.from("proveedores").select("id, razon_social, ruc_o_cod").order("razon_social").order("id").range(a, b))
+      ).filter((p) => p.id !== orden.proveedor_id)
+    : null;
+
   return (
     <DetalleOrden
+      proveedoresCambio={proveedoresCambio}
       manoObra={manoObra}
       // Precios nuevos (p. ej. el proveedor envió su cotización): el formulario parte de lo guardado.
       // Solo si cambian los precios, el link o llega un rechazo: un cambio de estado (p. ej. tras registrar la factura) no rearma la

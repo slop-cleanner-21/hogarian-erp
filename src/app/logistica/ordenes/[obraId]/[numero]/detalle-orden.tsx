@@ -39,6 +39,7 @@ import {
 } from "@/lib/types";
 import {
   anularOrden,
+  cambiarProveedorOrden,
   guardarPrecios,
   enviarATesoreria,
   reenviarATesoreria,
@@ -99,6 +100,7 @@ export function DetalleOrden({
   contrato,
   historico = false,
   retenidaEn = null,
+  proveedoresCambio = null,
 }: {
   orden: VOrden;
   items: VOcItem[];
@@ -151,6 +153,8 @@ export function DetalleOrden({
   historico?: boolean;
   /** La OS de retenciones en que se devolvió su garantía. */
   retenidaEn?: string | null;
+  /** OS: a quién se puede pasar (hasta que se le envía el contrato); null si ya no se cambia. */
+  proveedoresCambio?: { id: number; razon_social: string; ruc_o_cod: string }[] | null;
 }) {
   const pwa = useEsPwa();
   const router = useRouter();
@@ -225,6 +229,7 @@ export function DetalleOrden({
   const [error, setError] = useState<string | null>(null);
   const [aviso, setAviso] = useState<string | null>(null);
   const [menu, setMenu] = useState(false);
+  const [cambiarProv, setCambiarProv] = useState(false);
   const [anular, setAnular] = useState(false);
   const [comprobante, setComprobante] = useState(false);
   const [confirmarPrecios, setConfirmarPrecios] = useState(false);
@@ -418,7 +423,7 @@ export function DetalleOrden({
         right={
           <>
             <SelectorDiseno pantalla="orden-logistica" tipo="items" actual={diseno} />
-            {puedeAnular && (
+            {(puedeAnular || !!proveedoresCambio) && (
               <button
                 type="button"
                 aria-label="Más opciones"
@@ -921,19 +926,36 @@ export function DetalleOrden({
         onClose={() => setMenu(false)}
         title={`${orden.tipo} ${orden.numero}`}
       >
-        <div className="p-3">
-          <button
-            type="button"
-            onClick={() => {
-              setMenu(false);
-              setAnular(true);
-            }}
-            className="flex h-12 w-full items-center rounded-control px-3 text-danger active:bg-ink/8"
-          >
-            Anular orden
-          </button>
+        <div className="flex flex-col p-3">
+          {proveedoresCambio && (
+            <button
+              type="button"
+              onClick={() => {
+                setMenu(false);
+                setCambiarProv(true);
+              }}
+              className="flex h-12 w-full items-center rounded-control px-3 active:bg-ink/8"
+            >
+              Cambiar proveedor
+            </button>
+          )}
+          {puedeAnular && (
+            <button
+              type="button"
+              onClick={() => {
+                setMenu(false);
+                setAnular(true);
+              }}
+              className="flex h-12 w-full items-center rounded-control px-3 text-danger active:bg-ink/8"
+            >
+              Anular orden
+            </button>
+          )}
         </div>
       </Sheet>
+      {cambiarProv && proveedoresCambio && (
+        <CambiarProveedorSheet orden={orden} proveedores={proveedoresCambio} onClose={() => setCambiarProv(false)} />
+      )}
 
       <AnularSheet
         open={anular}
@@ -958,6 +980,60 @@ export function DetalleOrden({
         />
       )}
     </>
+  );
+}
+
+/** OS: otro proveedor (hasta que se le envía el contrato). El link del anterior deja de servir. */
+function CambiarProveedorSheet({
+  orden,
+  proveedores,
+  onClose,
+}: {
+  orden: VOrden;
+  proveedores: { id: number; razon_social: string; ruc_o_cod: string }[];
+  onClose: () => void;
+}) {
+  const router = useRouter();
+  const [proveedor, setProveedor] = useState<string | null>(null);
+  const [error, setError] = useState<string | null>(null);
+  const [pending, startTransition] = useTransition();
+  const cambiar = () =>
+    startTransition(async () => {
+      setError(null);
+      const r = await cambiarProveedorOrden(orden.obra_id!, orden.numero!, Number(proveedor));
+      if (!r.ok) return setError(r.error);
+      onClose();
+      router.refresh();
+    });
+  return (
+    <Sheet
+      open
+      onClose={onClose}
+      title="Cambiar proveedor"
+      footer={
+        <div className="flex flex-col gap-2">
+          {error && <p role="alert" className="text-danger">{error}</p>}
+          <Faltan items={[!proveedor && "proveedor"]} />
+          <Button size="lg" onClick={cambiar} disabled={pending || !proveedor}>
+            Cambiar proveedor
+          </Button>
+        </div>
+      }
+    >
+      <div className="flex flex-col gap-4 p-4">
+        <Field label="Ahora">
+          <div className={cn(inputClass, "flex items-center truncate bg-transparent")}>{orden.proveedor}</div>
+        </Field>
+        <Field label="Nuevo proveedor">
+          <SearchSelect
+            label="Nuevo proveedor"
+            value={proveedor}
+            onChange={setProveedor}
+            options={proveedores.map((p) => ({ value: String(p.id), label: p.razon_social, hint: p.ruc_o_cod }))}
+          />
+        </Field>
+      </div>
+    </Sheet>
   );
 }
 

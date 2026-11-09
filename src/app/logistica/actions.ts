@@ -231,6 +231,17 @@ export async function registrarComprobante(input: z.input<typeof Comprobante>): 
   return { ok: true, data: undefined };
 }
 
+/** OS: otro proveedor, hasta que se le envía el contrato (el link del anterior deja de servir). */
+export async function cambiarProveedorOrden(obraId: number, numero: string, proveedorId: number): Promise<Result> {
+  if (!(proveedorId > 0)) return fail("Elige el proveedor");
+  const supabase = await db();
+  const { error } = await supabase.rpc("cambiar_proveedor_orden", { p_obra_id: obraId, p_numero: numero, p_proveedor_id: proveedorId });
+  if (error) return fail(error.message);
+  revalidatePath(ordenPath(obraId, numero));
+  revalidatePath("/logistica");
+  return { ok: true, data: undefined };
+}
+
 export async function anularOrden(obraId: number, numero: string, motivo: string): Promise<Result> {
   if (!motivo.trim()) return fail("Ingresa el motivo");
   const supabase = await db();
