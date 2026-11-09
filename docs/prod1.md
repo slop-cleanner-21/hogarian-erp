@@ -192,7 +192,9 @@ Contabilidad, Residente y RRHH **no entran**. Sus roles siguen en la base
   anuladas), los ítems, proveedores, obras y partidas nuevos y, en las del Excel, lo que cambió (precios, comprobante y pago
   registrados en la app). La línea N de la carga es la N-ésima fila válida de GASTOEJEC: **la plantilla debe ser el mismo archivo
   con el que se generó `excel.sql`** (`npm run excel:plantilla -- <ruta>`). Si una hoja se llena (partidas 10,000, compras 15,951,
-  proveedores 500, obras 50), lo dice. Pesa más de lo que una respuesta del servidor permite: se guarda y se baja con un enlace
+  proveedores 500, obras 50), lo dice. Los RUC van como número y el texto de un ítem como lo tiene ITEMS (con sus espacios): si no, las búsquedas del libro (BUSCARV
+  de PROVEED e ITEMS) no los encuentran y dan #N/D. Revisado abriéndolo en Excel (`tests/audit/excel-recalc.ps1`, local): sin errores salvo 30
+  `#REF!` que ya trae la hoja FILTRO del original. Pesa más de lo que una respuesta del servidor permite: se guarda y se baja con un enlace
   de 2 minutos. Queda en la auditoría. El Jefe y el Ingeniero de Operaciones no lo tienen (lleva lo financiero).
 - **Ítems:** los crea Gerencia (Gerencia › Ítems, la misma lista que la de Logística). Al crearlo puede elegir
   la **cuenta contable** del ítem (la del asiento de compra), opcional; por eso Gerencia lee el plan de cuentas.
@@ -432,7 +434,8 @@ Contabilidad, Residente y RRHH **no entran**. Sus roles siguen en la base
 - **Quién firma por cada empresa:** ya se elige en Admin › Empresas (sin elegir, el gerente con la firma más
   reciente); falta que respondan si es uno por empresa. Los gerentes subirán su firma («Mi firma») en su momento.
 - **Detracciones y retenciones de 4ta:** se registran; las paga Contabilidad, que aún no está en prod 1.
-- **Contabilidad:** serán dos usuarios con el rol de Contabilidad (Ángeles y Jerson), cuando ese módulo entre a prod 1.
+- **Contabilidad:** dos roles iguales, como Operaciones: Jefe de Contabilidad y Asistente de Contabilidad (Ángeles y Jerson), cuando
+  ese módulo entre a prod 1.
 - **Observaciones de datos:**
   - Virgen del Mar numera sus órdenes desde 1000140 porque el Excel trae una OC 1000139 (parece un error de tipeo); se deja como
     en el Excel.

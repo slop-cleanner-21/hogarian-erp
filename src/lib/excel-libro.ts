@@ -55,6 +55,8 @@ const clave = (s: string | null | undefined) => norm(s).toUpperCase();
 const numero = (s: string | undefined) => (s === undefined || s.trim() === "" || Number.isNaN(Number(s)) ? null : Number(s));
 /** Iguales con los 4 decimales de la base (25.78125 del Excel es el 25.7813 de la base). */
 const igual = (a: number | null, b: number | null) => (a === null || b === null ? a === b : Math.abs(a - b) <= 0.00005 + 1e-9);
+/** Un RUC o DNI va como número, como en el Excel: las búsquedas (BUSCARV) no encuentran «20604180415» texto si la otra celda es número. */
+const codigoExcel = (c: string): Celda => (/^\d{1,15}$/.test(c.trim()) ? Number(c.trim()) : c);
 const numCol = (c: string) => [...c].reduce((n, l) => n * 26 + l.charCodeAt(0) - 64, 0);
 /** Días desde 1899-12-30: la fecha de Excel. */
 const serial = (fecha: string) => Math.round((Date.parse(`${fecha.slice(0, 10)}T00:00:00Z`) - Date.UTC(1899, 11, 30)) / 864e5);
@@ -183,6 +185,9 @@ export function armarLibro(plantilla: Uint8Array, datos: DatosExcel) {
   const cItems: Cambios = new Map();
   const itemLibre = siguientes(itemsHoja, "B", FILAS.items, "ITEMS");
   let itemsNuevos = 0;
+  // El texto de cada ítem tal como lo tiene ITEMS (con sus espacios): GASTOPROG lo busca exacto.
+  const textoItem = new Map<string, string>();
+  for (const [k, n] of filaItem) textoItem.set(k, itemsHoja.get(n)?.B ?? "");
   for (const i of datos.items) {
     const n = filaItem.get(clave(i.descripcion));
     if (n === undefined) {
@@ -212,7 +217,7 @@ export function armarLibro(plantilla: Uint8Array, datos: DatosExcel) {
     if (n === undefined) {
       const libre = provLibre();
       proveedoresNuevos++;
-      poner(cProv, libre, "B", p.cod);
+      poner(cProv, libre, "B", codigoExcel(p.cod));
       poner(cProv, libre, "C", p.razon);
       poner(cProv, libre, "D", p.comprobante);
       poner(cProv, libre, "E", p.banco);
@@ -242,7 +247,7 @@ export function armarLibro(plantilla: Uint8Array, datos: DatosExcel) {
       poner(cProg, n, "C", p.obra);
       poner(cProg, n, "E", p.etapa);
       poner(cProg, n, "G", p.requerimiento);
-      poner(cProg, n, "J", p.item);
+      poner(cProg, n, "J", textoItem.get(clave(p.item)) || p.item);
       poner(cProg, n, "M", p.cantidad);
       poner(cProg, n, "N", p.pu);
       continue;
@@ -276,7 +281,7 @@ export function armarLibro(plantilla: Uint8Array, datos: DatosExcel) {
       poner(cEjec, n, "C", l.cantidad);
       poner(cEjec, n, "D", l.pu);
       poner(cEjec, n, "E", l.orden);
-      poner(cEjec, n, "F", l.ruc);
+      poner(cEjec, n, "F", codigoExcel(l.ruc));
       poner(cEjec, n, "G", l.tipo);
       poner(cEjec, n, "H", l.comprobante);
       poner(cEjec, n, "I", l.operacion);
