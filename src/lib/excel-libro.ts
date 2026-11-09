@@ -53,8 +53,8 @@ const desescapar = (s: string) =>
 const norm = (s: string | null | undefined) => (s ?? "").replace(/\s+/g, " ").trim();
 const clave = (s: string | null | undefined) => norm(s).toUpperCase();
 const numero = (s: string | undefined) => (s === undefined || s.trim() === "" || Number.isNaN(Number(s)) ? null : Number(s));
-/** Iguales con los 4 decimales de la base. */
-const igual = (a: number | null, b: number | null) => (a === null || b === null ? a === b : Math.abs(a - b) < 0.00005);
+/** Iguales con los 4 decimales de la base (25.78125 del Excel es el 25.7813 de la base). */
+const igual = (a: number | null, b: number | null) => (a === null || b === null ? a === b : Math.abs(a - b) <= 0.00005 + 1e-9);
 const numCol = (c: string) => [...c].reduce((n, l) => n * 26 + l.charCodeAt(0) - 64, 0);
 /** Días desde 1899-12-30: la fecha de Excel. */
 const serial = (fecha: string) => Math.round((Date.parse(`${fecha.slice(0, 10)}T00:00:00Z`) - Date.UTC(1899, 11, 30)) / 864e5);
@@ -222,7 +222,8 @@ export function armarLibro(plantilla: Uint8Array, datos: DatosExcel) {
     const f = provHoja.get(n)!;
     if (norm(f.C) !== norm(p.razon)) poner(cProv, n, "C", p.razon);
     if (p.banco && norm(f.E) !== norm(p.banco)) poner(cProv, n, "E", p.banco);
-    if (p.cuenta && norm(f.F).replace(/^[´']+/, "") !== norm(p.cuenta)) poner(cProv, n, "F", p.cuenta);
+    // El Excel escribe algunas cuentas con un «´» o «'» delante (para que no las tome como número).
+    if (p.cuenta && norm(norm(f.F).replace(/^[´']+/, "")) !== norm(p.cuenta)) poner(cProv, n, "F", p.cuenta);
   }
 
   // ---- GASTOPROG: cada código ya tiene su fila

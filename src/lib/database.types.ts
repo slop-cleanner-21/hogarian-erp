@@ -956,6 +956,13 @@ export type Database = {
             referencedRelation: "entregas";
             referencedColumns: ["id"];
           },
+          {
+            foreignKeyName: "entrega_fotos_entrega_id_fkey";
+            columns: ["entrega_id"];
+            isOneToOne: false;
+            referencedRelation: "v_entregas_partida";
+            referencedColumns: ["id"];
+          },
         ];
       };
       entregas: {
@@ -3128,6 +3135,19 @@ export type Database = {
             referencedColumns: ["obra_id", "numero"];
           },
         ];
+      };
+      v_entregas_partida: {
+        Row: {
+          cantidad: number;
+          created_at: string;
+          id: number;
+          obra_id: number;
+          observacion: string | null;
+          partida_id: number;
+          rol: string;
+        };
+        ComputedFields: never;
+        Relationships: [];
       };
       v_expediente: {
         Row: {

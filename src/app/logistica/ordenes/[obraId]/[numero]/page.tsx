@@ -233,7 +233,6 @@ export default async function OrdenPage({ params }: PageProps<"/logistica/ordene
             lineas={entregas.lineas}
             entregas={entregas.entregas}
             registrar={orden.estado === "EN_ENTREGA" ? "archivos" : undefined}
-            aviso="Los residentes aún no pueden marcar las entregas."
           />
         )
       }

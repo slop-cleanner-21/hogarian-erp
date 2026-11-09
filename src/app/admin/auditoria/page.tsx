@@ -10,7 +10,7 @@ import { createClient, requireSesion } from "@/lib/supabase/server";
 export const metadata: Metadata = { title: "Auditoría" };
 
 const LIMA = "America/Lima";
-const cuando = new Intl.DateTimeFormat("es-PE", { day: "2-digit", month: "2-digit", year: "numeric", hour: "2-digit", minute: "2-digit", timeZone: LIMA });
+const cuando = new Intl.DateTimeFormat("es-PE", { day: "2-digit", month: "2-digit", year: "numeric", hour: "2-digit", minute: "2-digit", hourCycle: "h23", timeZone: LIMA });
 
 const ACCIONES = {
   sesiones: ["LOGIN", "LOGIN_FALLIDO", "LOGOUT", "CAMBIO_CONTRASENA", "CAMBIO_CONTRASENA_FALLIDO", "DESBLOQUEO", "DESBLOQUEO_FALLIDO", "CAPTCHA_IP"],

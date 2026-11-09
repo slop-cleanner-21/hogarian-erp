@@ -28,6 +28,7 @@ import { CampoObservacion, observacionLista } from "./campo-observacion";
 import { Field, NumberInput, inputClass } from "./ui/field";
 import { SearchSelect } from "./ui/search-select";
 import { Sheet } from "./ui/sheet";
+import { Faltan } from "./ui/faltan";
 
 type Vista = "carrusel" | "acordeon" | "galeria";
 const VISTAS: { value: Vista; label: string; icon: typeof Images }[] = [
@@ -54,6 +55,8 @@ const hora = new Intl.DateTimeFormat("es-PE", {
   month: "2-digit",
   hour: "2-digit",
   minute: "2-digit",
+  // 24 h: «p. m.» se escribe distinto según el navegador y no coincidía con el servidor (error #418 de React).
+  hourCycle: "h23",
   timeZone: "America/Lima",
 });
 
@@ -388,7 +391,8 @@ function NuevaEntrega({
     !!linea &&
     Number(cantidad) > 0 &&
     Number(cantidad) <= saldo + 0.0001 &&
-    fotos.length > 0 &&
+    // Logística puede registrar sin foto; el residente, no.
+    (fotos.length > 0 || modo === "archivos") &&
     observacionLista(observacion) &&
     (!conGps || !!ubicacion);
 
@@ -396,10 +400,7 @@ function NuevaEntrega({
     startTransition(async () => {
       setError(null);
       try {
-        const subidas = await subirArchivos(
-          `entregas/${obraId}/${numero}`,
-          fotos,
-        );
+        const subidas = fotos.length ? await subirArchivos(`entregas/${obraId}/${numero}`, fotos) : [];
         const r = await registrarEntrega({
           obraId,
           numero,
@@ -427,9 +428,20 @@ function NuevaEntrega({
       onClose={onClose}
       title="Registrar entrega"
       footer={
+        <div className="flex flex-col gap-2">
+        <Faltan
+          items={[
+            !linea && "ítem",
+            !!linea && !(Number(cantidad) > 0 && Number(cantidad) <= saldo + 0.0001) && "cantidad que llegó",
+            modo === "camara" && fotos.length === 0 && "foto",
+            !observacionLista(observacion) && "observación",
+            conGps && !ubicacion && "ubicación",
+          ]}
+        />
         <Button size="lg" onClick={guardarEntrega} disabled={!listo || pending}>
           Registrar
         </Button>
+        </div>
       }
     >
       <div className="flex flex-col gap-4 p-4">

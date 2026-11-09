@@ -26,7 +26,7 @@ export type RechazoVer = {
   reenviado: { fecha: string; por: string | null; nota: string | null } | null;
 };
 
-const hora = new Intl.DateTimeFormat("es-PE", { hour: "2-digit", minute: "2-digit", timeZone: "America/Lima" });
+const hora = new Intl.DateTimeFormat("es-PE", { hour: "2-digit", minute: "2-digit", hourCycle: "h23", timeZone: "America/Lima" });
 const cuando = (iso: string) => `${fecha(new Date(iso).toLocaleDateString("en-CA", { timeZone: "America/Lima" }))} ${hora.format(new Date(iso))}`;
 
 /** Rechazos de Tesorería de una orden, del más reciente al más antiguo: el rechazo y su reenvío. */

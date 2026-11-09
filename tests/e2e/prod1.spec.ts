@@ -377,10 +377,36 @@ test.describe("@prod1 @logistica pestañas por estado y «Enviada»", () => {
     await expect(page.locator("main section", { hasText: "Facturado" }).first()).toContainText(`Detracción− S/ ${fmt.format(Number(detraccion))}`);
   });
 
-  test("una orden «Enviada» (constancia de pago enviada) avisa que los residentes aún no marcan las entregas", async ({ abrir }) => {
+  test("una orden «Enviada»: Logística registra lo que llegó, sin foto, y con todo pasa a «Recibida»", async ({ abrir }, info) => {
+    test.skip(info.project.name !== "m390", "escribe en la base");
     const [obra, numero] = sql(`select obra_id, numero from ordenes_compra where tipo = 'OC' and estado = 'EN_ENTREGA' order by obra_id desc, numero limit 1`)[0];
     const page = await abrir("logistica", `/logistica/ordenes/${obra}/${encodeURIComponent(numero)}?tipo=OC`);
-    await expect(page.getByText("Los residentes aún no pueden marcar las entregas.")).toBeVisible();
+    const antes = sql1(`select count(*) from entregas where obra_id = ${obra} and numero_oc = '${numero}'`);
+    const lineas = sql(`select l.id, l.cantidad - coalesce((select sum(e.cantidad) from entregas e where e.oc_item_id = l.id), 0), i.descripcion
+                          from oc_items l join partidas p on p.id = l.partida_id join items i on i.id = p.item_id
+                         where l.obra_id = ${obra} and l.numero_oc = '${numero}' order by l.id`);
+    try {
+      for (const [, , descripcion] of lineas.filter(([, f]) => Number(f) > 0)) {
+        await page.getByRole("button", { name: "Registrar entrega" }).click();
+        const hoja = page.getByRole("dialog", { name: "Registrar entrega" });
+        // Cada ítem por su nombre (la lista de pendientes puede llegar un instante después del registro anterior).
+        if (lineas.length > 1) {
+          await hoja.getByRole("button", { name: "Ítem", exact: true }).click();
+          await page.getByRole("listbox", { name: "Ítem" }).getByRole("option", { name: descripcion }).first().click();
+        }
+        // Lo que falta del ítem elegido (el campo lo dice).
+        const etiqueta = await hoja.getByText(/^Cantidad \(faltan /).innerText();
+        await hoja.getByLabel("Cantidad").fill(etiqueta.match(/faltan ([\d,.]+)/)![1].replace(/,/g, ""));
+        await expect(hoja.getByRole("status", { name: "Lo que falta" })).toHaveCount(0);
+        await hoja.getByRole("button", { name: "Registrar" }).click();
+        await expect(hoja).toBeHidden();
+      }
+      await expect.poll(() => sql1(`select estado from ordenes_compra where obra_id = ${obra} and numero = '${numero}'`)).toBe("RECIBIDA");
+      expect(sql1(`select count(*) from entrega_fotos f join entregas e on e.id = f.entrega_id where e.obra_id = ${obra} and e.numero_oc = '${numero}' and e.rol = 'LOGISTICA'`), "sin foto").toBe("0");
+    } finally {
+      sql(`delete from entregas where obra_id = ${obra} and numero_oc = '${numero}' and id not in (select id from entregas where obra_id = ${obra} and numero_oc = '${numero}' order by id limit ${antes});
+           update ordenes_compra set estado = 'EN_ENTREGA' where obra_id = ${obra} and numero = '${numero}';`);
+    }
   });
 });
 

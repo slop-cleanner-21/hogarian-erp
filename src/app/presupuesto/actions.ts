@@ -21,7 +21,7 @@ export async function historialPartida(
   partidaId: number,
   antesDe?: { numero: string; fecha: string | null },
 ): Promise<Result<FilaHistorial[]>> {
-  await requireSesion(["TESORERIA", "LOGISTICA", "CONTABILIDAD", "GERENCIA", "OPERACIONES", "JEFE_OPERACIONES"]);
+  await requireSesion(["TESORERIA", "LOGISTICA", "CONTABILIDAD", "GERENCIA"]);
   const supabase = await createClient();
   let consulta = supabase
     .from("v_oc_items_calc")

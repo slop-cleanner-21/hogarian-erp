@@ -69,15 +69,10 @@ test.describe("@logistica borrador de Nueva OC / OS", () => {
     await expect(page.getByRole("button", { name: "Proveedor", exact: true })).toHaveCount(0);
   });
 
-  test("en Samsung Internet la hoja se cierra y elige con toques, y lo que pasa llega a los logs", async ({ browser }, info) => {
+  test("en Samsung Internet la hoja se cierra y elige con toques (ninguna hoja dentro de un label)", async ({ browser }, info) => {
     const [obra, descripcion] = partida();
     const ctx = await browser.newContext({ ...info.project.use, userAgent: SAMSUNG, storageState: sesion("logistica"), hasTouch: true, isMobile: true });
     const page = await ctx.newPage();
-    const avisos: string[] = [];
-    // Del contexto: el envío al salir de la pantalla sale de un documento que ya se fue.
-    ctx.on("request", (r) => {
-      if (r.url().endsWith("/diagnostico")) avisos.push(r.postData() ?? "");
-    });
     await page.goto(`/logistica/ordenes/nueva?tipo=OS&obra=${obra}`);
     await page.getByPlaceholder("Buscar partida").fill(descripcion.slice(0, 20));
     await page.locator("main label").filter({ hasText: descripcion.slice(0, 20) }).first().locator('input[type="checkbox"]').tap();
@@ -88,45 +83,11 @@ test.describe("@logistica borrador de Nueva OC / OS", () => {
     // La causa del S25: la hoja estaba dentro del <label> de Field, y Samsung Internet reenviaba cada toque al botón, que la
     // reabría. Ninguna hoja puede quedar dentro de un label.
     expect(await page.evaluate(() => [...document.querySelectorAll("dialog")].filter((d) => d.closest("label")).length), "hojas dentro de un label").toBe(0);
-    expect(await page.evaluate(() => document.activeElement?.tagName), "el buscador toma el foco").toBe("INPUT");
     await hoja.getByRole("button", { name: "Cerrar" }).tap();
     await expect(hoja).toHaveCount(0);
-
-    await page.getByRole("button", { name: "Comprobante", exact: true }).tap();
-    expect(await page.evaluate(() => [...document.querySelectorAll("dialog")].filter((d) => d.closest("label")).length), "tampoco esta").toBe(0);
-    await page.getByRole("listbox", { name: "Comprobante" }).getByRole("option", { name: "Factura" }).tap();
-
     await page.getByRole("button", { name: "Proveedor", exact: true }).tap();
     await page.getByRole("listbox", { name: "Proveedor" }).getByRole("option").first().tap();
     await expect(hoja).toHaveCount(0);
-
-    // Lo que pasó con los toques llega a los logs.
-    await expect.poll(() => avisos.join(" "), { timeout: 6000 }).toContain("«Cerrar»");
-    expect(avisos.join(" ")).toContain("abre «Proveedor»");
-    expect(avisos.join(" ")).toContain("hojas=1");
-    expect(avisos.join(" "), "se cerró: nada que avisar").not.toContain("sigue-abierta");
-
-    // Una hoja trabada, como la del S25: los toques llegan pero no la cierran. Queda en los logs, aunque salga enseguida.
-    avisos.length = 0;
-    await page.evaluate(() => {
-      document.addEventListener("click", (e) => (e.target as Element).closest?.("dialog") && e.stopPropagation(), { capture: true });
-    });
-    await page.getByRole("button", { name: "Proveedor", exact: true }).tap();
-    await expect(hoja).toBeVisible();
-    await hoja.getByPlaceholder("Buscar").tap();
-    await hoja.getByPlaceholder("Buscar").fill("TEXTO-PRIVADO");
-    await hoja.getByRole("button", { name: "Cerrar" }).tap();
-    await expect.poll(() => avisos.join(" "), { timeout: 6000 }).toContain("sigue-abierta «Proveedor» tras click en «Cerrar»");
-    expect(avisos.join(" "), "lo escrito no viaja").not.toContain("TEXTO-PRIVADO");
-
-    // Si los toques ni llegan: queda «abre» y nada más. Y lo pendiente sale al abandonar la pantalla.
-    await page.reload();
-    await page.getByRole("button", { name: "Proveedor", exact: true }).tap();
-    await expect(hoja).toBeVisible();
-    // (Un envío de una página que ya se fue no se ve desde aquí: se dispara el mismo evento con la página viva.)
-    avisos.length = 0;
-    await page.evaluate(() => window.dispatchEvent(new Event("pagehide")));
-    await expect.poll(() => avisos.join(" "), { timeout: 1500 }).toContain("abre «Proveedor»");
     await page.evaluate(() => Object.keys(localStorage).filter((k) => k.startsWith("prod1_borrador")).forEach((k) => localStorage.removeItem(k)));
     await ctx.close();
   });

@@ -17,7 +17,7 @@ código del MVP se toca lo mínimo, para que los cherry-picks entren sin conflic
 | **Tesorería** | Aprobación y pago de OC y OS (sin órdenes de pago de Contabilidad). Presupuesto de la obra enfocado en lo pagado y lo pendiente de pago. |
 | **Logística** | OC, OS, proveedores, transportistas e ítems (los consulta y clasifica; no los crea). Sin la pestaña Requerimientos ni nada de residentes. Registra la guía de remisión y crea las OS de mano de obra. |
 | **Gerencia** | Obras: carga y publica presupuestos, con sus detracciones, el mínimo del SPOT y los adicionales. Seguimiento (la misma vista que el del Jefe de Operaciones), órdenes e **ítems**: los crea Gerencia. |
-| **Jefe de Operaciones** | Solo el seguimiento de compras de Logística. |
+| **Jefe de Operaciones** | Solo el seguimiento de compras de Logística, sin nada de dinero ni contable: ni montos ni P.U. en pantalla, y la base no le da las tablas con precios, montos o datos contables (órdenes, partidas, ítems, proveedores, parámetros, adjuntos, valorizaciones). Su seguimiento sale de vistas sin montos (`v_seguimiento_partida`, `v_entregas_partida`; migración `prod1_operaciones_sin_dinero`). |
 | **Ingeniero de Operaciones** | Exactamente lo mismo que el Jefe: solo ver el seguimiento. Para la base es un Jefe (`rol_actual()` / `rol_en()` lo tratan como `JEFE_OPERACIONES`, migración `prod1_ing_operaciones`), así hereda todas sus restricciones; en `perfiles` queda su rol (`OPERACIONES`), para migrar al MVP. |
 | Admin | Todo lo anterior y **Usuarios** (`/admin`, desde su menú). |
 
@@ -118,11 +118,12 @@ Contabilidad, Residente y RRHH **no entran**. Sus roles siguen en la base
 - **OS de mano de obra:** Logística las crea directo, como una OS de subcontrato (sin avances,
   valorizaciones ni retenciones). El seguimiento de mano de obra usa el mismo recorrido que el de
   los subcontratos.
-- **Recepción: pendiente.** Nadie registra lo que llega todavía; se definirá después. Las entregas
-  históricas del Excel se siguen viendo. Una orden pasa a «Enviada» (estado EN_ENTREGA) cuando Logística confirma que envió la
-  constancia de pago al proveedor («Confirmar envío»: abrir WhatsApp o compartir no lo prueba) y ahí se queda. El mensaje nombra la
-  factura, no el N° de la orden, que es de control interno. El contrato de una OS igual: «Enviado» solo con su «Confirmar envío»; su detalle avisa «Los residentes aún no pueden marcar
-  las entregas».
+- **Recepción: la registra Logística** (migración `prod1_recepcion_logistica`), en la orden «Enviada» (estado EN_ENTREGA): por ítem,
+  lo que llegó, con foto opcional y observación (con observación, aviso a Logística y Operaciones). Cuando llega todo lo pedido, la
+  orden pasa a «Recibida». Una orden pasa a «Enviada» cuando Logística confirma que envió la constancia de pago al proveedor
+  («Confirmar envío»: abrir WhatsApp o compartir no lo prueba). El mensaje nombra la factura, no el N° de la orden, que es de
+  control interno. El contrato de una OS igual: «Enviado» solo con su «Confirmar envío». En el futuro la registrarán los residentes,
+  que tendrán que subir foto; ese rol aún no está en prod 1.
 - **Logística › OC / OS:** una pestaña por estado, con nombres cortos y en dos filas para que se vean
   todas a 360 px (Borrador, Cotizando, Facturar, Guía en OC o Contrato en OS, Tesorería, Pagada / Enviada, Recibida (las del
   Excel y el MVP), Anulada, Todas). En «Guía» / «Contrato» (facturadas) cada fila dice lo que falta: «Subir guía» o
@@ -424,14 +425,22 @@ Contabilidad, Residente y RRHH **no entran**. Sus roles siguen en la base
 
 ## Pendientes para producción
 
-- **Recepción** de lo que llega (ver arriba).
 - **Paso a producción** (Vercel + Supabase en la nube + repo propio): ver `docs/produccion.md`. Ya quedan
   por variables de entorno los botones de acceso rápido (`NEXT_PUBLIC_USUARIOS_LOCALES`), la contraseña de
   la demo (`DEMO_ACCESO`) y la conexión directa del navegador con
   Supabase sin `/sb` (`NEXT_PUBLIC_SUPABASE_DIRECTO=1`); en local siguen como antes hasta el paso.
 - **Quién firma por cada empresa:** ya se elige en Admin › Empresas (sin elegir, el gerente con la firma más
-  reciente); falta que respondan si es uno por empresa.
+  reciente); falta que respondan si es uno por empresa. Los gerentes subirán su firma («Mi firma») en su momento.
 - **Detracciones y retenciones de 4ta:** se registran; las paga Contabilidad, que aún no está en prod 1.
+- **Contabilidad:** serán dos usuarios con el rol de Contabilidad (Ángeles y Jerson), cuando ese módulo entre a prod 1.
+- **Observaciones de datos:**
+  - Virgen del Mar numera sus órdenes desde 1000140 porque el Excel trae una OC 1000139 (parece un error de tipeo); se deja como
+    en el Excel.
+  - Suspensiones de 4ta cruzadas por nombre, por confirmar: dos proveedores con código interno (`ZAMANTACRED`, `ASEVENT`) y un RUC que
+    está en el proveedor «PROVISIONAL DE LOGISTICA CONTOGURIZ».
+  - Las OS 100494 (Mercedes A) y 100496 (Mercedes B) del Excel son ítems «RETENCION 5%» sin pagar, del 15/05/2026: por decidir si se
+    pagan, porque la OS de retenciones de esas obras devolvería también ese dinero.
+  - Las líneas de mano de obra a otros porcentajes del presupuesto (0.855, 0.8938, 0.665, 0.9025) son otros precios, no retención.
 
 ## Entorno (separado del MVP)
 

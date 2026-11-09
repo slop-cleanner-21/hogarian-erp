@@ -10,7 +10,8 @@ const Entrega = z.object({
   numero: z.string().min(1),
   ocItemId: z.number().int().positive("Elige el ítem"),
   cantidad: z.number().positive("Ingresa la cantidad que llegó"),
-  fotos: z.array(z.string().min(1)).min(1, "Agrega al menos una foto"),
+  // Logística puede registrar sin foto; el residente, no (lo exige la base).
+  fotos: z.array(z.string().min(1)),
   lat: z.number().nullable(),
   lng: z.number().nullable(),
   precision: z.number().nullable(),

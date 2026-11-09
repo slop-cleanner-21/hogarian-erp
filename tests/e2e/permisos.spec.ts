@@ -27,12 +27,13 @@ const CORTOS = Object.keys(CORTO) as Corto[];
 const lista = (s: string) => CORTOS.filter((k) => s.split(/\s+/).includes(k));
 
 // ---------------------------------------------------------------------------------------------------------
+// Operaciones (OPS, JEF) no lee nada de dinero ni contable: su seguimiento sale de vistas sin montos (prod1_operaciones_sin_dinero).
 // Lectura: T = todas las filas · 0 = ninguna · P = parte (solo lo de sus obras) · M = las suyas (user_id) ·
 // X = sin permiso sobre la tabla (solo el servidor la usa).
 const LECTURA = tabla(`
   tabla                       LOG CON TES RES GER OPS JEF RRHH
-  adelantos                    T   T   T   0   T   T   T   0
-  adjuntos                     T   T   T   P   T   T   T   0
+  adelantos                    T   T   T   0   T   0   0   0
+  adjuntos                     T   T   T   P   T   0   0   0
   asiento_lineas               0   T   0   0   0   0   0   0
   asientos                     T   T   T   0   0   0   0   0
   audit_log                    0   0   0   0   0   0   0   0
@@ -48,18 +49,18 @@ const LECTURA = tabla(`
   entregas                     T   T   T   P   T   T   T   0
   etapas                       T   T   T   T   T   T   T   0
   guias                        T   T   T   0   T   0   0   0
-  items                        T   T   T   T   T   T   T   0
+  items                        T   T   T   T   T   0   0   0
   notificaciones               M   M   M   M   M   M   M   M
   aviso_preferencias           M   M   M   M   M   M   M   M
   obra_etapas                  T   T   T   T   T   T   T   0
   obras                        T   T   T   P   T   T   T   0
-  oc_items                     T   T   T   P   T   T   T   0
-  ordenes_compra               T   T   T   P   T   T   T   0
+  oc_items                     T   T   T   P   T   0   0   0
+  ordenes_compra               T   T   T   P   T   0   0   0
   orden_borradores             M   0   0   0   0   0   0   0
   ordenes_pago                 T   T   T   0   0   0   0   0
   pago_aplicaciones            T   T   T   0   T   T   0   0
   pagos                        T   T   T   0   T   0   0   0
-  partidas                     T   T   T   P   T   T   T   0
+  partidas                     T   T   T   P   T   0   0   0
   perfil_obras                 T   T   T   P   T   T   T   0
   perfiles                     T   T   T   T   T   T   T   T
   perfil_privado               0   0   0   0   0   0   0   0
@@ -75,7 +76,7 @@ const LECTURA = tabla(`
   proveedor_contactos          T   T   T   0   T   T   0   0
   proveedor_cuentas            T   T   T   0   T   0   0   0
   proveedor_tipos_material     T   T   T   0   T   T   0   0
-  proveedores                  T   T   T   P   T   T   T   0
+  proveedores                  T   T   T   P   T   0   0   0
   push_suscripciones           M   M   M   M   M   M   M   M
   rechazos                     T   T   T   0   T   0   0   0
   requerimientos               T   T   T   T   T   T   T   0
@@ -83,13 +84,13 @@ const LECTURA = tabla(`
   requerimientos_obra_items    T   T   T   0   T   T   T   0
   retenciones                  T   T   T   0   T   T   0   0
   detracciones                 T   T   T   0   T   T   0   0
-  parametros                   T   T   T   T   T   T   T   T
+  parametros                   T   T   T   T   T   0   0   T
   solicitud_adjuntos           0   0   0   0   T   T   0   0
   solicitudes                  0   0   0   0   T   T   0   T
   tipos_material               T   T   T   T   T   T   T   0
   transportistas               T   T   T   0   T   T   0   0
-  valorizacion_partidas        T   T   T   T   T   T   T   0
-  valorizaciones               T   T   T   P   T   T   T   0
+  valorizacion_partidas        T   T   T   T   T   0   0   0
+  valorizaciones               T   T   T   P   T   0   0   0
 `);
 
 // Escritura directa (PATCH al mismo valor): quién afecta filas.

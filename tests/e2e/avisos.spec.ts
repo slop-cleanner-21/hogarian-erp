@@ -18,7 +18,7 @@ test.describe("@prod1 avisos", () => {
       await expect(dia(`${marca} hoy`).getByRole("heading")).toHaveText(/^Hoy, \p{L}+, \d{1,2} de \p{L}+ de \d{4}$/u);
       await expect(dia(`${marca} ayer`).getByRole("heading")).toHaveText(/^Ayer, \p{L}+, \d{1,2} de \p{L}+ de \d{4}$/u);
       await expect(dia(`${marca} viejo`).getByRole("heading")).toHaveText("Lunes, 10 de marzo de 2025");
-      await expect(dia(`${marca} viejo`).locator("li").filter({ hasText: `${marca} viejo` })).toContainText(/03:30\s*p\.\s*m\./);
+      await expect(dia(`${marca} viejo`).locator("li").filter({ hasText: `${marca} viejo` })).toContainText("15:30");
       // Los días, del más reciente al más antiguo.
       const titulos = await page.locator("main section h2").allInnerTexts();
       expect(titulos.findIndex((t) => t.startsWith("Hoy"))).toBeLessThan(titulos.findIndex((t) => t.startsWith("Ayer")));

@@ -13,7 +13,7 @@ import { ROL_LABEL } from "@/lib/usuarios";
 
 export const metadata: Metadata = { title: "Sugerencias" };
 
-const cuando = new Intl.DateTimeFormat("es-PE", { day: "2-digit", month: "2-digit", year: "numeric", hour: "2-digit", minute: "2-digit", timeZone: "America/Lima" });
+const cuando = new Intl.DateTimeFormat("es-PE", { day: "2-digit", month: "2-digit", year: "numeric", hour: "2-digit", minute: "2-digit", hourCycle: "h23", timeZone: "America/Lima" });
 const TONO: Record<string, string> = { ERROR: "bg-danger-bg text-danger", MEJORA: "bg-sunken text-ink-2", DISENO: "bg-sunken text-ink-2" };
 
 /** Sugerencias (solo el Admin): lo que manda cada usuario desde el encabezado, con su pantalla y sus capturas. */

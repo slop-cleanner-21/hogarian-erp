@@ -11,7 +11,7 @@ import { borrarAvisos } from "./actions";
 export type Aviso = { id: number; titulo: string; cuerpo: string | null; href: string | null; leida_at: string | null; created_at: string };
 
 const LIMA = "America/Lima";
-const hora = new Intl.DateTimeFormat("es-PE", { hour: "2-digit", minute: "2-digit", timeZone: LIMA });
+const hora = new Intl.DateTimeFormat("es-PE", { hour: "2-digit", minute: "2-digit", hourCycle: "h23", timeZone: LIMA });
 const diaLargo = new Intl.DateTimeFormat("es-PE", { weekday: "long", day: "numeric", month: "long", year: "numeric", timeZone: LIMA });
 /** Día (AAAA-MM-DD) en Lima: los avisos se agrupan por él. */
 const diaDe = (d: Date) => d.toLocaleDateString("en-CA", { timeZone: LIMA });
