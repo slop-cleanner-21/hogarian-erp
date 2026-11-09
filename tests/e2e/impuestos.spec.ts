@@ -360,3 +360,46 @@ test.describe("@impuestos retención de 4ta, detracción y comprobante de OS en 
     }
   });
 });
+
+test.describe("@impuestos la retención de 4ta se hace al pagar", () => {
+  test("la suspensión subida después del recibo quita la retención mientras no esté pagado; uno ya pagado no cambia", () => {
+    const [id, prov] = sql(`select c.id, c.proveedor_id from comprobantes c
+                             where c.tipo = 'RXH' and c.anulado_at is null and not c.historico and c.retencion > 0
+                               and not exists (select 1 from pago_aplicaciones a where a.comprobante_id = c.id)
+                               and not exists (select 1 from asientos s where s.comprobante_id = c.id)
+                             order by c.id limit 1`)[0] ?? [];
+    test.skip(!id, "sin recibos por pagar con retención");
+    const pagado = sql1(`select c.id from comprobantes c where c.tipo = 'RXH' and c.retencion > 0 and c.proveedor_id = ${prov}
+                           and exists (select 1 from pago_aplicaciones a where a.comprobante_id = c.id) limit 1`);
+    const leer = (cid: string) => `(select retencion from comprobantes where id = ${cid})`;
+    // Como Logística sube la suspensión (con su N° de operación), de ayer: hoy ya rige.
+    const r = sqlScript(`begin;
+      select set_config('app.skip_audit', 'on', true) is null;
+      select ${leer(id)}${pagado ? ` || '|' || ${leer(pagado)}` : ""};
+      update proveedores set suspension_4ta_fecha = (now() at time zone 'America/Lima')::date - 1, suspension_4ta_path = null,
+                             suspension_4ta_operacion = '123456' where id = ${prov};
+      select ${leer(id)}${pagado ? ` || '|' || ${leer(pagado)}` : ""};
+      update proveedores set suspension_4ta_fecha = null, suspension_4ta_operacion = null where id = ${prov};
+      select ${leer(id)};
+      rollback;`);
+    const [antes, con, sin] = r.slice(-3);
+    expect(Number(antes[0])).toBeGreaterThan(0);
+    expect(con[0], "con la suspensión vigente, sin retención").toBe("0.00");
+    if (pagado) expect(con[1], "el ya pagado no cambia").toBe(antes[1]);
+    expect(sin[0], "sin la suspensión vuelve").toBe(antes[0]);
+  });
+
+  test("al abrir la orden se recalcula (la suspensión rige desde el día siguiente): solo Tesorería, Logística y Gerencia", () => {
+    const o = sql(`select i.obra_id, i.numero_oc from oc_items i join comprobantes c on c.id = i.comprobante_id
+                    where c.tipo = 'RXH' and c.anulado_at is null and not c.historico limit 1`)[0];
+    test.skip(!o, "sin órdenes con recibo");
+    const como = (rol: string) =>
+      sqlScript(`begin;
+        select set_config('request.jwt.claims', '{"sub":"${uidDe(rol)}","role":"authenticated"}', true) is null;
+        set local role authenticated;
+        select refrescar_retencion_orden(${o[0]}, '${o[1]}');
+        rollback;`).at(-1)![0];
+    expect(como("TESORERIA")).toMatch(/^\d+$/);
+    expect(() => como("JEFE_OPERACIONES")).toThrow(/No tienes permiso/);
+  });
+});

@@ -170,6 +170,8 @@ const RPC: Record<string, string> = {
   reenviar_cotizacion: "LOG",
   registrar_avance: "RES",
   registrar_comprobante: "LOG",
+  // Solo recalcula la retención de 4ta de los recibos sin pagar (20261110100000_prod1_retencion_al_pagar).
+  refrescar_retencion_orden: "LOG TES GER",
   registrar_entrega: "LOG RES",
   registrar_pago: "", // solo seeds y cargas (postgres / service_role)
   resolver_solicitud: "GER",
