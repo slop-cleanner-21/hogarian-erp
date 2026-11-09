@@ -900,6 +900,36 @@ export type Database = {
           },
         ];
       };
+      empresa_firmas: {
+        Row: {
+          empresa_id: number;
+          path: string;
+          subida_at: string;
+          subida_por: string | null;
+        };
+        ComputedFields: never;
+        Insert: {
+          empresa_id: number;
+          path: string;
+          subida_at?: string;
+          subida_por?: string | null;
+        };
+        Update: {
+          empresa_id?: number;
+          path?: string;
+          subida_at?: string;
+          subida_por?: string | null;
+        };
+        Relationships: [
+          {
+            foreignKeyName: "empresa_firmas_empresa_id_fkey";
+            columns: ["empresa_id"];
+            isOneToOne: true;
+            referencedRelation: "empresas";
+            referencedColumns: ["id"];
+          },
+        ];
+      };
       empresas: {
         Row: {
           direccion: string | null;

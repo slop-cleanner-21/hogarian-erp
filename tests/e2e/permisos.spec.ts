@@ -67,6 +67,7 @@ const LECTURA = tabla(`
   perfil_roles                 M   M   M   M   M   M   M   M
   sugerencias                  X   X   X   X   X   X   X   X
   suspensiones_4ta             X   X   X   X   X   X   X   X
+  empresa_firmas               X   X   X   X   X   X   X   X
   huellas                      X   X   X   X   X   X   X   X
   huella_desafios              X   X   X   X   X   X   X   X
   credenciales                 X   X   X   X   X   X   X   X

@@ -25,7 +25,7 @@ const s = StyleSheet.create({
   glosa: { marginTop: 4, padding: 8, border: "1 solid #111" },
   firmas: { flexDirection: "row", justifyContent: "space-between", marginTop: 12 },
   firmaCol: { width: "42%" },
-  firmaImg: { height: 44, justifyContent: "flex-end", alignItems: "center" },
+  firmaImg: { height: 72, justifyContent: "flex-end", alignItems: "center" },
   firma: { borderTop: "1 solid #111", paddingTop: 4, textAlign: "center" },
   membrete: { flexDirection: "row", alignItems: "center", marginBottom: 14, paddingBottom: 8, borderBottom: "0.5 solid #ccc" },
   logo: { height: 40, maxWidth: 160, objectFit: "contain" },
@@ -366,7 +366,7 @@ function Firmas({ orden, datos, empresa, proveedor }: { orden: VOrden; datos?: D
       <View style={s.firmas}>
         <View style={s.firmaCol}>
           {/* eslint-disable-next-line jsx-a11y/alt-text -- Image de react-pdf, no un <img> */}
-          <View style={s.firmaImg}>{firma ? <Image src={firma} style={{ maxHeight: 44, maxWidth: 150, objectFit: "contain" }} /> : null}</View>
+          <View style={s.firmaImg}>{firma ? <Image src={firma} style={{ maxHeight: 72, maxWidth: 190, objectFit: "contain" }} /> : null}</View>
           <View style={s.firma}>
             <Text style={s.b}>{empresa}</Text>
             <Text>{nombreEmpresa(orden, datos)}</Text>

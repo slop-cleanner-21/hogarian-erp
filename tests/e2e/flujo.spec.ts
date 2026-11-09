@@ -442,6 +442,8 @@ test.describe("@flujo flujo completo por las pantallas", () => {
       const hoja = page.getByRole("dialog", { name: "Mi firma" });
       await hoja.locator('input[type="file"]').setInputFiles(ARCHIVO);
       await hoja.getByRole("button", { name: "Guardar firma" }).click();
+      await expect(hoja.getByRole("status")).toHaveText("Guardada");
+      await hoja.getByRole("button", { name: "Cerrar" }).click();
       await expect(hoja).toBeHidden();
 
       const admin = await abrir("admin", "/admin");

@@ -289,7 +289,7 @@ export function UserMenu({ id, nombre, rol }: { id: string; nombre: string; rol:
                 {MODULOS[m].label}
               </Link>
             ))}
-          {rol === "GERENCIA" && (
+          {(rol === "GERENCIA" || rol === "ADMIN") && (
             <button
               type="button"
               onClick={() => {

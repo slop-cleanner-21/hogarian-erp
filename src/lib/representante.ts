@@ -19,11 +19,18 @@ export async function representanteContratos(
     ? await db.from("empresas").select("razon_social, direccion, firmante_id").eq("id", empresaId).maybeSingle()
     : { data: null };
   const empresa = { razonSocial: emp?.razon_social ?? null, direccion: emp?.direccion ?? null };
+  // La firma de la empresa (cada una con su sello), si la hay; si no, la del gerente que firma.
+  const { data: deEmpresa } = conFirma && empresaId ? await db.from("empresa_firmas").select("path").eq("empresa_id", empresaId).maybeSingle() : { data: null };
+  const firmaDe = async (path: string | null | undefined) => {
+    const { data: archivo } = path ? await db.storage.from("documentos").download(path) : { data: null };
+    return archivo ? `data:${archivo.type || "image/png"};base64,${Buffer.from(await archivo.arrayBuffer()).toString("base64")}` : null;
+  };
+  const firmaEmpresa = await firmaDe(deEmpresa?.path);
 
   let elegido: string | null = emp?.firmante_id ?? null;
   if (!elegido) {
     const { data: gerentes } = await db.from("perfil_roles").select("user_id").eq("rol", "GERENCIA");
-    if (!gerentes?.length) return { representante: null, empresa };
+    if (!gerentes?.length) return { representante: firmaEmpresa ? { nombre: "", dni: null, firma: firmaEmpresa } : null, empresa };
     const { data: ultimo } = await db
       .from("perfil_privado")
       .select("user_id")
@@ -34,13 +41,12 @@ export async function representanteContratos(
       .maybeSingle();
     elegido = ultimo?.user_id ?? null;
   }
-  if (!elegido) return { representante: null, empresa };
+  if (!elegido) return { representante: firmaEmpresa ? { nombre: "", dni: null, firma: firmaEmpresa } : null, empresa };
 
   const [{ data: perfil }, { data: p }] = await Promise.all([
     db.from("perfiles").select("nombre").eq("user_id", elegido).maybeSingle(),
     db.from("perfil_privado").select("dni, firma_path").eq("user_id", elegido).maybeSingle(),
   ]);
-  const { data: archivo } = conFirma && p?.firma_path ? await db.storage.from("documentos").download(p.firma_path) : { data: null };
-  const firma = archivo ? `data:${archivo.type || "image/png"};base64,${Buffer.from(await archivo.arrayBuffer()).toString("base64")}` : null;
+  const firma = firmaEmpresa ?? (conFirma ? await firmaDe(p?.firma_path) : null);
   return { representante: { nombre: perfil?.nombre ?? "", dni: p?.dni ?? null, firma }, empresa };
 }

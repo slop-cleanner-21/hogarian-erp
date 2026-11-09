@@ -207,6 +207,34 @@ test.describe("@prod1 @logistica facturar: guía y retención", () => {
 });
 
 test.describe("@prod1 @gerencia firma y DNI", () => {
+  // Una a la vez: una cambia quién firma por una empresa, y la otra vería «Mi firma» por empresa.
+  test.describe.configure({ mode: "serial" });
+  test("firma por empresa: el gerente que firma por ella la sube y la cambia; va en el contrato", async ({ abrir }, info) => {
+    test.skip(info.project.name !== "m390", "escribe en la base");
+    const uid = sql1(`select id from auth.users where email = 'gerencia@erp.local'`);
+    const [empresa, nombre, antes] = sql(`select id, nombre, coalesce(firmante_id::text, '') from empresas order by id limit 1`)[0];
+    sql(`update empresas set firmante_id = '${uid}' where id = ${empresa}`);
+    try {
+      const page = await abrir("gerencia", "/gerencia/obras");
+      await page.getByRole("button", { name: "Usuario" }).click();
+      await page.getByRole("button", { name: "Mi firma" }).click();
+      const hoja = page.getByRole("dialog", { name: "Mi firma" });
+      const bloque = hoja.getByRole("region", { name: `Firma ${nombre}` });
+      await expect(bloque).toBeVisible();
+      await bloque.locator('input[type="file"]').setInputFiles(path.resolve("tests/e2e/archivos/ariant.png"));
+      await bloque.getByRole("button", { name: "Guardar firma" }).click();
+      await expect(bloque.getByRole("status")).toHaveText("Guardada");
+      expect(sql1(`select (path like 'firmas/empresa-${empresa}-%') || ' ' || (subida_por = '${uid}') from empresa_firmas where empresa_id = ${empresa}`)).toBe("true true");
+      // Otra la reemplaza (se puede cambiar).
+      const primera = sql1(`select path from empresa_firmas where empresa_id = ${empresa}`);
+      await bloque.locator('input[type="file"]').setInputFiles(path.resolve("tests/e2e/archivos/ariant.png"));
+      await bloque.getByRole("button", { name: "Guardar firma" }).click();
+      await expect.poll(() => sql1(`select path from empresa_firmas where empresa_id = ${empresa}`)).not.toBe(primera);
+    } finally {
+      sql(`delete from empresa_firmas where empresa_id = ${empresa}; update empresas set firmante_id = ${antes ? `'${antes}'` : "null"} where id = ${empresa};`);
+    }
+  });
+
   test("Gerencia sube su firma desde su menú; el Admin exige el DNI de Gerencia", async ({ abrir }, info) => {
     test.skip(info.project.name !== "m390", "escribe en la base");
     const uid = sql1(`select id from auth.users where email = 'gerencia@erp.local'`);
@@ -220,6 +248,8 @@ test.describe("@prod1 @gerencia firma y DNI", () => {
       await hoja.locator('input[type="file"]').setInputFiles(path.resolve("tests/e2e/archivos/ariant.png"));
       await expect(hoja.getByRole("img", { name: "Firma" })).toBeVisible();
       await hoja.getByRole("button", { name: "Guardar firma" }).click();
+      await expect(hoja.getByRole("status")).toHaveText("Guardada");
+      await hoja.getByRole("button", { name: "Cerrar" }).click();
       await expect(hoja).toBeHidden();
       expect(sql1(`select firma_path like 'firmas/${uid}-%' from perfil_privado where user_id = '${uid}'`)).toBe("t");
 

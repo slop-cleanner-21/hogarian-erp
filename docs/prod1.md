@@ -62,8 +62,9 @@ Contabilidad, Residente y RRHH **no entran**. Sus roles siguen en la base
     la orden (el archivo queda) y hay que enviarlo y firmarlo de nuevo. Lo hace la base en la misma transacción que
     el registro (`fn_os_comprobante`); una OS ya en Tesorería no cambia de comprobante sin un rechazo. Una OS solo
     acepta factura o recibo por honorarios.
-  - El contrato lleva la firma de Gerencia (la imagen de «Mi firma», del firmante de la empresa) sobre la línea, pero no su nombre
-    ni su DNI: debajo va la empresa (su rol en el contrato, razón social y RUC), como el proveedor; sin firma subida, el espacio en
+  - El contrato lleva la firma de la empresa sobre la línea (tabla `empresa_firmas`, una por empresa: un gerente puede firmar por
+    varias, con un sello distinto en cada una; sin ella, la del gerente firmante), pero no su nombre ni su DNI. La sube y la cambia
+    el gerente que firma por esa empresa en «Mi firma» (una por cada empresa suya), o el Admin (todas): debajo va la empresa (su rol en el contrato, razón social y RUC), como el proveedor; sin firma subida, el espacio en
     blanco para firmar. La empresa comparece «debidamente representada». El contrato del link del proveedor va sin la imagen de la
     firma (cualquiera con el link podría copiarla).
   - Arriba del contrato va el **logo de la empresa** (PNG para PDF en `public/empresas/pdf/`: react-pdf no lee
