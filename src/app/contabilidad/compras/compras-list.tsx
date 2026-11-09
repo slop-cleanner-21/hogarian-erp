@@ -196,13 +196,19 @@ function CompraSheet({ fila, exp: marcas, onClose }: { fila: VRegistroCompra; ex
           {fila.retencion > 0 && (
             <>
               <dt className="text-ink-3">Retención de 4ta</dt>
-              <dd>{soles(fila.retencion)}</dd>
+              <dd>
+                {soles(fila.retencion)}
+                <Pagado pago={exp?.impuestos.find((i) => i.tipo === "RETENCION_4TA")} />
+              </dd>
             </>
           )}
           {(exp?.detraccion ?? 0) > 0 && (
             <>
               <dt className="text-ink-3">Detracción</dt>
-              <dd>{soles(exp!.detraccion)}</dd>
+              <dd>
+                {soles(exp!.detraccion)}
+                <Pagado pago={exp?.impuestos.find((i) => i.tipo === "DETRACCION")} />
+              </dd>
             </>
           )}
         </dl>
@@ -286,6 +292,15 @@ function CompraSheet({ fila, exp: marcas, onClose }: { fila: VRegistroCompra; ex
       </div>
     </Sheet>
   );
+}
+
+/** Pagado por Contabilidad (detracción o retención): cuándo y con qué N°. */
+function Pagado({ pago }: { pago?: { fecha: string; numero: string } }) {
+  return pago ? (
+    <span className="ml-2 text-sm text-ok">
+      pagada {fecha(pago.fecha)} · N° {pago.numero}
+    </span>
+  ) : null;
 }
 
 /** Un documento que está en la orden (se ve en su consulta y va en el ZIP): si está o si falta. */

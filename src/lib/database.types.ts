@@ -321,6 +321,7 @@ export type Database = {
           fecha: string;
           glosa: string;
           id: number;
+          impuesto_pago_id: number | null;
           origen: string;
           pago_id: number | null;
         };
@@ -333,6 +334,7 @@ export type Database = {
           fecha: string;
           glosa: string;
           id?: number;
+          impuesto_pago_id?: number | null;
           origen: string;
           pago_id?: number | null;
         };
@@ -344,6 +346,7 @@ export type Database = {
           fecha?: string;
           glosa?: string;
           id?: number;
+          impuesto_pago_id?: number | null;
           origen?: string;
           pago_id?: number | null;
         };
@@ -366,6 +369,13 @@ export type Database = {
             foreignKeyName: "asientos_comprobante_id_fkey";
             columns: ["comprobante_id"];
             isOneToOne: false;
+            referencedRelation: "v_detracciones";
+            referencedColumns: ["comprobante_id"];
+          },
+          {
+            foreignKeyName: "asientos_comprobante_id_fkey";
+            columns: ["comprobante_id"];
+            isOneToOne: false;
             referencedRelation: "v_expediente";
             referencedColumns: ["comprobante_id"];
           },
@@ -377,11 +387,39 @@ export type Database = {
             referencedColumns: ["comprobante_id"];
           },
           {
+            foreignKeyName: "asientos_comprobante_id_fkey";
+            columns: ["comprobante_id"];
+            isOneToOne: false;
+            referencedRelation: "v_retenciones_4ta";
+            referencedColumns: ["comprobante_id"];
+          },
+          {
             foreignKeyName: "asientos_empresa_id_fkey";
             columns: ["empresa_id"];
             isOneToOne: false;
             referencedRelation: "empresas";
             referencedColumns: ["id"];
+          },
+          {
+            foreignKeyName: "asientos_impuesto_pago_id_fkey";
+            columns: ["impuesto_pago_id"];
+            isOneToOne: false;
+            referencedRelation: "impuesto_pagos";
+            referencedColumns: ["id"];
+          },
+          {
+            foreignKeyName: "asientos_impuesto_pago_id_fkey";
+            columns: ["impuesto_pago_id"];
+            isOneToOne: false;
+            referencedRelation: "v_detracciones";
+            referencedColumns: ["impuesto_pago_id"];
+          },
+          {
+            foreignKeyName: "asientos_impuesto_pago_id_fkey";
+            columns: ["impuesto_pago_id"];
+            isOneToOne: false;
+            referencedRelation: "v_retenciones_4ta";
+            referencedColumns: ["impuesto_pago_id"];
           },
           {
             foreignKeyName: "asientos_pago_id_fkey";
@@ -726,6 +764,13 @@ export type Database = {
             foreignKeyName: "comprobantes_historial_comprobante_id_fkey";
             columns: ["comprobante_id"];
             isOneToOne: false;
+            referencedRelation: "v_detracciones";
+            referencedColumns: ["comprobante_id"];
+          },
+          {
+            foreignKeyName: "comprobantes_historial_comprobante_id_fkey";
+            columns: ["comprobante_id"];
+            isOneToOne: false;
             referencedRelation: "v_expediente";
             referencedColumns: ["comprobante_id"];
           },
@@ -734,6 +779,13 @@ export type Database = {
             columns: ["comprobante_id"];
             isOneToOne: false;
             referencedRelation: "v_registro_compras";
+            referencedColumns: ["comprobante_id"];
+          },
+          {
+            foreignKeyName: "comprobantes_historial_comprobante_id_fkey";
+            columns: ["comprobante_id"];
+            isOneToOne: false;
+            referencedRelation: "v_retenciones_4ta";
             referencedColumns: ["comprobante_id"];
           },
         ];
@@ -1283,6 +1335,149 @@ export type Database = {
         };
         Relationships: [];
       };
+      impuesto_pago_comprobantes: {
+        Row: {
+          comprobante_id: number;
+          impuesto_pago_id: number;
+          monto: number;
+          tipo: string;
+          vigente: boolean;
+        };
+        ComputedFields: never;
+        Insert: {
+          comprobante_id: number;
+          impuesto_pago_id: number;
+          monto: number;
+          tipo: string;
+          vigente?: boolean;
+        };
+        Update: {
+          comprobante_id?: number;
+          impuesto_pago_id?: number;
+          monto?: number;
+          tipo?: string;
+          vigente?: boolean;
+        };
+        Relationships: [
+          {
+            foreignKeyName: "impuesto_pago_comprobantes_comprobante_id_fkey";
+            columns: ["comprobante_id"];
+            isOneToOne: false;
+            referencedRelation: "comprobantes";
+            referencedColumns: ["id"];
+          },
+          {
+            foreignKeyName: "impuesto_pago_comprobantes_comprobante_id_fkey";
+            columns: ["comprobante_id"];
+            isOneToOne: false;
+            referencedRelation: "v_comprobantes";
+            referencedColumns: ["id"];
+          },
+          {
+            foreignKeyName: "impuesto_pago_comprobantes_comprobante_id_fkey";
+            columns: ["comprobante_id"];
+            isOneToOne: false;
+            referencedRelation: "v_detracciones";
+            referencedColumns: ["comprobante_id"];
+          },
+          {
+            foreignKeyName: "impuesto_pago_comprobantes_comprobante_id_fkey";
+            columns: ["comprobante_id"];
+            isOneToOne: false;
+            referencedRelation: "v_expediente";
+            referencedColumns: ["comprobante_id"];
+          },
+          {
+            foreignKeyName: "impuesto_pago_comprobantes_comprobante_id_fkey";
+            columns: ["comprobante_id"];
+            isOneToOne: false;
+            referencedRelation: "v_registro_compras";
+            referencedColumns: ["comprobante_id"];
+          },
+          {
+            foreignKeyName: "impuesto_pago_comprobantes_comprobante_id_fkey";
+            columns: ["comprobante_id"];
+            isOneToOne: false;
+            referencedRelation: "v_retenciones_4ta";
+            referencedColumns: ["comprobante_id"];
+          },
+          {
+            foreignKeyName: "impuesto_pago_comprobantes_impuesto_pago_id_fkey";
+            columns: ["impuesto_pago_id"];
+            isOneToOne: false;
+            referencedRelation: "impuesto_pagos";
+            referencedColumns: ["id"];
+          },
+          {
+            foreignKeyName: "impuesto_pago_comprobantes_impuesto_pago_id_fkey";
+            columns: ["impuesto_pago_id"];
+            isOneToOne: false;
+            referencedRelation: "v_detracciones";
+            referencedColumns: ["impuesto_pago_id"];
+          },
+          {
+            foreignKeyName: "impuesto_pago_comprobantes_impuesto_pago_id_fkey";
+            columns: ["impuesto_pago_id"];
+            isOneToOne: false;
+            referencedRelation: "v_retenciones_4ta";
+            referencedColumns: ["impuesto_pago_id"];
+          },
+        ];
+      };
+      impuesto_pagos: {
+        Row: {
+          anulado_at: string | null;
+          anulado_motivo: string | null;
+          archivo_path: string;
+          created_at: string;
+          created_by: string | null;
+          empresa_id: number;
+          fecha: string;
+          id: number;
+          monto: number;
+          numero: string;
+          periodo: string | null;
+          tipo: string;
+        };
+        ComputedFields: never;
+        Insert: {
+          anulado_at?: string | null;
+          anulado_motivo?: string | null;
+          archivo_path: string;
+          created_at?: string;
+          created_by?: string | null;
+          empresa_id: number;
+          fecha: string;
+          id?: never;
+          monto: number;
+          numero: string;
+          periodo?: string | null;
+          tipo: string;
+        };
+        Update: {
+          anulado_at?: string | null;
+          anulado_motivo?: string | null;
+          archivo_path?: string;
+          created_at?: string;
+          created_by?: string | null;
+          empresa_id?: number;
+          fecha?: string;
+          id?: never;
+          monto?: number;
+          numero?: string;
+          periodo?: string | null;
+          tipo?: string;
+        };
+        Relationships: [
+          {
+            foreignKeyName: "impuesto_pagos_empresa_id_fkey";
+            columns: ["empresa_id"];
+            isOneToOne: false;
+            referencedRelation: "empresas";
+            referencedColumns: ["id"];
+          },
+        ];
+      };
       invitaciones: {
         Row: {
           creada_por: string | null;
@@ -1554,6 +1749,13 @@ export type Database = {
             foreignKeyName: "oc_items_comprobante_id_fkey";
             columns: ["comprobante_id"];
             isOneToOne: false;
+            referencedRelation: "v_detracciones";
+            referencedColumns: ["comprobante_id"];
+          },
+          {
+            foreignKeyName: "oc_items_comprobante_id_fkey";
+            columns: ["comprobante_id"];
+            isOneToOne: false;
             referencedRelation: "v_expediente";
             referencedColumns: ["comprobante_id"];
           },
@@ -1562,6 +1764,13 @@ export type Database = {
             columns: ["comprobante_id"];
             isOneToOne: false;
             referencedRelation: "v_registro_compras";
+            referencedColumns: ["comprobante_id"];
+          },
+          {
+            foreignKeyName: "oc_items_comprobante_id_fkey";
+            columns: ["comprobante_id"];
+            isOneToOne: false;
+            referencedRelation: "v_retenciones_4ta";
             referencedColumns: ["comprobante_id"];
           },
           {
@@ -1896,6 +2105,13 @@ export type Database = {
             foreignKeyName: "pago_aplicaciones_comprobante_id_fkey";
             columns: ["comprobante_id"];
             isOneToOne: false;
+            referencedRelation: "v_detracciones";
+            referencedColumns: ["comprobante_id"];
+          },
+          {
+            foreignKeyName: "pago_aplicaciones_comprobante_id_fkey";
+            columns: ["comprobante_id"];
+            isOneToOne: false;
             referencedRelation: "v_expediente";
             referencedColumns: ["comprobante_id"];
           },
@@ -1904,6 +2120,13 @@ export type Database = {
             columns: ["comprobante_id"];
             isOneToOne: false;
             referencedRelation: "v_registro_compras";
+            referencedColumns: ["comprobante_id"];
+          },
+          {
+            foreignKeyName: "pago_aplicaciones_comprobante_id_fkey";
+            columns: ["comprobante_id"];
+            isOneToOne: false;
+            referencedRelation: "v_retenciones_4ta";
             referencedColumns: ["comprobante_id"];
           },
           {
@@ -2323,6 +2546,7 @@ export type Database = {
           comprobante_habitual:
             | Database["public"]["Enums"]["tipo_comprobante"]
             | null;
+          cuenta_detracciones: string | null;
           id: number;
           razon_social: string;
           retencion_4ta_pct: number;
@@ -2337,6 +2561,7 @@ export type Database = {
           comprobante_habitual?:
             | Database["public"]["Enums"]["tipo_comprobante"]
             | null;
+          cuenta_detracciones?: string | null;
           id?: number;
           razon_social: string;
           retencion_4ta_pct?: number;
@@ -2350,6 +2575,7 @@ export type Database = {
           comprobante_habitual?:
             | Database["public"]["Enums"]["tipo_comprobante"]
             | null;
+          cuenta_detracciones?: string | null;
           id?: number;
           razon_social?: string;
           retencion_4ta_pct?: number;
@@ -3133,6 +3359,45 @@ export type Database = {
           },
         ];
       };
+      v_detracciones: {
+        Row: {
+          comprobante_id: number;
+          constancia: string | null;
+          cuenta_detracciones: string | null;
+          detraccion: number;
+          empresa: string;
+          empresa_id: number;
+          fecha_emision: string;
+          fecha_pago: string | null;
+          historico: boolean;
+          impuesto_pago_id: number | null;
+          numero: string;
+          pagado_proveedor: string | null;
+          proveedor: string;
+          proveedor_id: number;
+          proveedor_ruc: string;
+          serie: string;
+          tipo: Database["public"]["Enums"]["tipo_comprobante"];
+          total: number;
+        };
+        ComputedFields: never;
+        Relationships: [
+          {
+            foreignKeyName: "comprobantes_empresa_id_fkey";
+            columns: ["empresa_id"];
+            isOneToOne: false;
+            referencedRelation: "empresas";
+            referencedColumns: ["id"];
+          },
+          {
+            foreignKeyName: "comprobantes_proveedor_id_fkey";
+            columns: ["proveedor_id"];
+            isOneToOne: false;
+            referencedRelation: "proveedores";
+            referencedColumns: ["id"];
+          },
+        ];
+      };
       v_entregas_item: {
         Row: {
           entregado: number | null;
@@ -3295,6 +3560,13 @@ export type Database = {
             foreignKeyName: "oc_items_comprobante_id_fkey";
             columns: ["comprobante_id"];
             isOneToOne: false;
+            referencedRelation: "v_detracciones";
+            referencedColumns: ["comprobante_id"];
+          },
+          {
+            foreignKeyName: "oc_items_comprobante_id_fkey";
+            columns: ["comprobante_id"];
+            isOneToOne: false;
             referencedRelation: "v_expediente";
             referencedColumns: ["comprobante_id"];
           },
@@ -3303,6 +3575,13 @@ export type Database = {
             columns: ["comprobante_id"];
             isOneToOne: false;
             referencedRelation: "v_registro_compras";
+            referencedColumns: ["comprobante_id"];
+          },
+          {
+            foreignKeyName: "oc_items_comprobante_id_fkey";
+            columns: ["comprobante_id"];
+            isOneToOne: false;
+            referencedRelation: "v_retenciones_4ta";
             referencedColumns: ["comprobante_id"];
           },
           {
@@ -3462,6 +3741,13 @@ export type Database = {
             foreignKeyName: "oc_items_comprobante_id_fkey";
             columns: ["comprobante_id"];
             isOneToOne: false;
+            referencedRelation: "v_detracciones";
+            referencedColumns: ["comprobante_id"];
+          },
+          {
+            foreignKeyName: "oc_items_comprobante_id_fkey";
+            columns: ["comprobante_id"];
+            isOneToOne: false;
             referencedRelation: "v_expediente";
             referencedColumns: ["comprobante_id"];
           },
@@ -3470,6 +3756,13 @@ export type Database = {
             columns: ["comprobante_id"];
             isOneToOne: false;
             referencedRelation: "v_registro_compras";
+            referencedColumns: ["comprobante_id"];
+          },
+          {
+            foreignKeyName: "oc_items_comprobante_id_fkey";
+            columns: ["comprobante_id"];
+            isOneToOne: false;
+            referencedRelation: "v_retenciones_4ta";
             referencedColumns: ["comprobante_id"];
           },
           {
@@ -3600,6 +3893,13 @@ export type Database = {
             foreignKeyName: "oc_items_comprobante_id_fkey";
             columns: ["comprobante_id"];
             isOneToOne: false;
+            referencedRelation: "v_detracciones";
+            referencedColumns: ["comprobante_id"];
+          },
+          {
+            foreignKeyName: "oc_items_comprobante_id_fkey";
+            columns: ["comprobante_id"];
+            isOneToOne: false;
             referencedRelation: "v_expediente";
             referencedColumns: ["comprobante_id"];
           },
@@ -3608,6 +3908,13 @@ export type Database = {
             columns: ["comprobante_id"];
             isOneToOne: false;
             referencedRelation: "v_registro_compras";
+            referencedColumns: ["comprobante_id"];
+          },
+          {
+            foreignKeyName: "oc_items_comprobante_id_fkey";
+            columns: ["comprobante_id"];
+            isOneToOne: false;
+            referencedRelation: "v_retenciones_4ta";
             referencedColumns: ["comprobante_id"];
           },
           {
@@ -4116,6 +4423,44 @@ export type Database = {
           },
         ];
       };
+      v_retenciones_4ta: {
+        Row: {
+          comprobante_id: number;
+          constancia: string | null;
+          empresa: string;
+          empresa_id: number;
+          fecha_emision: string;
+          fecha_pago: string | null;
+          historico: boolean;
+          impuesto_pago_id: number | null;
+          numero: string;
+          pagado_proveedor: string | null;
+          periodo: string | null;
+          proveedor: string;
+          proveedor_id: number;
+          proveedor_ruc: string;
+          retencion: number;
+          serie: string;
+          total: number;
+        };
+        ComputedFields: never;
+        Relationships: [
+          {
+            foreignKeyName: "comprobantes_empresa_id_fkey";
+            columns: ["empresa_id"];
+            isOneToOne: false;
+            referencedRelation: "empresas";
+            referencedColumns: ["id"];
+          },
+          {
+            foreignKeyName: "comprobantes_proveedor_id_fkey";
+            columns: ["proveedor_id"];
+            isOneToOne: false;
+            referencedRelation: "proveedores";
+            referencedColumns: ["id"];
+          },
+        ];
+      };
       v_seguimiento_partida: {
         Row: {
           adelanto_dado: number | null;
@@ -4206,6 +4551,10 @@ export type Database = {
         Returns: undefined;
       };
       anular_orden_pago: {
+        Args: { p_id: number; p_motivo: string };
+        Returns: undefined;
+      };
+      anular_pago_impuesto: {
         Args: { p_id: number; p_motivo: string };
         Returns: undefined;
       };
@@ -4376,6 +4725,7 @@ export type Database = {
         Args: { p_clave: string; p_conservar?: string; p_user: string };
         Returns: undefined;
       };
+      fn_asiento_impuesto: { Args: { p_pago: number }; Returns: number };
       fn_comprometido_ordenes_mo: {
         Args: { p_partida_id: number };
         Returns: number;
@@ -4383,6 +4733,10 @@ export type Database = {
       fn_comprometido_partida: {
         Args: { p_partida_id: number };
         Returns: number;
+      };
+      fn_constancia_valida: {
+        Args: { p_empresa_id: number; p_path: string };
+        Returns: undefined;
       };
       fn_cotizacion_limite: { Args: { p_token: string }; Returns: undefined };
       fn_detraccion_sugerida: {
@@ -4443,6 +4797,10 @@ export type Database = {
       glosa_rhe_defecto: {
         Args: { p_numero: string; p_obra_id: number };
         Returns: string;
+      };
+      guardar_cuenta_detracciones: {
+        Args: { p_cuenta: string; p_proveedor_id: number };
+        Returns: undefined;
       };
       guardar_detraccion_minimo: {
         Args: { p_monto: number };
@@ -4694,6 +5052,26 @@ export type Database = {
           p_empresa_id: number;
           p_fecha: string;
           p_numero_operacion: string;
+        };
+        Returns: number;
+      };
+      registrar_pago_detraccion: {
+        Args: {
+          p_archivo_path: string;
+          p_comprobantes: number[];
+          p_fecha: string;
+          p_numero: string;
+        };
+        Returns: number;
+      };
+      registrar_pago_retencion: {
+        Args: {
+          p_archivo_path: string;
+          p_empresa_id: number;
+          p_fecha: string;
+          p_monto: number;
+          p_numero: string;
+          p_periodo: string;
         };
         Returns: number;
       };

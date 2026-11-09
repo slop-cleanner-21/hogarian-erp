@@ -15,7 +15,7 @@ código del MVP se toca lo mínimo, para que los cherry-picks entren sin conflic
 | Rol | Qué tiene |
 |---|---|
 | **Tesorería** | Aprobación y pago de OC y OS, y de las órdenes de pago (OP) de Contabilidad. Presupuesto de la obra enfocado en lo pagado y lo pendiente de pago. |
-| **Contabilidad** (Jefe y Asistente) | Registro de compras (contabilizar, periodo de anotación, destino del IGV, TXT del SIRE, expediente ZIP), contabilizar los pagos, órdenes de pago y cuentas contables de los ítems y el plan. El Asistente tiene exactamente lo mismo que el Jefe: para la base es `CONTABILIDAD` (`rol_actual()` / `rol_en()`, migración `prod1_contabilidad`); en `perfiles` queda su rol (`ASISTENTE_CONTABILIDAD`). |
+| **Contabilidad** (Jefe y Asistente) | Registro de compras (contabilizar, periodo de anotación, destino del IGV, TXT del SIRE, expediente ZIP), contabilizar los pagos, órdenes de pago, **pago de detracciones y retenciones de 4ta** y cuentas contables de los ítems y el plan. El Asistente tiene exactamente lo mismo que el Jefe: para la base es `CONTABILIDAD` (`rol_actual()` / `rol_en()`, migración `prod1_contabilidad`); en `perfiles` queda su rol (`ASISTENTE_CONTABILIDAD`). |
 | **Logística** | OC, OS, proveedores, transportistas e ítems (los consulta y clasifica; no los crea). Sin la pestaña Requerimientos ni nada de residentes. Registra la guía de remisión y crea las OS de mano de obra. |
 | **Gerencia** | Obras: carga y publica presupuestos, con sus detracciones, el mínimo del SPOT y los adicionales. Seguimiento (la misma vista que el del Jefe de Operaciones), órdenes e **ítems**: los crea Gerencia. |
 | **Jefe de Operaciones** | Solo el seguimiento de compras de Logística, sin nada de dinero ni contable: ni montos ni P.U. en pantalla, y la base no le da las tablas con precios, montos o datos contables (órdenes, partidas, ítems, proveedores, parámetros, adjuntos, valorizaciones). Su seguimiento sale de vistas sin montos (`v_seguimiento_partida`, `v_entregas_partida`; migración `prod1_operaciones_sin_dinero`). |
@@ -422,6 +422,22 @@ Residente y RRHH **no entran**. Sus roles siguen en la base
   - de una OP, Contabilidad solo cambia la cuenta (por columna; estado y monto van por sus funciones), y no en una anulada ni con
     su pago ya contabilizado. Su detalle muestra los pagos con el voucher; la lista, la obra (la numeración es por obra).
 
+- **Pago de detracciones y retenciones de 4ta** (Contabilidad › Impuestos, `/contabilidad/impuestos`; migración
+  `prod1_pagos_impuestos`). Pestañas Detracciones / Retenciones 4ta, y Por pagar / Pagadas, con filtro de empresa.
+  - **Detracción:** por comprobante (facturas vigentes con detracción). Se eligen una o varias de **una misma empresa** y se
+    registra el pago: fecha (no futura ni anterior al comprobante), N° de constancia y la constancia (PDF o foto, obligatoria,
+    en `documentos/impuestos/<empresa>/`). Cada fila dice si Tesorería ya pagó la factura y la **cuenta de detracciones** del
+    proveedor (Banco de la Nación), que pone Contabilidad desde la fila o Logística en la ficha del proveedor.
+  - **Retención de 4ta:** por empresa y **mes del pago del recibo** (es cuando se retiene): se paga todo lo retenido de ese mes
+    con el N° de orden u operación y la constancia. La base rechaza el pago si lo del mes cambió desde que se abrió
+    (`p_monto`).
+  - Cada pago genera su **asiento** (Debe 421210101 la detracción / 401720101 la renta de 4ta; Haber 1041). En Pagadas se ve la
+    constancia, los comprobantes y el asiento, y se **anula** con motivo: el comprobante vuelve a por pagar y el asiento se borra.
+  - Un comprobante con su detracción o su retención pagada **no se anula ni cambia ese monto** (primero se anula el pago).
+  - La hoja del comprobante en Compras dice si su detracción o su retención ya se pagaron.
+  - Lo leen Contabilidad, Tesorería y Gerencia; el Jefe de Operaciones, nada. Las constancias las sube solo Contabilidad.
+  - Las retenciones de los recibos históricos (del Excel) aparecen por pagar por mes: Contabilidad registra las que ya pagó.
+
 ### Heredado del MVP (ya implementado)
 
 - **Detracciones:** Gerencia marca, por obra e ítem, cuáles llevan detracción. Ninguno la lleva por
@@ -463,7 +479,6 @@ Residente y RRHH **no entran**. Sus roles siguen en la base
 - **Quién firma por cada empresa:** ya se elige en Admin › Empresas (sin elegir, el gerente con la firma más
   reciente); falta que respondan si es uno por empresa. Desde el 09/11 el contrato lleva su firma pero no su nombre ni su
   DNI; los gerentes suben su firma («Mi firma») en su momento.
-- **Detracciones y retenciones de 4ta:** se registran; su pago (a SUNAT / Banco de la Nación) aún no se registra en la app.
 - **Contabilidad:** crear las cuentas de Ángeles (Jefe) y Jerson (Asistente) cuando haya su correo.
 - **Observaciones de datos:**
   - Virgen del Mar numera sus órdenes desde 1000140 porque el Excel trae una OC 1000139 (parece un error de tipeo); se deja como

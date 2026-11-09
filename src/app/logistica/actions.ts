@@ -268,6 +268,13 @@ const Proveedor = z.object({
   suspension_4ta_operacion: z.string().trim().regex(/^\d{6,12}$/, "El N° de operación son de 6 a 12 dígitos").nullable().default(null),
   banco: z.string().trim().max(60).nullable(),
   cuenta_bancaria: z.string().trim().max(60).nullable(),
+  /** Cuenta de detracciones (Banco de la Nación): solo números. */
+  cuenta_detracciones: z
+    .string()
+    .transform((s) => s.replace(/[\s-]/g, ""))
+    .pipe(z.string().regex(/^\d{8,20}$/, "La cuenta de detracciones lleva solo números"))
+    .nullable()
+    .default(null),
   contactos: z.array(
     z.object({
       nombre: z.string().trim().max(120).nullable(),

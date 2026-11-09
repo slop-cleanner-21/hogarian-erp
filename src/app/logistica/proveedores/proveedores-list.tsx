@@ -38,6 +38,7 @@ export const PROVEEDOR_VACIO: ProveedorFicha = {
   suspension_4ta_fecha: null,
   suspension_4ta_path: null,
   suspension_4ta_operacion: null,
+  cuenta_detracciones: null,
   banco: null,
   cuenta_bancaria: null,
   contactos: [],
@@ -156,6 +157,7 @@ export function ProveedorSheet({
         suspension_4ta_operacion: suspension ? p.suspension_4ta_operacion?.trim() || null : null,
         banco: p.banco || null,
         cuenta_bancaria: p.cuenta_bancaria || null,
+        cuenta_detracciones: p.cuenta_detracciones?.trim() || null,
         contactos: contactos.filter((c) => c.telefono.trim()),
         tipos: [...tipos],
       });
@@ -364,6 +366,14 @@ export function ProveedorSheet({
         </Field>
         <Field label="Cuenta">
           <Input value={p.cuenta_bancaria ?? ""} onChange={(e) => set({ cuenta_bancaria: e.target.value })} className="num" />
+        </Field>
+        <Field label="Cuenta de detracciones (Banco de la Nación)">
+          <Input
+            value={p.cuenta_detracciones ?? ""}
+            onChange={(e) => set({ cuenta_detracciones: e.target.value })}
+            inputMode="numeric"
+            className="num"
+          />
         </Field>
       </div>
     </Sheet>

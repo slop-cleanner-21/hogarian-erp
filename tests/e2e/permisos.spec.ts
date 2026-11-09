@@ -49,6 +49,8 @@ const LECTURA = tabla(`
   entregas                     T   T   T   P   T   T   T   0
   etapas                       T   T   T   T   T   T   T   0
   guias                        T   T   T   0   T   0   0   0
+  impuesto_pagos               0   T   T   0   T   0   0   0
+  impuesto_pago_comprobantes   0   T   T   0   T   0   0   0
   items                        T   T   T   T   T   0   0   0
   notificaciones               M   M   M   M   M   M   M   M
   aviso_preferencias           M   M   M   M   M   M   M   M
@@ -122,6 +124,11 @@ const RPC: Record<string, string> = {
   adjuntar_solicitud: "OPS JEF",
   anular_orden: "LOG GER",
   anular_orden_pago: "CON",
+  // Pagos de detracciones y retenciones de 4ta (20261109160000_prod1_pagos_impuestos).
+  anular_pago_impuesto: "CON",
+  guardar_cuenta_detracciones: "LOG CON",
+  registrar_pago_detraccion: "CON",
+  registrar_pago_retencion: "CON",
   asignar_cuenta_item: "CON",
   asignar_cuenta_items: "CON",
   asignar_persona_obra: "GER JEF",

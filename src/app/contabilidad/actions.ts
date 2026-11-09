@@ -6,6 +6,7 @@ import { z } from "zod";
 import { createClient, requireSesion } from "@/lib/supabase/server";
 import type { Result } from "@/app/logistica/actions";
 import { listarAdjuntos, urlsComprobantes, type AdjuntoFirmado } from "@/lib/adjuntos";
+import { urlPublica } from "@/lib/supabase/config";
 
 async function db() {
   await requireSesion(ROLES_CONTABILIDAD);
@@ -95,6 +96,8 @@ export type ExpedienteDetalle = {
   /** Del Excel: le pueden faltar archivos. */
   historico: boolean;
   detraccion: number;
+  /** Pagos de su detracción o su retención de 4ta (vigentes). */
+  impuestos: { tipo: "DETRACCION" | "RETENCION_4TA"; fecha: string; numero: string }[];
   ordenes: { obra_id: number; numero: string; tipo: "OC" | "OS"; adjuntos: AdjuntoFirmado[] }[];
   vouchers: AdjuntoFirmado[];
   /** Artículos del comprobante con su cuenta contable. */
@@ -113,6 +116,11 @@ export async function expedienteComprobante(comprobanteId: number): Promise<Resu
       .order("id"),
   ]);
   if (e1 || e2) return { ok: false, error: (e1 ?? e2)!.message };
+  const { data: impuestos } = await supabase
+    .from("impuesto_pago_comprobantes")
+    .select("tipo, impuesto_pagos(fecha, numero)")
+    .eq("comprobante_id", comprobanteId)
+    .eq("vigente", true);
 
   const claves = [...new Map(lineas.map((l) => [`${l.obra_id}|${l.numero_oc}`, l])).values()];
   const { data: ords, error: e3 } = await supabase
@@ -142,6 +150,10 @@ export async function expedienteComprobante(comprobanteId: number): Promise<Resu
       archivoUrl: comp.archivo_path ? (urls.get(comp.archivo_path) ?? null) : null,
       historico: comp.historico,
       detraccion: Number(comp.detraccion ?? 0),
+      impuestos: (impuestos ?? []).map((i) => {
+        const p = i.impuesto_pagos as unknown as { fecha: string; numero: string };
+        return { tipo: i.tipo as "DETRACCION" | "RETENCION_4TA", fecha: p.fecha, numero: p.numero };
+      }),
       ordenes: ordenes.map((o, i) => ({ ...o, adjuntos: porOrden[i] })),
       vouchers,
       lineas: lineas.map((l) => ({
@@ -308,4 +320,102 @@ export async function itemsDeCuenta(codigo: string): Promise<Result<ItemCuenta[]
     .limit(500);
   if (error) return { ok: false, error: error.message };
   return { ok: true, data };
+}
+
+// ------------------------------------------------------------ detracciones y retenciones de 4ta
+const PagoImpuesto = z.object({
+  fecha: z.string().regex(/^\d{4}-\d{2}-\d{2}$/, "Ingresa la fecha del pago"),
+  numero: z.string().trim().min(1, "Ingresa el N° de la constancia").max(40),
+  archivo: z.string().min(1, "Sube la constancia"),
+});
+
+/** Detracciones de una misma empresa pagadas con una constancia (o un pago masivo). */
+export async function pagarDetracciones(input: { ids: number[] } & z.input<typeof PagoImpuesto>): Promise<Result<number>> {
+  const p = PagoImpuesto.safeParse(input);
+  if (!p.success) return { ok: false, error: p.error.issues[0].message };
+  if (!input.ids.length) return { ok: false, error: "Elige las detracciones" };
+  const supabase = await db();
+  const { data, error } = await supabase.rpc("registrar_pago_detraccion", {
+    p_comprobantes: input.ids,
+    p_fecha: p.data.fecha,
+    p_numero: p.data.numero,
+    p_archivo_path: p.data.archivo,
+  });
+  if (error) return { ok: false, error: error.message };
+  revalidatePath("/contabilidad/impuestos");
+  return { ok: true, data: Number(data) };
+}
+
+/** Las retenciones de 4ta de una empresa en un mes (el del pago de los recibos). `monto`: lo que se vio en pantalla. */
+export async function pagarRetenciones(
+  input: { empresaId: number; periodo: string; monto: number } & z.input<typeof PagoImpuesto>,
+): Promise<Result<number>> {
+  const p = PagoImpuesto.safeParse(input);
+  if (!p.success) return { ok: false, error: p.error.issues[0].message };
+  const supabase = await db();
+  const { data, error } = await supabase.rpc("registrar_pago_retencion", {
+    p_empresa_id: input.empresaId,
+    p_periodo: input.periodo,
+    p_monto: input.monto,
+    p_fecha: p.data.fecha,
+    p_numero: p.data.numero,
+    p_archivo_path: p.data.archivo,
+  });
+  if (error) return { ok: false, error: error.message };
+  revalidatePath("/contabilidad/impuestos");
+  return { ok: true, data: Number(data) };
+}
+
+export async function anularPagoImpuesto(id: number, motivo: string): Promise<Result> {
+  if (!motivo.trim()) return { ok: false, error: "Ingresa el motivo" };
+  const supabase = await db();
+  const { error } = await supabase.rpc("anular_pago_impuesto", { p_id: id, p_motivo: motivo.trim() });
+  if (error) return { ok: false, error: error.message };
+  revalidatePath("/contabilidad/impuestos");
+  return { ok: true, data: undefined };
+}
+
+/** Cuenta de detracciones del proveedor (Banco de la Nación); vacía la quita. */
+export async function guardarCuentaDetracciones(proveedorId: number, cuenta: string): Promise<Result> {
+  const supabase = await db();
+  const { error } = await supabase.rpc("guardar_cuenta_detracciones", { p_proveedor_id: proveedorId, p_cuenta: cuenta });
+  if (error) return { ok: false, error: error.message };
+  revalidatePath("/contabilidad/impuestos");
+  return { ok: true, data: undefined };
+}
+
+export type DetallePagoImpuesto = {
+  comprobantes: { id: number; proveedor: string; documento: string; monto: number }[];
+  archivoUrl: string | null;
+  asientoId: number | null;
+};
+
+/** Un pago de impuestos: sus comprobantes, la constancia y el asiento. */
+export async function detallePagoImpuesto(id: number): Promise<Result<DetallePagoImpuesto>> {
+  const supabase = await db();
+  const [{ data: pago, error: e1 }, { data: lineas, error: e2 }, { data: asiento }] = await Promise.all([
+    supabase.from("impuesto_pagos").select("archivo_path").eq("id", id).single(),
+    supabase
+      .from("impuesto_pago_comprobantes")
+      .select("monto, comprobantes(id, serie, numero, proveedores(razon_social))")
+      .eq("impuesto_pago_id", id)
+      .order("comprobante_id"),
+    supabase.from("asientos").select("id").eq("impuesto_pago_id", id).maybeSingle(),
+  ]);
+  if (e1 || e2) return { ok: false, error: (e1 ?? e2)!.message };
+  const { data: firmada } = await supabase.storage.from("documentos").createSignedUrl(pago.archivo_path, 300);
+  type Fila = { monto: number; comprobantes: { id: number; serie: string; numero: string; proveedores: { razon_social: string } | null } | null };
+  return {
+    ok: true,
+    data: {
+      comprobantes: (lineas as unknown as Fila[]).map((l) => ({
+        id: l.comprobantes?.id ?? 0,
+        proveedor: l.comprobantes?.proveedores?.razon_social ?? "",
+        documento: `${l.comprobantes?.serie}-${l.comprobantes?.numero}`,
+        monto: Number(l.monto),
+      })),
+      archivoUrl: firmada?.signedUrl ? urlPublica(firmada.signedUrl) : null,
+      asientoId: asiento?.id ?? null,
+    },
+  };
 }
