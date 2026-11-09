@@ -91,14 +91,15 @@ export default async function OrdenesPage({ searchParams }: PageProps<"/logistic
 
   const supabase = await createClient();
   const estados = TABS[tab];
+  // `porEstado`: sin la pestaña ni el filtro de estado (para contar cuántas hay en cada pestaña).
   // eslint-disable-next-line @typescript-eslint/no-explicit-any -- el mismo filtro sirve a la lista y a los totales por grupo
-  const filtrar = <Q extends { eq: any; in: any; overlaps: any; gte: any; lt: any; or: any }>(query: Q): Q => {
+  const filtrar = <Q extends { eq: any; in: any; overlaps: any; gte: any; lt: any; or: any }>(query: Q, porEstado = false): Q => {
     query = query.eq("tipo", tipo);
-    if (estados) query = query.in("estado", estados);
+    if (estados && !porEstado) query = query.in("estado", estados);
     if (obra) query = query.eq("obra_id", Number(obra));
     if (proveedor) query = query.eq("proveedor_id", Number(proveedor));
     if (alerta) query = query.eq("has_alertas", alerta === "si");
-    if (estado && estado in ESTADO_LABEL) query = query.eq("estado", estado);
+    if (estado && estado in ESTADO_LABEL && !porEstado) query = query.eq("estado", estado);
     if (etapasSel.length) query = query.overlaps("etapas", etapasSel);
     if (materiales.length) query = query.overlaps("tipos_material", materiales);
     if (rangoMonto) {
@@ -127,7 +128,7 @@ export default async function OrdenesPage({ searchParams }: PageProps<"/logistic
       .order("numero")
       .limit(limite),
   );
-  const [{ data: ordenes, error }, { data: obras }, { data: proveedores }, { data: etapas }, { data: tipos }, grupos] = await Promise.all([
+  const [{ data: ordenes, error }, { data: obras }, { data: proveedores }, { data: etapas }, { data: tipos }, grupos, estadosTodas, { count: nBorradores }] = await Promise.all([
     query,
     // Por páginas: la API corta cada respuesta en 1000 filas.
     todas((a, b) => supabase.from("obras").select("id, nombre").order("nombre").order("id").range(a, b)).then((data) => ({ data })),
@@ -140,7 +141,20 @@ export default async function OrdenesPage({ searchParams }: PageProps<"/logistic
           (a, b) => filtrar(supabase.from("v_ordenes").select("obra_id, numero, obra, proveedor, empresa, fecha, total")).range(a, b),
         )
       : Promise.resolve([]),
+    // Cuántas hay en cada pestaña, con los mismos filtros, obra y búsqueda.
+    todas<{ estado: string | null }>((a, b) => filtrar(supabase.from("v_ordenes").select("estado"), true).order("obra_id").order("numero").range(a, b)),
+    (() => {
+      let qb = supabase.from("orden_borradores").select("id", { count: "exact", head: true }).eq("tipo", tipo);
+      if (obra) qb = qb.eq("obra_id", Number(obra));
+      return qb;
+    })(),
   ]);
+  const porEstado = new Map<string, number>();
+  for (const { estado: e } of estadosTodas) porEstado.set(e ?? "", (porEstado.get(e ?? "") ?? 0) + 1);
+  const cuentaDe = (t: keyof typeof TABS) => {
+    const est: readonly string[] | null = TABS[t];
+    return t === "bor" ? (nBorradores ?? 0) : est ? est.reduce((n, e) => n + (porEstado.get(e) ?? 0), 0) : estadosTodas.length;
+  };
   // Los borradores de esta cuenta (solo se ven los propios).
   let borradores: FilaBorrador[] = [];
   if (tab === "bor") {
@@ -502,6 +516,7 @@ export default async function OrdenesPage({ searchParams }: PageProps<"/logistic
           options={(Object.entries(TABS) as [keyof typeof TABS, EstadoOC[] | null][]).map(([value]) => ({
             value,
             label: value === "fact" && tipo === "OS" ? "Contrato" : PESTANAS[value],
+            cuenta: cuentaDe(value),
           }))}
         />
         <SearchBox placeholder="N°, proveedor, obra o ítem" />
