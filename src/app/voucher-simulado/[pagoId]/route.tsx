@@ -11,7 +11,7 @@ const ALTO = 820;
 type Fila = [string, string];
 
 export async function GET(_: Request, { params }: RouteContext<"/voucher-simulado/[pagoId]">) {
-  await requireSesion(["TESORERIA", "CONTABILIDAD", "LOGISTICA"]);
+  await requireSesion(["TESORERIA", "CONTABILIDAD", "ASISTENTE_CONTABILIDAD", "LOGISTICA"]);
   const id = Number((await params).pagoId);
   if (!Number.isInteger(id)) return new Response("No encontrado", { status: 404 });
 

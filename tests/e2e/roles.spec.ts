@@ -156,6 +156,32 @@ test.describe("@admin @roles varios roles", () => {
     }
   });
 
+  test("el Asistente de Contabilidad tiene lo mismo que el Jefe: su módulo, sus permisos y sus avisos", async ({ browser }, info) => {
+    const c = await cuentaTemporal();
+    try {
+      sql(`update perfiles set rol = 'ASISTENTE_CONTABILIDAD' where user_id = '${c.id}'; delete from perfil_roles where user_id = '${c.id}' and rol = 'TESORERIA'`);
+      expect(roles(c.id)).toEqual(["ASISTENTE_CONTABILIDAD"]);
+      // Para la base es un Jefe de Contabilidad; en perfiles queda su rol.
+      expect(como(c.id, `select rol_actual(), rol_en('CONTABILIDAD')`).at(-1)).toEqual(["CONTABILIDAD", "t"]);
+      expect(como(c.id, `select exigir_rol('CONTABILIDAD'); select count(*) > 0 from asiento_lineas`).at(-1)).toEqual(["t"]);
+      expect(() => como(c.id, `select exigir_rol('TESORERIA')`)).toThrow(/No tienes permiso/);
+      // Los avisos de Contabilidad le llegan.
+      sql(`select notificar('CONTABILIDAD', 'RECHAZO', 'E2E aviso asistente', null, '/contabilidad/op')`);
+      expect(sql1(`select count(*) from notificaciones where user_id = '${c.id}' and titulo = 'E2E aviso asistente'`)).toBe("1");
+      sql(`delete from notificaciones where titulo = 'E2E aviso asistente'`);
+
+      const { ctx, page } = await entrar(browser, info, c.email);
+      await page.goto("/");
+      await page.waitForURL(/\/contabilidad\/compras/);
+      await expect(page.getByRole("link", { name: "Cuentas", exact: true })).toBeVisible();
+      await page.goto("/tesoreria");
+      await expect(page).toHaveURL(/\/contabilidad/);
+      await ctx.close();
+    } finally {
+      c.borrar();
+    }
+  });
+
   test("la base: solo pasa a sus roles, nadie se los asigna por la API y cada rol sigue con sus permisos", async () => {
     const c = await cuentaTemporal();
     const otra = await cuentaTemporal();
@@ -175,8 +201,8 @@ test.describe("@admin @roles varios roles", () => {
         "cada uno ve solo los suyos",
       ).toEqual(["1"]);
 
-      sql(`insert into perfil_roles (user_id, rol) values ('${c.id}', 'GERENCIA'), ('${c.id}', 'CONTABILIDAD')`);
-      expect(() => como(c.id, `select cambiar_rol('CONTABILIDAD')`), "un rol sin módulo en prod 1").toThrow(/No tienes ese rol/);
+      sql(`insert into perfil_roles (user_id, rol) values ('${c.id}', 'GERENCIA'), ('${c.id}', 'RRHH')`);
+      expect(() => como(c.id, `select cambiar_rol('RRHH')`), "un rol sin módulo en prod 1").toThrow(/No tienes ese rol/);
       // Un rol a la vez: como Gerencia no tiene lo de Tesorería, aunque también lo sea.
       expect(como(c.id, `select cambiar_rol('GERENCIA'); select rol_actual()`).at(-1)).toEqual(["GERENCIA"]);
       expect(() => como(c.id, `select cambiar_rol('GERENCIA'); select exigir_rol('TESORERIA')`)).toThrow(/No tienes permiso/);

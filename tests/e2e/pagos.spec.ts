@@ -307,7 +307,7 @@ test.describe("@pagos @tesoreria avance de cada línea", () => {
     )[0];
     const [comprado, parcial] = sql(`select monto_comprado, parcial from v_avance_partida where partida_id = ${partida}`)[0];
     const page = await abrir("tesoreria", `/tesoreria/pago/${obraId}/${encodeURIComponent(numero)}`);
-    await expect(page.getByText(`S/ ${dinero(Number(comprado))} / ${dinero(Number(parcial))}`).first()).toBeVisible();
+    await expect(page.getByText(`S/ ${dinero(Number(comprado))} / S/ ${dinero(Number(parcial))}`).first()).toBeVisible();
   });
 });
 

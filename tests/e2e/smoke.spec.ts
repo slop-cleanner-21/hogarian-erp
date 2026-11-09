@@ -48,6 +48,17 @@ const RUTAS: Partial<Record<Rol, string[]>> = {
     "/gerencia/ordenes",
     "/consulta/orden/:oc",
   ],
+  contabilidad: [
+    "/contabilidad/compras",
+    "/contabilidad/pagos",
+    "/contabilidad/pagos?tab=con",
+    "/contabilidad/op",
+    "/contabilidad",
+    "/contabilidad?tab=con",
+    "/contabilidad?tab=plan",
+    "/consulta/orden/:oc",
+    "/avisos",
+  ],
   jefe: ["/operaciones"],
   // El Ingeniero de Operaciones: lo mismo que el Jefe.
   operaciones: ["/operaciones"],
@@ -55,11 +66,11 @@ const RUTAS: Partial<Record<Rol, string[]>> = {
 
 // Roles fuera de prod 1 y rutas de módulos quitados.
 const FUERA: Partial<Record<Rol, string[]>> = {
-  contabilidad: ["/", "/contabilidad/op", "/avisos", "/tesoreria"],
   residente: ["/", "/residente", "/avisos"],
   rrhh: ["/", "/rrhh", "/avisos"],
 };
 const QUITADAS: [Rol, string][] = [
+  ["contabilidad", "/contabilidad/guias"],
   ["logistica", "/logistica/requerimientos"],
   ["gerencia", "/gerencia/solicitudes"],
   ["jefe", "/operaciones/requerimientos"],

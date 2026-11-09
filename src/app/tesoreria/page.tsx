@@ -46,14 +46,14 @@ export default async function PagosPage({ searchParams }: PageProps<"/tesoreria"
   const fObraUrl = filtro(sp, "obra");
   const fProveedor = filtro(sp, "proveedor");
   // Varias etapas a la vez, separadas por coma (como en el presupuesto).
-  const fEtapas = typeof sp.etapa === "string" ? sp.etapa.split(",").filter((e) => e && e !== TODOS) : [];
-  // Área Logística: pestañas OC | OS (la de estado se conserva al cambiar).
-  const doc = sp.doc === "OS" ? "OS" : "OC";
+  const fEtapas = typeof sp.etapa === "string" && sp.doc !== "OP" ? sp.etapa.split(",").filter((e) => e && e !== TODOS) : [];
+  // Pestañas OC | OS | OP (la de estado se conserva al cambiar). Las OP son las órdenes de pago de Contabilidad.
+  const doc = sp.doc === "OS" ? "OS" : sp.doc === "OP" ? "OP" : "OC";
   const fFecha = filtro(sp, "fecha");
   const fMonto = filtro(sp, "monto");
   // Entrada: primero la empresa, luego el área que envía (Logística: OC/OS; Contabilidad: OP); en
   // las dos se puede elegir «todas».
-  // Prod 1: sin Contabilidad no hay órdenes de pago; solo el área Logística (OC / OS).
+  // Prod 1: una sola área, con las OP de Contabilidad como una pestaña más junto a OC y OS.
   const area = "log" as Area | null;
   // El monto que se ordena es el que se muestra en cada pestaña.
   const columnaMonto = pagado ? "pagado" : "saldo";
@@ -582,10 +582,10 @@ export default async function PagosPage({ searchParams }: PageProps<"/tesoreria"
               {
                 tipo: "lista",
                 param: "proveedor",
-                titulo: area === "con" ? "Beneficiario" : "Proveedor",
+                titulo: doc === "OP" ? "Beneficiario" : "Proveedor",
                 opciones: (proveedores ?? []).map((p) => ({ value: String(p.id), label: p.razon_social, hint: p.ruc_o_cod })),
               },
-              ...(area === "log" && !rechazos
+              ...(area === "log" && !rechazos && doc !== "OP"
                 ? [{ tipo: "varias" as const, param: "etapa", titulo: "Etapas", opciones: (etapas ?? []).map((e) => e.codigo) }]
                 : []),
             ]}
@@ -598,6 +598,7 @@ export default async function PagosPage({ searchParams }: PageProps<"/tesoreria"
             options={[
               { value: "OC", label: "OC" },
               { value: "OS", label: "OS" },
+              { value: "OP", label: "OP" },
             ]}
           />
         )}

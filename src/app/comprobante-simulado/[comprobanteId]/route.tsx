@@ -10,7 +10,7 @@ const ANCHO = 600;
 const ALTO = 820;
 
 export async function GET(_: Request, { params }: RouteContext<"/comprobante-simulado/[comprobanteId]">) {
-  await requireSesion(["TESORERIA", "CONTABILIDAD", "LOGISTICA"]);
+  await requireSesion(["TESORERIA", "CONTABILIDAD", "ASISTENTE_CONTABILIDAD", "LOGISTICA"]);
   const id = Number((await params).comprobanteId);
   if (!Number.isInteger(id)) return new Response("No encontrado", { status: 404 });
 

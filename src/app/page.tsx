@@ -10,8 +10,10 @@ export default async function Home() {
   const inicio = HOME_BY_ROL[rol];
   // ADMIN entra a todos los módulos; los demás solo retoman pantallas de su módulo. Solo rutas internas.
   // Nunca a una pantalla que no se retoma (una cookie vieja podía guardar el bloqueo y dejarlo en un bucle).
+  // El módulo es el primer tramo del inicio (Contabilidad entra a Compras y retoma también Pagos o Cuentas).
+  const modulo = `/${inicio.split("/")[1]}`;
   const valida = (ruta: string) =>
-    seRetoma(ruta) && (rol === "ADMIN" || ruta === inicio || ruta.startsWith(`${inicio}/`) || ruta.startsWith(`${inicio}?`));
+    seRetoma(ruta) && (rol === "ADMIN" || ruta === modulo || ruta.startsWith(`${modulo}/`) || ruta.startsWith(`${modulo}?`));
 
   // Con la última pantalla en la cookie, se abre directo desde el servidor (sin pantalla en blanco).
   const cookie = (await cookies()).get(COOKIE_ULTIMA)?.value;
@@ -23,5 +25,5 @@ export default async function Home() {
     redirect(valida(ruta) ? ruta : inicio);
   }
   // Sin cookie (versión anterior de la app): se retoma desde el navegador.
-  return <RetomarRuta inicio={inicio} prefijos={rol === "ADMIN" ? null : [inicio]} />;
+  return <RetomarRuta inicio={inicio} prefijos={rol === "ADMIN" ? null : [modulo]} />;
 }

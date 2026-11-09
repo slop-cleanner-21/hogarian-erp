@@ -88,8 +88,8 @@ test.describe("@seguridad", () => {
   });
 
   test("roles fuera de prod 1 no leen nada y el Jefe no escribe ni ve contratos", async () => {
-    const [con, res, jef] = await Promise.all([ROLES.contabilidad, ROLES.residente, ROLES.jefe].map(token));
-    for (const jwt of [con, res]) {
+    const [rrhh, res, jef] = await Promise.all([ROLES.rrhh, ROLES.residente, ROLES.jefe].map(token));
+    for (const jwt of [rrhh, res]) {
       for (const t of ["ordenes_compra?select=obra_id", "proveedor_cuentas?select=proveedor_id", "comprobantes?select=id"]) {
         expect(await (await rest(jwt, `${t}&limit=1`)).json(), `${t}`).toEqual([]);
       }

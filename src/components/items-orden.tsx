@@ -30,7 +30,7 @@ export type ItemVista = {
 };
 
 const pct = (a: number, b: number) => (b > 0 ? Math.max(0, Math.min(100, (a / b) * 100)) : 0);
-const Soles = ({ n, className }: { n: number; className?: string }) => <span className={cn("num", className)}>S/ {money(n)}</span>;
+const Soles = ({ n, className }: { n: number; className?: string }) => <span className={cn("num whitespace-nowrap", className)}>S/ {money(n)}</span>;
 const Cantidad = ({ i }: { i: ItemVista }) => (
   <span className="num">
     {qty(i.cantidad)} <span className="text-ink-3">{i.unidad}</span>
@@ -168,7 +168,7 @@ function ConAvance({ items }: { items: ItemVista[] }) {
                   </span>
                   {i.montoPresupuestado != null && i.montoPresupuestado > 0 && (
                     <span>
-                      S/ {money(i.montoEjecutado ?? 0)} / {money(i.montoPresupuestado)}
+                      S/ {money(i.montoEjecutado ?? 0)} / S/ {money(i.montoPresupuestado)}
                     </span>
                   )}
                 </span>

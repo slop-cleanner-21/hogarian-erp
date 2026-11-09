@@ -17,7 +17,7 @@ const TIPO_XLSM = "application/vnd.ms-excel.sheet.macroEnabled.12";
  * más de lo que una respuesta del servidor permite, así que se guarda y se baja con un enlace que dura 2 minutos.
  */
 export async function exportarExcel(): Promise<{ url: string } | { error: string }> {
-  const sesion = await requireSesionVigente(["LOGISTICA", "TESORERIA", "GERENCIA"]);
+  const sesion = await requireSesionVigente(["LOGISTICA", "TESORERIA", "GERENCIA", "CONTABILIDAD", "ASISTENTE_CONTABILIDAD"]);
   const db = createAdminClient(sesion.userId);
   try {
     const [{ data: plantilla, error }, datos] = await Promise.all([db.storage.from(BUCKET).download(PLANTILLA), leerDatosExcel(db)]);

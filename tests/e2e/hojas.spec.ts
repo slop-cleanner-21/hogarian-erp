@@ -13,8 +13,12 @@ test.describe("@ui hojas", () => {
       const boton = hoja.getByRole("button", { name: "Guardar" });
       const pie = hoja.locator("footer");
       await expect(boton).toBeVisible();
-      const [b, f] = [(await boton.boundingBox())!, (await pie.boundingBox())!];
-      expect(f.y + f.height - (b.y + b.height), "espacio entre el botón y el borde inferior (px)").toBeGreaterThanOrEqual(8);
+      // Medido ya quieta: con el servidor cargado, la hoja todavía puede estar entrando.
+      const aire = async () => {
+        const [b, f] = [(await boton.boundingBox())!, (await pie.boundingBox())!];
+        return f.y + f.height - (b.y + b.height);
+      };
+      await expect.poll(aire, { message: "espacio entre el botón y el borde inferior (px)" }).toBeGreaterThanOrEqual(8);
     });
   }
 

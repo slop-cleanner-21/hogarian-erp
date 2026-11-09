@@ -105,7 +105,7 @@ test.describe("@sugerencias sugerencias", () => {
     expect(() => como(log, `select enviar_sugerencia('ERROR', 'hola mundo', null, null, array['${uidDe("TESORERIA")}/x.png'])`), "archivo ajeno").toThrow(/Captura no válida/);
     expect(() => como(log, `select enviar_sugerencia('ERROR', 'hola mundo', null, null, array['${log}/../x.png'])`)).toThrow(/Captura no válida/);
     expect(() => como(log, `select enviar_sugerencia('ERROR', 'hola mundo', null, null, array['${log}/no-existe.png'])`), "sin subir").toThrow(/Captura no válida/);
-    expect(() => como(uidDe("CONTABILIDAD"), `select enviar_sugerencia('ERROR', 'hola mundo', null, null, null)`), "rol sin módulo").toThrow(/No tienes permiso/);
+    expect(() => como(uidDe("RRHH"), `select enviar_sugerencia('ERROR', 'hola mundo', null, null, null)`), "rol sin módulo").toThrow(/No tienes permiso/);
     expect(como(uidDe("JEFE_OPERACIONES"), `select enviar_sugerencia('MEJORA', 'hola ${marca}', 'Seguimiento', '/operaciones', null) > 0`).at(-1), "el Jefe sí puede").toEqual(["t"]);
 
     // Las capturas: cada uno a su carpeta, y nadie las lee por la API.

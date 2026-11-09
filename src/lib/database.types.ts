@@ -3192,6 +3192,7 @@ export type Database = {
           periodo: string | null;
           proveedor: string;
           requiere_contrato: boolean | null;
+          requiere_guia: boolean | null;
           serie: string;
           tiene_archivo: boolean | null;
           tiene_contrato: boolean | null;
@@ -4772,7 +4773,8 @@ export type Database = {
         | "OPERACIONES"
         | "OBRAS"
         | "RRHH"
-        | "JEFE_OPERACIONES";
+        | "JEFE_OPERACIONES"
+        | "ASISTENTE_CONTABILIDAD";
       rubro:
         | "MATERIAL"
         | "MANO OBRA"
@@ -4940,6 +4942,7 @@ export const Constants = {
         "OBRAS",
         "RRHH",
         "JEFE_OPERACIONES",
+        "ASISTENTE_CONTABILIDAD",
       ],
       rubro: [
         "MATERIAL",

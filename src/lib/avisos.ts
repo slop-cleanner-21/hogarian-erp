@@ -8,7 +8,7 @@ export type EventoAviso = { tipo: string; label: string; area: string; roles: Ro
 
 export const EVENTOS_AVISO: EventoAviso[] = [
   { tipo: "COTIZACION_RECIBIDA", label: "Un proveedor envió su cotización", area: "Logística", roles: ["LOGISTICA"] },
-  { tipo: "RECHAZO", label: "Tesorería rechazó una orden", area: "Logística", roles: ["LOGISTICA"] },
+  { tipo: "RECHAZO", label: "Tesorería rechazó una orden", area: "Logística", roles: ["LOGISTICA", "CONTABILIDAD", "ASISTENTE_CONTABILIDAD"] },
   { tipo: "ADICIONAL", label: "Gerencia agregó un adicional", area: "Logística", roles: ["LOGISTICA"] },
   { tipo: "PRECIO_PRESUPUESTO", label: "Gerencia cambió un precio del presupuesto", area: "Logística", roles: ["LOGISTICA"] },
   { tipo: "POR_PAGAR", label: "Llegó una orden por pagar", area: "Tesorería", roles: ["TESORERIA"] },

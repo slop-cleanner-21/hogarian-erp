@@ -14,7 +14,8 @@ código del MVP se toca lo mínimo, para que los cherry-picks entren sin conflic
 
 | Rol | Qué tiene |
 |---|---|
-| **Tesorería** | Aprobación y pago de OC y OS (sin órdenes de pago de Contabilidad). Presupuesto de la obra enfocado en lo pagado y lo pendiente de pago. |
+| **Tesorería** | Aprobación y pago de OC y OS, y de las órdenes de pago (OP) de Contabilidad. Presupuesto de la obra enfocado en lo pagado y lo pendiente de pago. |
+| **Contabilidad** (Jefe y Asistente) | Registro de compras (contabilizar, periodo de anotación, destino del IGV, TXT del SIRE, expediente ZIP), contabilizar los pagos, órdenes de pago y cuentas contables de los ítems y el plan. El Asistente tiene exactamente lo mismo que el Jefe: para la base es `CONTABILIDAD` (`rol_actual()` / `rol_en()`, migración `prod1_contabilidad`); en `perfiles` queda su rol (`ASISTENTE_CONTABILIDAD`). |
 | **Logística** | OC, OS, proveedores, transportistas e ítems (los consulta y clasifica; no los crea). Sin la pestaña Requerimientos ni nada de residentes. Registra la guía de remisión y crea las OS de mano de obra. |
 | **Gerencia** | Obras: carga y publica presupuestos, con sus detracciones, el mínimo del SPOT y los adicionales. Seguimiento (la misma vista que el del Jefe de Operaciones), órdenes e **ítems**: los crea Gerencia. |
 | **Jefe de Operaciones** | Solo el seguimiento de compras de Logística, sin nada de dinero ni contable: ni montos ni P.U. en pantalla, y la base no le da las tablas con precios, montos o datos contables (órdenes, partidas, ítems, proveedores, parámetros, adjuntos, valorizaciones). Su seguimiento sale de vistas sin montos (`v_seguimiento_partida`, `v_entregas_partida`; migración `prod1_operaciones_sin_dinero`). |
@@ -30,7 +31,7 @@ firmar por una empresa si uno es Gerencia (mientras firme, no se le puede quitar
 tiene la app abierta en dos dispositivos, el otro toma el cambio al renovar su sesión (hasta 1 h); mientras, la base le niega
 lo del rol anterior.
 
-Contabilidad, Residente y RRHH **no entran**. Sus roles siguen en la base
+Residente y RRHH **no entran**. Sus roles siguen en la base
 (para migrar al MVP), pero `requireSesion` los manda a `/sin-acceso` (`src/lib/prod1.ts`).
 
 ## Decisiones de flujo (propias de prod 1)
@@ -188,7 +189,7 @@ Contabilidad, Residente y RRHH **no entran**. Sus roles siguen en la base
   las acciones de cuentas del Admin (`src/lib/auditoria.ts`). Pantalla con pestañas Sesiones / Cambios, filtros
   (usuario, fecha, acción, qué) y CSV. «Sistema» = sin usuario (SQL directo o el proveedor desde su link). Las
   cargas masivas (Excel, seeds) no se auditan (`app.skip_audit`).
-- **Exportar Excel** (menú de Logística, Tesorería, Gerencia y Admin; `src/lib/excel-libro.ts`): el mismo `CONTROL DE COSTOS`
+- **Exportar Excel** (menú de Logística, Tesorería, Gerencia, Contabilidad y Admin; `src/lib/excel-libro.ts`): el mismo `CONTROL DE COSTOS`
   .xlsm con lo que se registró en la app, con sus fórmulas, macros y hojas, y Excel recalcula al abrirlo. No se arma uno nuevo: se
   toma el original (la plantilla, bucket privado `excel`; tiene RUCs y cuentas reales, no va en el repo) y se escriben solo las
   celdas de datos: es lo inverso de `scripts/extract_excel.py`. Entran las órdenes con precios confirmados en adelante (no las
@@ -405,6 +406,22 @@ Contabilidad, Residente y RRHH **no entran**. Sus roles siguen en la base
   barra de arriba sí sigue el tema (`meta theme-color`, `BarrasSistema`). Las apps ya instaladas toman el color
   cuando Chrome actualiza la app (o al reinstalarla).
 
+- **Contabilidad** (migración `prod1_contabilidad`; pantallas del MVP en `src/app/contabilidad`, adaptadas): Compras, Pagos, OP y
+  Cuentas (inicio: Compras). Sin la pestaña Guías: en prod 1 la guía la registra Logística, y al anular una OC ya no se le avisa a
+  Contabilidad. Lo que cambia respecto del MVP:
+  - el comprobante muestra la retención de 4ta y la detracción; uno histórico sin archivo dice «Histórico · sin archivo»;
+  - cada orden del comprobante abre su consulta completa (`/consulta/orden/…`: PDF, contrato, guía, pagos con voucher, entregas);
+  - el expediente ZIP incluye la guía registrada por Logística (tabla `guias`) y, como el Excel, se guarda y se baja con un enlace
+    de 2 minutos (bucket privado `exportes`): el de un periodo pasa de lo que una respuesta del servidor permite;
+  - la OP enviada le avisa a Tesorería («Nueva OP-0001 por pagar · obra»), que la ve en Pagos, pestaña «OP» (junto a OC y OS, sin
+    filtro de etapas); su rechazo les avisa a los dos de Contabilidad;
+  - el asiento de compra va sobre el comprobante tal como se registró: con garantía, al neto (es lo que factura el proveedor).
+  - **expediente completo** (`v_expediente`): comprobante, orden y voucher, más la guía si la OC la requiere y el contrato firmado
+    si es OS; ya no cuenta las fotos de entrega (las subían los residentes: casi todo quedaba en 3/4). La hoja dice qué falta;
+  - el total del pie de Compras suma todo lo listado (antes dejaba fuera los recibos por honorarios), y cada fila dice el tipo;
+  - de una OP, Contabilidad solo cambia la cuenta (por columna; estado y monto van por sus funciones), y no en una anulada ni con
+    su pago ya contabilizado. Su detalle muestra los pagos con el voucher; la lista, la obra (la numeración es por obra).
+
 ### Heredado del MVP (ya implementado)
 
 - **Detracciones:** Gerencia marca, por obra e ítem, cuáles llevan detracción. Ninguno la lleva por
@@ -446,9 +463,8 @@ Contabilidad, Residente y RRHH **no entran**. Sus roles siguen en la base
 - **Quién firma por cada empresa:** ya se elige en Admin › Empresas (sin elegir, el gerente con la firma más
   reciente); falta que respondan si es uno por empresa. Desde el 09/11 el contrato lleva su firma pero no su nombre ni su
   DNI; los gerentes suben su firma («Mi firma») en su momento.
-- **Detracciones y retenciones de 4ta:** se registran; las paga Contabilidad, que aún no está en prod 1.
-- **Contabilidad:** dos roles iguales, como Operaciones: Jefe de Contabilidad y Asistente de Contabilidad (Ángeles y Jerson), cuando
-  ese módulo entre a prod 1.
+- **Detracciones y retenciones de 4ta:** se registran; su pago (a SUNAT / Banco de la Nación) aún no se registra en la app.
+- **Contabilidad:** crear las cuentas de Ángeles (Jefe) y Jerson (Asistente) cuando haya su correo.
 - **Observaciones de datos:**
   - Virgen del Mar numera sus órdenes desde 1000140 porque el Excel trae una OC 1000139 (parece un error de tipeo); se deja como
     en el Excel.

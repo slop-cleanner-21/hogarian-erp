@@ -3,11 +3,14 @@
 import {
   ArrowLeft,
   Banknote,
+  BookCheck,
   Building2,
   ClipboardList,
+  FileText,
   Hammer,
   Lightbulb,
   Package,
+  Receipt,
   Search,
   TrendingUp,
   Truck,
@@ -37,7 +40,7 @@ import { HuellaSheet, marcarSalida } from "./huella";
 
 type NavItem = { href: string; label: string; icon: typeof Package; match?: (p: string, s: URLSearchParams) => boolean };
 
-type ClaveModulo = "logistica" | "tesoreria" | "gerencia" | "operaciones" | "admin";
+type ClaveModulo = "logistica" | "tesoreria" | "contabilidad" | "gerencia" | "operaciones" | "admin";
 
 const MODULOS: Record<ClaveModulo, { label: string; roles: Rol[]; nav: NavItem[] }> = {
   logistica: {
@@ -61,6 +64,16 @@ const MODULOS: Record<ClaveModulo, { label: string; roles: Rol[]; nav: NavItem[]
     nav: [
       { href: "/tesoreria", label: "Pagos", icon: Banknote, match: (p) => p === "/tesoreria" || p.startsWith("/tesoreria/pago") },
       { href: "/tesoreria/consultas", label: "Presupuesto", icon: Search },
+    ],
+  },
+  contabilidad: {
+    label: "Contabilidad",
+    roles: ["CONTABILIDAD", "ASISTENTE_CONTABILIDAD"],
+    nav: [
+      { href: "/contabilidad/compras", label: "Compras", icon: Receipt },
+      { href: "/contabilidad/pagos", label: "Pagos", icon: Banknote },
+      { href: "/contabilidad/op", label: "OP", icon: FileText },
+      { href: "/contabilidad", label: "Cuentas", icon: BookCheck, match: (p) => p === "/contabilidad" },
     ],
   },
   gerencia: {
@@ -301,7 +314,7 @@ export function UserMenu({ id, nombre, rol }: { id: string; nombre: string; rol:
               Mi firma
             </button>
           )}
-          {(["LOGISTICA", "TESORERIA", "GERENCIA", "ADMIN"] as Rol[]).includes(rol) && (
+          {(["LOGISTICA", "TESORERIA", "GERENCIA", "CONTABILIDAD", "ASISTENTE_CONTABILIDAD", "ADMIN"] as Rol[]).includes(rol) && (
             <>
               <button
                 type="button"

@@ -295,7 +295,7 @@ export function DetallePago({
                       </span>
                     )}
                   </span>
-                  <span className="num font-medium">S/ {money(l.parcial)}</span>
+                  <span className="num whitespace-nowrap font-medium">{soles(l.parcial)}</span>
                 </div>
                 {(l.puMin != null || l.puUltimo != null) && (
                   <div className="num mt-1 flex gap-4 text-[13px] text-ink-3">
@@ -311,7 +311,7 @@ export function DetallePago({
                         Ejecutado {qty(l.ejecutado ?? 0)} / {qty(l.presupuestado ?? 0)} {l.unidad}
                       </span>
                       <span>
-                        S/ {money(l.montoEjecutado ?? 0)} / {money(l.montoPresupuestado ?? 0)}
+                        {soles(l.montoEjecutado ?? 0)} / {soles(l.montoPresupuestado ?? 0)}
                       </span>
                     </span>
                     <button

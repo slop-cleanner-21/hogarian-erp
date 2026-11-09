@@ -102,7 +102,8 @@ const ESCRITURA: [string, string][] = [
   ["tipos_material", "LOG"],
   ["transportistas", "LOG"],
   ["cuentas_contables", "CON"],
-  ["ordenes_pago", "CON"],
+  // Contabilidad solo cambia la cuenta de una OP (columna; 20261109150100_prod1_contabilidad): la clave, nadie.
+  ["ordenes_pago", ""],
   ["ordenes_compra", ""],
   ["pagos", ""],
   ["adjuntos", ""],
@@ -197,11 +198,11 @@ const ARCHIVOS: [string, string, string, string][] = [
   ["avances de obras del residente", "documentos", "name like 'avances/%' and split_part(name, '/', 2) in ({res})", "LOG CON TES RES GER OPS JEF"],
 ];
 
-// Prod 1 (20261105130000_prod1_seguridad), sobre la matriz del MVP: Contabilidad, Residente y RRHH no existen para
-// la base (como sin perfil), y el Jefe de Operaciones no pasa ninguna función que escriba ni ve archivos salvo las
+// Prod 1 (20261105130000_prod1_seguridad), sobre la matriz del MVP: Residente y RRHH no existen para la base (como
+// sin perfil; Contabilidad entró con 20261109150100_prod1_contabilidad), y el Jefe de Operaciones no pasa ninguna función que escriba ni ve archivos salvo las
 // fotos de las entregas. El Ingeniero de Operaciones (OPS) tiene exactamente lo mismo que el Jefe
 // (20261106110000_prod1_ing_operaciones).
-const FUERA = ["CON", "RES", "RRHH"];
+const FUERA = ["RES", "RRHH"];
 const sin = (s: string, quitar: string[]) => s.split(/\s+/).filter((k) => k && !quitar.includes(k)).join(" ");
 /** OPS pasa donde pasa el Jefe, y en nada más. */
 const comoJefe = (s: string) => {
