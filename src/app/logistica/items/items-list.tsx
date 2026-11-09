@@ -180,6 +180,10 @@ function NuevoItemSheet({
   // Ítems con nombre parecido (para no duplicar); con uno igual no se guarda.
   const similares = useMemo(() => parecidos(descripcion, catalogo), [descripcion, catalogo]);
   const igual = similares.find((p) => p.igual);
+  const casi = similares.find((p) => p.casi);
+  // Con uno casi igual (una letra de diferencia), se confirma que es otro.
+  const [esOtro, setEsOtro] = useState(false);
+  const falta = !descripcion.trim() || !unidad || !!igual || (!!casi && !esOtro);
   const [error, setError] = useState<string | null>(null);
   const [pending, startTransition] = useTransition();
 
@@ -192,6 +196,7 @@ function NuevoItemSheet({
         tolerancia_pct: Number(tolerancia) / 100,
         tipo_material: tipo === SIN_TIPO ? null : tipo,
         cuenta_contable: cuenta,
+        es_otro: esOtro,
       });
       if (!res.ok) return setError(res.error);
       onClose();
@@ -205,8 +210,15 @@ function NuevoItemSheet({
       title={clase === "mat" ? "Nuevo material" : "Nuevo servicio"}
       footer={
         <div className="flex flex-col gap-2">
-          <Faltan items={[!descripcion.trim() && "descripción", !unidad && "unidad", !!igual && "otro nombre: ya existe"]} />
-          <Button size="lg" onClick={guardar} disabled={pending || !descripcion.trim() || !unidad || !!igual}>
+          <Faltan
+            items={[
+              !descripcion.trim() && "descripción",
+              !unidad && "unidad",
+              !!igual && "otro nombre: ya existe",
+              !igual && !!casi && !esOtro && "confirmar que es otro ítem",
+            ]}
+          />
+          <Button size="lg" onClick={guardar} disabled={pending || falta}>
             Guardar
           </Button>
         </div>
@@ -214,17 +226,30 @@ function NuevoItemSheet({
     >
       <div className="flex flex-col gap-4 p-4">
         <Field label="Descripción">
-          <Input value={descripcion} onChange={(e) => setDescripcion(e.target.value)} autoComplete="off" />
+          <Input
+            value={descripcion}
+            onChange={(e) => {
+              setDescripcion(e.target.value);
+              setEsOtro(false);
+            }}
+            autoComplete="off"
+          />
         </Field>
         {similares.length > 0 && (
-          <section aria-label="Ítems parecidos" className={cn("-mt-2 rounded-field border px-3 py-2", igual ? "border-danger bg-danger-bg" : "border-line")}>
-            <p className={cn("text-[14px] font-semibold", igual ? "text-danger" : "text-ink-2")}>
-              {igual ? "Ya existe con ese nombre" : "Ya existen parecidos"}
+          <section
+            aria-label="Ítems parecidos"
+            className={cn(
+              "-mt-2 rounded-field border px-3 py-2",
+              igual ? "border-danger bg-danger-bg" : casi ? "border-warn-line bg-warn-bg" : "border-line",
+            )}
+          >
+            <p className={cn("text-[14px] font-semibold", igual ? "text-danger" : casi ? "text-warn" : "text-ink-2")}>
+              {igual ? "Ya existe" : casi ? "Ya existe uno casi igual" : "Ya existen parecidos"}
             </p>
             <ul className="mt-1 flex flex-col gap-1">
-              {similares.map(({ item, igual: mismo }) => (
+              {similares.map(({ item, igual: mismo, casi: casiMismo }) => (
                 <li key={item.id} className="flex items-baseline gap-2 text-[15px] leading-snug">
-                  <span className={cn("min-w-0 flex-1", mismo && "font-semibold")}>{item.descripcion}</span>
+                  <span className={cn("min-w-0 flex-1", (mismo || casiMismo) && "font-semibold")}>{item.descripcion}</span>
                   <span className="shrink-0 text-[13px] text-ink-3">
                     {item.unidad}
                     {item.rubro !== "MATERIAL" && ` · ${item.rubro}`}
@@ -232,6 +257,17 @@ function NuevoItemSheet({
                 </li>
               ))}
             </ul>
+            {!igual && casi && (
+              <label className="mt-2 flex min-h-12 cursor-pointer items-center justify-between gap-3 border-t border-line pt-2">
+                <span>Es otro ítem</span>
+                <input
+                  type="checkbox"
+                  checked={esOtro}
+                  onChange={(e) => setEsOtro(e.target.checked)}
+                  className="h-6 w-6 shrink-0 accent-primary"
+                />
+              </label>
+            )}
           </section>
         )}
         <div className="grid grid-cols-2 gap-3">

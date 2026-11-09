@@ -203,7 +203,12 @@ Contabilidad, Residente y RRHH **no entran**. Sus roles siguen en la base
   la **cuenta contable** del ítem (la del asiento de compra), opcional; por eso Gerencia lee el plan de cuentas.
   Logística ve el catálogo sin «Nuevo» y sigue clasificando el tipo de material o la especialidad.
   Al escribir la descripción, la hoja muestra los ítems ya existentes con nombre parecido (sin importar
-  mayúsculas, tildes ni el orden de las palabras; `src/lib/parecidos.ts`); con uno igual no deja guardar.
+  mayúsculas, tildes ni el orden de las palabras; `src/lib/parecidos.ts`):
+  - **el mismo escrito de otra forma** (espacios, guiones, «N°», «pulg», plural, conectores u otro orden, con las mismas cifras
+    en el mismo orden): no deja guardar, tampoco el servidor;
+  - **casi igual** (una letra de diferencia en una palabra, o una letra suelta de más): se guarda solo marcando «Es otro ítem».
+  Las cifras nunca se toleran («ACERO DE 1/2"» y «1/4"», «C1» y «C1A» son distintos). En el catálogo del Excel ya había
+  pares así (por ejemplo «PRE VIGUETAS» / «PRE-VIGUETAS», «CALZADURA DE MUROS COLINDANTES» / «… EN MURO COLINDANTE»).
 - **Requerimientos:** no existen. En el seguimiento, «Por requerir» pasa a «Por comprar» (o «Por
   contratar») y desaparece «Requerido sin comprar».
 - **Tesorería › Pagos:** arriba, la misma fila del presupuesto: empresa por su logo, obra (fuera de

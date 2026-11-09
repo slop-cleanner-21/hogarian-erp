@@ -42,8 +42,38 @@ test.describe("@prod1 ítems", () => {
     await expect(hoja.getByRole("button", { name: "Guardar" })).toBeEnabled();
     // El mismo nombre (sin importar mayúsculas): no se guarda.
     await hoja.getByLabel("Descripción").fill(desc.toLowerCase());
-    await expect(parecidos).toContainText("Ya existe con ese nombre");
+    await expect(parecidos.locator("p").first()).toHaveText("Ya existe");
     await expect(hoja.getByRole("button", { name: "Guardar" })).toBeDisabled();
+  });
+
+  test("el mismo ítem escrito de otra forma no se crea; uno casi igual, confirmando que es otro", async ({ abrir }) => {
+    // Primera palabra de 6 letras o más que no termina en S (para escribirla en plural o con una letra de menos).
+    const [desc] = sql(`select descripcion from items where rubro = 'MATERIAL' and descripcion ~ '^[A-Z]{5,}[A-RT-Z] [A-Z]{3,} [A-Z]{3,}$'
+                        order by id limit 1`)[0];
+    const [primera, ...resto] = desc.split(" ");
+    const page = await abrir("gerencia", "/gerencia/items");
+    await page.getByRole("button", { name: "Nuevo material" }).click();
+    const hoja = page.getByRole("dialog", { name: "Nuevo material" });
+    await hoja.getByRole("button", { name: "Unidad", exact: true }).click();
+    await page.getByRole("listbox", { name: "Unidad" }).getByRole("option").first().click();
+    const parecidos = hoja.getByRole("region", { name: "Ítems parecidos" });
+    const guardar = hoja.getByRole("button", { name: "Guardar" });
+    // En plural, con un conector y otro orden: es el mismo.
+    await hoja.getByLabel("Descripción").fill(`${resto.join(" ")} de ${primera}s`.toLowerCase());
+    await expect(parecidos.locator("p").first()).toHaveText("Ya existe");
+    await expect(parecidos.locator("li").first()).toContainText(desc);
+    await expect(guardar).toBeDisabled();
+    // Con una letra de menos: casi igual; se guarda solo confirmando que es otro.
+    const errata = primera.slice(0, 2) + primera.slice(3);
+    await hoja.getByLabel("Descripción").fill([errata, ...resto].join(" "));
+    await expect(parecidos).toContainText("Ya existe uno casi igual");
+    await expect(guardar).toBeDisabled();
+    await expect(hoja.getByText("Falta: confirmar que es otro ítem")).toBeVisible();
+    await hoja.getByLabel("Es otro ítem").check();
+    await expect(guardar).toBeEnabled();
+    // Al cambiar la descripción, se vuelve a confirmar.
+    await hoja.getByLabel("Descripción").fill([errata, ...resto].join(" ") + " ");
+    await expect(hoja.getByLabel("Es otro ítem")).not.toBeChecked();
   });
 
   test("Gerencia crea un material con su cuenta contable y otro sin ella", async ({ abrir, revisarPantalla }, info) => {

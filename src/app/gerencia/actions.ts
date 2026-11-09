@@ -4,6 +4,8 @@ import { revalidatePath } from "next/cache";
 import { after } from "next/server";
 import { z } from "zod";
 import type { Result } from "@/app/logistica/actions";
+import { todas } from "@/lib/paginar";
+import { parecidos } from "@/lib/parecidos";
 import { enviarAvisosPendientes } from "@/lib/push";
 import { createClient, requireSesion } from "@/lib/supabase/server";
 
@@ -15,6 +17,8 @@ const Item = z.object({
   tipo_material: z.string().nullable(),
   /** Cuenta contable del ítem (la del asiento de compra): opcional. */
   cuenta_contable: z.string().trim().min(1).nullable().default(null),
+  /** Confirmó que no es el ítem casi igual que ya existe. */
+  es_otro: z.boolean().default(false),
 });
 
 /** Gerencia crea un ítem del catálogo (material o servicio); Logística lo clasifica después si hace falta. */
@@ -23,7 +27,13 @@ export async function crearItem(input: z.input<typeof Item>): Promise<Result<num
   if (!p.success) return { ok: false, error: p.error.issues[0].message };
   await requireSesion(["GERENCIA"]);
   const supabase = await createClient();
-  const row = { ...p.data, descripcion: p.data.descripcion.toUpperCase(), unidad: p.data.unidad.toUpperCase() };
+  // El mismo ítem escrito de otra forma no se crea; uno casi igual, solo si se confirmó que es otro.
+  const catalogo = await todas<{ descripcion: string }>((d, h) => supabase.from("items").select("descripcion").order("id").range(d, h));
+  const [repetido] = parecidos(p.data.descripcion, catalogo, 1);
+  if (repetido?.igual) return { ok: false, error: `Ya existe: ${repetido.item.descripcion}` };
+  const { es_otro: esOtro, ...datos } = p.data;
+  if (repetido?.casi && !esOtro) return { ok: false, error: `Ya existe uno casi igual: ${repetido.item.descripcion}` };
+  const row = { ...datos, descripcion: datos.descripcion.toUpperCase(), unidad: datos.unidad.toUpperCase() };
   const { data, error } = await supabase.from("items").insert(row).select("id").single();
   if (error) return { ok: false, error: error.code === "23505" ? "Ya existe un ítem con esa descripción" : error.message };
   revalidatePath("/gerencia/items");
