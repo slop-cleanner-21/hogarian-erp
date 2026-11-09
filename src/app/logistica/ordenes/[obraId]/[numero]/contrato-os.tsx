@@ -11,7 +11,6 @@ import { abrirBlob, useEsPwa } from "@/components/visor";
 import { cn, fecha, money, telefonoIntl } from "@/lib/format";
 import type { VOcItem, VOrden } from "@/lib/types";
 import type { DatosContrato } from "@/lib/pdf/contrato-pdf";
-import { firmaContrato } from "./contrato-actions";
 import { logoPdfEmpresa } from "@/lib/empresas";
 import { guardarGlosaRhe, marcarContratoEnviado } from "../../../actions";
 
@@ -56,13 +55,14 @@ export function ContratoOS({
 
   const nombre = `Contrato-OS-${orden.numero}-${orden.obra}.pdf`.replace(/\s+/g, "_");
   const generar = async () => {
-    const [{ contratoPdfBlob }, firma] = await Promise.all([import("@/lib/pdf/contrato-pdf"), firmaContrato(orden.obra_id!, orden.numero!)]);
+    // Sin la firma de Gerencia: el contrato lleva el espacio en blanco para firmarlo.
+    const { contratoPdfBlob } = await import("@/lib/pdf/contrato-pdf");
     const logo = logoPdfEmpresa(orden.empresa ?? "");
     const conFirma = {
       ...datos,
       comprobante: datos?.comprobante ?? null,
       fechaInicio: datos?.fechaInicio ?? null,
-      representante: datos?.representante ? { ...datos.representante, firma } : (datos?.representante ?? null),
+      representante: datos?.representante ?? null,
       // Arriba del contrato, el logo de la empresa (react-pdf lo pide por URL completa).
       logo: logo ? new URL(logo, window.location.origin).href : null,
     };

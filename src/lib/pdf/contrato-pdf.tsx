@@ -71,8 +71,8 @@ const fechaLarga = (iso: string) => {
 const fechaCorta = (iso: string) => iso.slice(0, 10).split("-").reverse().join("/");
 
 const parcial = (it: VOcItem) => Number(it.parcial ?? Number(it.pu_efectivo ?? it.pu_partida) * Number(it.cantidad));
-/** La línea antes de la garantía: cantidad × P.U. */
-const bruto = (it: VOcItem) => parcial(it) + Number(it.retenido ?? 0);
+/** El P.U. que se le comunica al proveedor: el neto de la garantía (lo que factura entre la cantidad). */
+const puNeto = (it: VOcItem) => (Number(it.cantidad) > 0 ? parcial(it) / Number(it.cantidad) : Number(it.pu_efectivo ?? it.pu_partida));
 
 /** Debajo de los ítems: lo retenido por garantía (si hay) y el total que se factura. */
 function Totales({ etiqueta, total, retenido }: { etiqueta: string; total: number; retenido: number }) {
@@ -103,9 +103,9 @@ function Garantia({ retiene, a, total, retenido }: { retiene: string; a: string;
   if (retenido <= 0.005) return null;
   return (
     <Text style={[s.p, { marginTop: 3 }]}>
-      {retiene} retiene S/ {money(retenido)} del valor de los servicios como garantía de su correcta ejecución, por lo que {a} emitirá
-      su comprobante por S/ {money(total)}. Esa retención se devuelve a {a} después del cierre de la obra, mediante una orden de
-      servicio de retenciones.
+      Los precios de esta orden ya descuentan la retención por garantía de su correcta ejecución (S/ {money(retenido)}), que {retiene}{" "}
+      devuelve a {a} después del cierre de la obra, mediante una orden de servicio de retenciones. {a} emite su comprobante por el total
+      de esta orden, S/ {money(total)}.
     </Text>
   );
 }
@@ -181,11 +181,11 @@ export function ContratoDoc({ orden, items, datos }: { orden: VOrden; items: VOc
               <Text style={s.cD}>{it.descripcion}</Text>
               <Text style={s.cU}>{it.unidad}</Text>
               <Text style={s.cQ}>{qty(it.cantidad)}</Text>
-              <Text style={s.cP}>S/ {precio(it.pu_bruto ?? it.pu_efectivo ?? it.pu_partida)}</Text>
-              <Text style={s.cT}>S/ {money(bruto(it))}</Text>
+              <Text style={s.cP}>S/ {precio(puNeto(it))}</Text>
+              <Text style={s.cT}>S/ {money(parcial(it))}</Text>
             </View>
           ))}
-          <Totales etiqueta="Total" total={total} retenido={retenido} />
+          <Totales etiqueta="Total" total={total} retenido={0} />
         </>
       ),
     },
@@ -206,7 +206,7 @@ export function ContratoDoc({ orden, items, datos }: { orden: VOrden; items: VOc
             </Text>
           ) : (
             <Text style={s.p}>
-              La retribución total es de S/ {money(total + retenido)}, que corresponde al 100 % de la orden de servicio y cubre todos los
+              La retribución total es de S/ {money(total)}, que corresponde al 100 % de la orden de servicio y cubre todos los
               costos de EL LOCADOR (personal, herramientas, traslados y cualquier otro gasto). EL COMITENTE la pagará por transferencia
               bancaria, previa conformidad del servicio y entrega del {comprobante} con el concepto indicado en la cláusula
               siguiente.
@@ -305,7 +305,7 @@ export function ContratoDoc({ orden, items, datos }: { orden: VOrden; items: VOc
         <Text style={[s.p, { marginTop: 12 }]}>
           Conste por el presente documento el contrato de locación de servicios que celebran, de una parte,{" "}
           <Text style={s.b}>{nombreEmpresa(orden, datos)}</Text>, con RUC {orden.empresa_ruc ?? "—"}
-          {domicilio(datos)}, <Representada r={datos?.representante} />, en
+          {domicilio(datos)}, <Representada />, en
           adelante EL COMITENTE; y de la otra, <Text style={s.b}>{orden.proveedor}</Text>, con {dni ? "DNI" : "RUC"} {doc}, en
           adelante EL LOCADOR; en los términos siguientes:
         </Text>
@@ -317,15 +317,9 @@ export function ContratoDoc({ orden, items, datos }: { orden: VOrden; items: VOc
   );
 }
 
-function Representada({ r }: { r?: Representante | null }) {
-  return r?.nombre ? (
-    <>
-      debidamente representada por <Text style={s.b}>{r.nombre}</Text>
-      {r.dni ? `, identificado con DNI ${r.dni}` : ""}
-    </>
-  ) : (
-    <>debidamente representada</>
-  );
+/** La empresa comparece por su representante, sin sus datos personales (el contrato lleva los de la empresa). */
+function Representada() {
+  return <>debidamente representada</>;
 }
 
 function Plazo({ orden, datos, quien }: { orden: VOrden; datos?: DatosContrato; quien: string }) {
@@ -357,9 +351,9 @@ function Clausulas({ clausulas }: { clausulas: { titulo: string; cuerpo: ReactNo
   );
 }
 
+/** Firmas: arriba de la línea, el espacio en blanco para firmar; debajo, la empresa (no los datos de quien firma) y el proveedor. */
 function Firmas({ orden, datos, empresa, proveedor }: { orden: VOrden; datos?: DatosContrato; empresa: string; proveedor: string }) {
   const doc = orden.proveedor_ruc ?? "";
-  const r = datos?.representante;
   return (
     <View wrap={false}>
       <Text style={[s.p, { marginTop: 14 }]}>
@@ -367,14 +361,11 @@ function Firmas({ orden, datos, empresa, proveedor }: { orden: VOrden; datos?: D
       </Text>
       <View style={s.firmas}>
         <View style={s.firmaCol}>
-          {/* eslint-disable-next-line jsx-a11y/alt-text -- Image de react-pdf, no un <img> */}
-          <View style={s.firmaImg}>{r?.firma ? <Image src={r.firma} style={{ maxHeight: 44, maxWidth: 150, objectFit: "contain" }} /> : null}</View>
+          <View style={s.firmaImg} />
           <View style={s.firma}>
             <Text style={s.b}>{empresa}</Text>
             <Text>{nombreEmpresa(orden, datos)}</Text>
             <Text>RUC {orden.empresa_ruc ?? "—"}</Text>
-            {r?.nombre ? <Text>{r.nombre}</Text> : null}
-            {r?.dni ? <Text>DNI {r.dni}</Text> : null}
           </View>
         </View>
         <View style={s.firmaCol}>
@@ -420,11 +411,11 @@ function ContratoComercial({ orden, items, datos, total, retenido }: { orden: VO
               <Text style={s.cD}>{it.descripcion}</Text>
               <Text style={s.cU}>{it.unidad}</Text>
               <Text style={s.cQ}>{qty(it.cantidad)}</Text>
-              <Text style={s.cP}>S/ {precio(it.pu_bruto ?? it.pu_efectivo ?? it.pu_partida)}</Text>
-              <Text style={s.cT}>S/ {money(bruto(it))}</Text>
+              <Text style={s.cP}>S/ {precio(puNeto(it))}</Text>
+              <Text style={s.cT}>S/ {money(parcial(it))}</Text>
             </View>
           ))}
-          <Totales etiqueta="Total (incluye IGV)" total={total} retenido={retenido} />
+          <Totales etiqueta="Total (incluye IGV)" total={total} retenido={0} />
         </>
       ),
     },
@@ -434,7 +425,7 @@ function ContratoComercial({ orden, items, datos, total, retenido }: { orden: VO
       cuerpo: (
         <>
           <Text style={s.p}>
-            El precio total es de S/ {money(total + retenido)}, incluido el IGV, por el 100 % de la orden de servicio. Es a suma alzada y cubre
+            El precio total es de S/ {money(total)}, incluido el IGV, por el 100 % de la orden de servicio. Es a suma alzada y cubre
             todos los costos de EL CONTRATISTA (personal, materiales menores, herramientas, equipos, traslados, seguros y tributos).
             LA EMPRESA lo pagará por transferencia bancaria, previa conformidad del servicio y entrega de la factura electrónica
             correspondiente.
@@ -519,7 +510,7 @@ function ContratoComercial({ orden, items, datos, total, retenido }: { orden: VO
         <Text style={[s.p, { marginTop: 12 }]}>
           Conste por el presente documento el contrato comercial de prestación de servicios que celebran, de una parte,{" "}
           <Text style={s.b}>{nombreEmpresa(orden, datos)}</Text>, con RUC {orden.empresa_ruc ?? "—"}
-          {domicilio(datos)}, <Representada r={datos?.representante} />, en
+          {domicilio(datos)}, <Representada />, en
           adelante LA EMPRESA; y de la otra, <Text style={s.b}>{orden.proveedor}</Text>, con RUC {doc}, en adelante EL
           CONTRATISTA; en los términos siguientes:
         </Text>

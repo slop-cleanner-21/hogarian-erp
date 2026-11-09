@@ -62,10 +62,9 @@ Contabilidad, Residente y RRHH **no entran**. Sus roles siguen en la base
     la orden (el archivo queda) y hay que enviarlo y firmarlo de nuevo. Lo hace la base en la misma transacción que
     el registro (`fn_os_comprobante`); una OS ya en Tesorería no cambia de comprobante sin un rechazo. Una OS solo
     acepta factura o recibo por honorarios.
-  - El contrato lleva la **firma de Gerencia** (imagen que sube el gerente en «Mi firma», su menú), con su
-    nombre y DNI (lo pone el Admin al crear su usuario; obligatorio en Gerencia). Firma y DNI están en
-    `perfil_privado` y en `documentos/firmas/`: solo los lee el servidor. Si hay varios gerentes, firma el de
-    la firma más reciente. La firma se pide al armar el PDF (`firmaContrato`), no viaja con la orden.
+  - El contrato no lleva datos de quien firma por la empresa (ni nombre, ni DNI, ni la imagen de su firma): arriba de la línea, el
+    espacio en blanco para firmar; debajo, la empresa (su rol en el contrato, razón social y RUC), como el proveedor. La empresa
+    comparece «debidamente representada».
   - Arriba del contrato va el **logo de la empresa** (PNG para PDF en `public/empresas/pdf/`: react-pdf no lee
     WebP ni SVG; `logoPdfEmpresa`).
 - **Link del proveedor:** mientras la orden está «Cotizando» cotiza en él; desde que se confirman los precios, el
@@ -74,7 +73,7 @@ Contabilidad, Residente y RRHH **no entran**. Sus roles siguen en la base
   - la retención de 4ta y la detracción de su comprobante;
   - sus pagos (fecha, banco, N° de operación, monto) con el voucher;
   - en una OS, el contrato: el firmado si Logística ya lo subió; si no, el contrato para firmar (generado en el
-    servidor, con el logo y la firma de Gerencia).
+    servidor, con el logo).
 
   No ve el presupuesto, la revisión interna (sobreprecio, rechazos y sus motivos), cuentas, la factura ni la guía.
   Los archivos los entrega `/cotizar/<token>/archivo`, que valida el token en la base (`archivo_link`, solo con la
@@ -83,7 +82,9 @@ Contabilidad, Residente y RRHH **no entran**. Sus roles siguen en la base
 - **Retención por garantía** (OS; distinta de la de 4ta y anterior a ella): Logística la define al crear la OS, por tipo de
   partida: mano de obra 5 %, subcontratos 0 % y adicionales 0 % por defecto (`src/lib/garantia.ts`); después no se cambia. Va por
   línea (`oc_items.ret_garantia_pct`). El P.U. sigue siendo el acordado (contra él se compara el presupuesto) y `parcial` es el
-  neto: el proveedor factura y cobra el neto (S/ 1,000 al 5 % son S/ 950) y la 4ta se calcula sobre ese comprobante. La base no
+  neto: el proveedor factura y cobra el neto (S/ 1,000 al 5 % son S/ 950) y la 4ta se calcula sobre ese comprobante. Al proveedor se le
+  comunica por la misma OS: en el PDF de la orden, en su link (ya confirmada) y en el contrato, los P.U. van netos (P.U. × 95 %), sin
+  renglón de retención; el contrato dice además que esos precios ya descuentan la retención y que se le devuelve al cierre. La base no
   acepta otro total (`fn_exigir_neto`, S/ 1 de margen por redondeo): con el 100 %, lo retenido se pagaría dos veces. Las pantallas
   muestran cada línea a cantidad × P.U. y restan lo retenido en el total. En el Excel exportado va el P.U. neto.
 - **OS de retenciones** (Proveedores › Retenciones, `/logistica/retenciones`, vista `v_os_retenidas`): lo retenido por proveedor y
@@ -432,7 +433,8 @@ Contabilidad, Residente y RRHH **no entran**. Sus roles siguen en la base
   la demo (`DEMO_ACCESO`) y la conexión directa del navegador con
   Supabase sin `/sb` (`NEXT_PUBLIC_SUPABASE_DIRECTO=1`); en local siguen como antes hasta el paso.
 - **Quién firma por cada empresa:** ya se elige en Admin › Empresas (sin elegir, el gerente con la firma más
-  reciente); falta que respondan si es uno por empresa. Los gerentes subirán su firma («Mi firma») en su momento.
+  reciente); falta que respondan si es uno por empresa. Desde el 09/11 el contrato no lleva sus datos ni su firma (se
+  firma a mano en el espacio en blanco), así que «Mi firma» y el firmante elegido ya no salen en el PDF.
 - **Detracciones y retenciones de 4ta:** se registran; las paga Contabilidad, que aún no está en prod 1.
 - **Contabilidad:** dos roles iguales, como Operaciones: Jefe de Contabilidad y Asistente de Contabilidad (Ángeles y Jerson), cuando
   ese módulo entre a prod 1.

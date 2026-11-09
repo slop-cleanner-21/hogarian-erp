@@ -30,7 +30,7 @@ export type CotizacionData = {
   pagos?: { id: number; fecha: string; monto: number; banco: string | null; operacion: string | null; vouchers: number[] }[] | null;
   /** OS: su contrato (el firmado, si Logística ya lo subió). */
   contrato?: { firmado: boolean } | null;
-  items: { id: number; descripcion: string; unidad: string; cantidad: number; pu_cotizado: number | null; ret_garantia_pct?: number }[];
+  items: { id: number; descripcion: string; unidad: string; cantidad: number; pu_cotizado: number | null; ret_garantia_pct?: number; parcial?: number | null }[];
 };
 
 type Precios = Record<number, string>;
@@ -66,8 +66,12 @@ function Formulario({ token, data, conBorrador }: { token: string; data: Cotizac
   const [pending, startTransition] = useTransition();
 
   const subtotal = data.items.reduce((a, i) => a + (Number(pu[i.id]) || 0) * Number(i.cantidad), 0);
-  const garantia = data.items.reduce((a, i) => a + retenidoDe((Number(pu[i.id]) || 0) * Number(i.cantidad), Number(i.ret_garantia_pct ?? 0)), 0);
-  const total = subtotal - garantia;
+  // Con la orden ya confirmada, los P.U. que ve van netos de la garantía (es como se le comunica): no hay retención aparte.
+  const garantia = orden ? 0 : data.items.reduce((a, i) => a + retenidoDe((Number(pu[i.id]) || 0) * Number(i.cantidad), Number(i.ret_garantia_pct ?? 0)), 0);
+  const total = orden ? data.items.reduce((a, i) => a + Number(i.parcial ?? 0), 0) : subtotal - garantia;
+  /** P.U. y parcial que se muestran: en la orden, los netos. */
+  const puVisto = (i: CotizacionData["items"][number]) =>
+    orden && i.parcial != null && Number(i.cantidad) > 0 ? Number(i.parcial) / Number(i.cantidad) : Number(pu[i.id]) || 0;
   const completa = data.items.every((i) => Number(pu[i.id]) > 0);
 
   const cambiar = (id: number, valor: string) =>
@@ -133,7 +137,7 @@ function Formulario({ token, data, conBorrador }: { token: string; data: Cotizac
                   {qty(i.cantidad)} <span className="text-ink-3">{i.unidad}</span>
                 </span>
                 {enviada ? (
-                  <span className="num text-right">{pu[i.id] ? solesPu(Number(pu[i.id])) : "—"}</span>
+                  <span className="num text-right">{pu[i.id] ? solesPu(puVisto(i)) : "—"}</span>
                 ) : (
                   <NumberInput
                     aria-label={`Precio unitario ${i.descripcion}`}
@@ -143,7 +147,7 @@ function Formulario({ token, data, conBorrador }: { token: string; data: Cotizac
                   />
                 )}
                 <span className="num text-right font-medium">
-                  {pu[i.id] ? soles(Number(pu[i.id]) * Number(i.cantidad)) : "—"}
+                  {pu[i.id] ? soles(orden && i.parcial != null ? Number(i.parcial) : Number(pu[i.id]) * Number(i.cantidad)) : "—"}
                 </span>
               </div>
             </li>
