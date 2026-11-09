@@ -351,9 +351,13 @@ function Clausulas({ clausulas }: { clausulas: { titulo: string; cuerpo: ReactNo
   );
 }
 
-/** Firmas: arriba de la línea, el espacio en blanco para firmar; debajo, la empresa (no los datos de quien firma) y el proveedor. */
+/**
+ * Firmas: arriba de la línea, la firma de Gerencia (o el espacio para firmar); debajo, la empresa, sin el nombre ni el DNI de
+ * quien firma. Del proveedor, el espacio para firmar.
+ */
 function Firmas({ orden, datos, empresa, proveedor }: { orden: VOrden; datos?: DatosContrato; empresa: string; proveedor: string }) {
   const doc = orden.proveedor_ruc ?? "";
+  const firma = datos?.representante?.firma;
   return (
     <View wrap={false}>
       <Text style={[s.p, { marginTop: 14 }]}>
@@ -361,7 +365,8 @@ function Firmas({ orden, datos, empresa, proveedor }: { orden: VOrden; datos?: D
       </Text>
       <View style={s.firmas}>
         <View style={s.firmaCol}>
-          <View style={s.firmaImg} />
+          {/* eslint-disable-next-line jsx-a11y/alt-text -- Image de react-pdf, no un <img> */}
+          <View style={s.firmaImg}>{firma ? <Image src={firma} style={{ maxHeight: 44, maxWidth: 150, objectFit: "contain" }} /> : null}</View>
           <View style={s.firma}>
             <Text style={s.b}>{empresa}</Text>
             <Text>{nombreEmpresa(orden, datos)}</Text>

@@ -62,9 +62,10 @@ Contabilidad, Residente y RRHH **no entran**. Sus roles siguen en la base
     la orden (el archivo queda) y hay que enviarlo y firmarlo de nuevo. Lo hace la base en la misma transacción que
     el registro (`fn_os_comprobante`); una OS ya en Tesorería no cambia de comprobante sin un rechazo. Una OS solo
     acepta factura o recibo por honorarios.
-  - El contrato no lleva datos de quien firma por la empresa (ni nombre, ni DNI, ni la imagen de su firma): arriba de la línea, el
-    espacio en blanco para firmar; debajo, la empresa (su rol en el contrato, razón social y RUC), como el proveedor. La empresa
-    comparece «debidamente representada».
+  - El contrato lleva la firma de Gerencia (la imagen de «Mi firma», del firmante de la empresa) sobre la línea, pero no su nombre
+    ni su DNI: debajo va la empresa (su rol en el contrato, razón social y RUC), como el proveedor; sin firma subida, el espacio en
+    blanco para firmar. La empresa comparece «debidamente representada». El contrato del link del proveedor va sin la imagen de la
+    firma (cualquiera con el link podría copiarla).
   - Arriba del contrato va el **logo de la empresa** (PNG para PDF en `public/empresas/pdf/`: react-pdf no lee
     WebP ni SVG; `logoPdfEmpresa`).
 - **Link del proveedor:** mientras la orden está «Cotizando» cotiza en él; desde que se confirman los precios, el
@@ -437,8 +438,8 @@ Contabilidad, Residente y RRHH **no entran**. Sus roles siguen en la base
   la demo (`DEMO_ACCESO`) y la conexión directa del navegador con
   Supabase sin `/sb` (`NEXT_PUBLIC_SUPABASE_DIRECTO=1`); en local siguen como antes hasta el paso.
 - **Quién firma por cada empresa:** ya se elige en Admin › Empresas (sin elegir, el gerente con la firma más
-  reciente); falta que respondan si es uno por empresa. Desde el 09/11 el contrato no lleva sus datos ni su firma (se
-  firma a mano en el espacio en blanco), así que «Mi firma» y el firmante elegido ya no salen en el PDF.
+  reciente); falta que respondan si es uno por empresa. Desde el 09/11 el contrato lleva su firma pero no su nombre ni su
+  DNI; los gerentes suben su firma («Mi firma») en su momento.
 - **Detracciones y retenciones de 4ta:** se registran; las paga Contabilidad, que aún no está en prod 1.
 - **Contabilidad:** dos roles iguales, como Operaciones: Jefe de Contabilidad y Asistente de Contabilidad (Ángeles y Jerson), cuando
   ese módulo entre a prod 1.
