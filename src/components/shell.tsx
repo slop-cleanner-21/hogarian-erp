@@ -17,6 +17,7 @@ import {
   Users,
   History,
   Landmark,
+  Scale,
 } from "lucide-react";
 import { Avatar } from "./avatar";
 import { CambiarContrasena } from "./cambiar-contrasena";
@@ -75,6 +76,7 @@ const MODULOS: Record<ClaveModulo, { label: string; roles: Rol[]; nav: NavItem[]
       { href: "/contabilidad/pagos", label: "Pagos", icon: Banknote },
       { href: "/contabilidad/op", label: "OP", icon: FileText },
       { href: "/contabilidad/impuestos", label: "Impuestos", icon: Landmark },
+      { href: "/contabilidad/eeff", label: "EEFF", icon: Scale },
       { href: "/contabilidad", label: "Cuentas", icon: BookCheck, match: (p) => p === "/contabilidad" },
     ],
   },

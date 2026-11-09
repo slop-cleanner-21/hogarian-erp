@@ -4969,6 +4969,13 @@ export type Database = {
         Returns: number;
       };
       publicar_presupuesto: { Args: { p_obra_id: number }; Returns: undefined };
+      rango_asientos: {
+        Args: { p_empresa_id: number };
+        Returns: {
+          desde: string;
+          hasta: string;
+        }[];
+      };
       rechazar_documento: {
         Args: {
           p_correccion?: string;
@@ -5122,6 +5129,15 @@ export type Database = {
           p_tipo: string;
         };
         Returns: number;
+      };
+      sumas_cuentas: {
+        Args: { p_desde: string; p_empresa_id: number; p_hasta: string };
+        Returns: {
+          cuenta: string;
+          debe: number;
+          denominacion: string;
+          haber: number;
+        }[];
       };
       token_cotizacion_de: {
         Args: { p_numero: string; p_obra: number };

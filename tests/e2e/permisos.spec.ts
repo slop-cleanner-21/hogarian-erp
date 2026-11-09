@@ -187,7 +187,8 @@ const RPC: Record<string, string> = {
 };
 // Funciones de lectura o internas que no necesitan fila en RPC; anular_requerimiento va aparte (mira el
 // requerimiento antes que el rol, así que se prueba en SQL revertido).
-const SIN_ROL = /^(fn_|rol_|mi_rol$|es_residente$|obras_residente$|orden_visible_residente$|ruta_obra_residente$|exigir_rol$|faltante$|glosa_rhe_defecto$|siguiente_numero_oc$|token_cotizacion_de$|rol_prod1$|get_cotizacion$|enviar_cotizacion$|anular_requerimiento$|sesion_bloqueada$|cambiar_rol$|enviar_sugerencia$|bloqueo_estado$|bloqueo_activar$)/;
+const SIN_ROL = /^(fn_|rol_|mi_rol$|es_residente$|obras_residente$|orden_visible_residente$|ruta_obra_residente$|exigir_rol$|faltante$|glosa_rhe_defecto$|siguiente_numero_oc$|token_cotizacion_de$|rol_prod1$|get_cotizacion$|enviar_cotizacion$|anular_requerimiento$|sesion_bloqueada$|cambiar_rol$|enviar_sugerencia$|bloqueo_estado$|bloqueo_activar$|sumas_cuentas$|rango_asientos$)/;
+// sumas_cuentas y rango_asientos solo leen, con los permisos de quien consulta: eeff.spec prueba que solo Contabilidad ve algo.
 const DENEGADO =
   /No tienes permiso|^Solo (Recursos Humanos|Operaciones|Gerencia|Logística|Contabilidad|Tesorería|el Jefe|los residentes|quien lo creó)|Inicia sesión|permission denied for function/i;
 

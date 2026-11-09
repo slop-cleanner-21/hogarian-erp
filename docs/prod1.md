@@ -438,6 +438,20 @@ Residente y RRHH **no entran**. Sus roles siguen en la base
   - Lo leen Contabilidad, Tesorería y Gerencia; el Jefe de Operaciones, nada. Las constancias las sube solo Contabilidad.
   - Las retenciones de los recibos históricos (del Excel) aparecen por pagar por mes: Contabilidad registra las que ya pagó.
 
+- **Estados financieros** (Contabilidad › EEFF, `/contabilidad/eeff`; migración `prod1_eeff`, `src/lib/eeff.ts`). No existían en
+  el MVP. Salen de los asientos de la app (compras, pagos y pagos de impuestos), por empresa, acumulados del ejercicio (desde el
+  1 de enero) hasta el mes elegido. Las sumas por cuenta las da la base (`sumas_cuentas`, con los permisos de quien consulta:
+  solo Contabilidad lee las líneas de los asientos).
+  - **Comprobación:** cada cuenta con su Debe, su Haber y su saldo; abajo los totales (cuadran).
+  - **Situación financiera:** por elemento del PCGE (2 dígitos). En las clases 1 a 4 el saldo decide el lado (el IGV por
+    acreditar de la 40 va al activo; un banco con saldo acreedor, al pasivo); la clase 5 es patrimonio, y el resultado del
+    ejercicio es lo que queda de las clases 6 a 9, así siempre cuadra.
+  - **Resultados por naturaleza:** ingresos 70-78 menos gastos 60-69 (la 79 no: es la contrapartida de la clase 9). Debajo,
+    los costos y gastos por función (clase 9); si no cuadran con la 79, la diferencia se avisa.
+  - Mientras la app no registre ventas, saldos iniciales ni depósitos, muestran solo lo de compras y pagos: el banco sale con
+    saldo acreedor y el resultado, como pérdida.
+- **TXT del SIRE** (registro de compras, libro 080400): el único TXT del MVP; ya portado (Compras › Descargar).
+
 ### Heredado del MVP (ya implementado)
 
 - **Detracciones:** Gerencia marca, por obra e ítem, cuáles llevan detracción. Ninguno la lleva por
