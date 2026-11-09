@@ -103,6 +103,20 @@ export default async function PagosPage({ searchParams }: PageProps<"/tesoreria"
     fObra = obraValida;
     listaP = null;
   }
+  // Cuántos hay en cada pestaña (un circulito), con los mismos filtros: OC, OS y OP en el estado elegido, y cada estado
+  // del documento elegido. Solo cuentan (head): no traen filas.
+  const contar = async (estado: "pend" | "pag" | "rec", d: string) => {
+    const { count } =
+      estado === "rec"
+        ? await filtrarRechazos(supabase.from("v_rechazos").select("doc", { count: "exact", head: true }).eq("doc", d))
+        : await filtrarDocumentos(
+            supabase.from("v_por_pagar").select("doc", { count: "exact", head: true }).eq("estado", estado === "pag" ? "PAGADO" : "PENDIENTE").eq("doc", d),
+            // Las OP no tienen etapas.
+            d === "OP",
+          );
+    return count ?? 0;
+  };
+  const cuentasP = Promise.all([contar(est, "OC"), contar(est, "OS"), contar(est, "OP"), contar("pend", doc), contar("pag", doc), contar("rec", doc)]);
   const galletas = await cookies();
   const diseno = leerDiseno(galletas.get(cookieDiseno("pagos"))?.value);
   const fijo = leerFijar(galletas.get(cookieFijar("pagos"))?.value);
@@ -116,6 +130,7 @@ export default async function PagosPage({ searchParams }: PageProps<"/tesoreria"
   // grupo, para los diseños agrupados (por obra, proveedor, fecha, empresa o monto).
   // `filtrados`: todos los documentos filtrados (no solo los cargados), para «Por etapa».
   const [porDoc, { t: totales, filas: filtrados }] = await (listaP ?? pedirLista());
+  const [nOC, nOS, nOP, nPend, nPag, nRec] = await cuentasP;
   const data = porDoc.flat();
   const visibles = Math.max(0, ...porDoc.map((f) => f.length));
 
@@ -209,11 +224,11 @@ export default async function PagosPage({ searchParams }: PageProps<"/tesoreria"
   }
 
   // eslint-disable-next-line @typescript-eslint/no-explicit-any -- el mismo filtro sirve a la lista y a los totales
-  function filtrarDocumentos<Q extends { eq: any; overlaps: any; gte: any; lt: any; or: any }>(query: Q): Q {
+  function filtrarDocumentos<Q extends { eq: any; overlaps: any; gte: any; lt: any; or: any }>(query: Q, sinEtapas = false): Q {
     if (!todasEmpresas) query = query.eq("empresa_id", Number(empresaId));
     if (fObra) query = query.eq("obra_id", Number(fObra));
     if (fProveedor) query = query.eq("proveedor_id", Number(fProveedor));
-    if (fEtapas.length) query = query.overlaps("etapas", fEtapas);
+    if (fEtapas.length && !sinEtapas) query = query.overlaps("etapas", fEtapas);
     const desde = desdeFecha(fFecha);
     if (desde) query = query.gte("fecha", desde[0]).lt("fecha", desde[1]);
     const rango = RANGOS_MONTO[fMonto ?? ""];
@@ -596,9 +611,9 @@ export default async function PagosPage({ searchParams }: PageProps<"/tesoreria"
             param="doc"
             current={doc}
             options={[
-              { value: "OC", label: "OC" },
-              { value: "OS", label: "OS" },
-              { value: "OP", label: "OP" },
+              { value: "OC", label: "OC", cuenta: nOC },
+              { value: "OS", label: "OS", cuenta: nOS },
+              { value: "OP", label: "OP", cuenta: nOP },
             ]}
           />
         )}
@@ -606,9 +621,9 @@ export default async function PagosPage({ searchParams }: PageProps<"/tesoreria"
           param="est"
           current={est}
           options={[
-            { value: "pend", label: "Por pagar" },
-            { value: "pag", label: "Pagado" },
-            { value: "rec", label: "Rechazos" },
+            { value: "pend", label: "Por pagar", cuenta: nPend },
+            { value: "pag", label: "Pagado", cuenta: nPag },
+            { value: "rec", label: "Rechazos", cuenta: nRec },
           ]}
         />
         <SearchBox placeholder="N°, proveedor, RUC u obra" />

@@ -605,6 +605,26 @@ test.describe("@tesoreria bandejas", () => {
   });
 });
 
+test.describe("@tesoreria cuántos hay en cada pestaña", () => {
+  test("OC / OS y Por pagar / Pagado / Rechazos llevan su circulito con lo mismo que la base", async ({ abrir }) => {
+    const page = await abrir("tesoreria", "/tesoreria?empresa=todas&area=log&doc=OC&est=pend");
+    const n = (q: string) => Number(sql1(q));
+    const esperado: [string, number][] = [
+      ["OC", n("select count(*) from v_por_pagar where estado = 'PENDIENTE' and doc = 'OC'")],
+      ["OS", n("select count(*) from v_por_pagar where estado = 'PENDIENTE' and doc = 'OS'")],
+      ["OP", n("select count(*) from v_por_pagar where estado = 'PENDIENTE' and doc = 'OP'")],
+      ["Por pagar", n("select count(*) from v_por_pagar where estado = 'PENDIENTE' and doc = 'OC'")],
+      ["Pagado", n("select count(*) from v_por_pagar where estado = 'PAGADO' and doc = 'OC'")],
+      ["Rechazos", n("select count(*) from v_rechazos where doc = 'OC'")],
+    ];
+    for (const [pestana, total] of esperado) {
+      const circulo = page.getByRole("tab", { name: pestana, exact: true }).locator("[data-cuenta]");
+      if (total) await expect(circulo, pestana).toHaveAttribute("data-cuenta", total > 999 ? "999+" : String(total));
+      else await expect(circulo, pestana).toHaveCount(0);
+    }
+  });
+});
+
 test.describe("@tesoreria empresa y obra compartidas entre Pagos y Presupuesto", () => {
   // Dos obras con presupuesto y órdenes en Tesorería, de empresas distintas si las hay.
   const [[O1, E1, N1, NE1], [O2, E2, N2, NE2]] = sql(`

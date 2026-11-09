@@ -355,3 +355,23 @@ test.describe("@contabilidad órdenes de pago", () => {
     }
   });
 });
+
+test.describe("@contabilidad cuántos hay en cada pestaña", () => {
+  test("OP: Borrador / Tesorería / Pagadas / Anuladas; Impuestos: detracciones y meses de retenciones por pagar", async ({ abrir }) => {
+    const circulo = (page: import("@playwright/test").Page, pestana: string) => page.getByRole("tab", { name: pestana, exact: true }).locator("[data-cuenta]");
+    const revisar = async (page: import("@playwright/test").Page, esperado: [string, number][]) => {
+      for (const [pestana, n] of esperado) {
+        if (n) await expect(circulo(page, pestana), pestana).toHaveAttribute("data-cuenta", String(n));
+        else await expect(circulo(page, pestana), pestana).toHaveCount(0);
+      }
+    };
+    const op = (estado: string) => Number(sql1(`select count(*) from ordenes_pago where estado = '${estado}'`));
+    const page = await abrir("contabilidad", "/contabilidad/op?est=bor");
+    await revisar(page, [["Borrador", op("BORRADOR")], ["Tesorería", op("EN_TESORERIA")], ["Pagadas", op("PAGADA")], ["Anuladas", op("ANULADA")]]);
+
+    const det = Number(sql1("select count(*) from v_detracciones where impuesto_pago_id is null"));
+    const ret = Number(sql1("select count(distinct (empresa_id, periodo)) from v_retenciones_4ta where impuesto_pago_id is null"));
+    const imp = await abrir("contabilidad", "/contabilidad/impuestos?imp=det&est=pend");
+    await revisar(imp, [["Detracciones", det], ["Retenciones 4ta", ret], ["Por pagar", det]]);
+  });
+});

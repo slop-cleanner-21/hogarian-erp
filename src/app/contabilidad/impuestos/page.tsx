@@ -21,7 +21,20 @@ export default async function ImpuestosPage({ searchParams }: PageProps<"/contab
   const est = sp.est === "pag" ? "pag" : "pend";
   const empresa = Number(filtro(sp, "empresa")) || null;
   const supabase = await createClient();
-  const { data: empresas } = await supabase.from("empresas").select("id, nombre").order("nombre");
+  // Lo que hay por pagar (un circulito en cada pestaña): detracciones y meses de retenciones, de la empresa elegida.
+  const pendientes = (vista: "v_detracciones" | "v_retenciones_4ta", columnas: string) => {
+    let c = supabase.from(vista).select(columnas).is("impuesto_pago_id", null);
+    if (empresa) c = c.eq("empresa_id", empresa);
+    return c;
+  };
+  const [{ data: empresas }, { data: detPend }, { data: retPend }] = await Promise.all([
+    supabase.from("empresas").select("id, nombre").order("nombre"),
+    pendientes("v_detracciones", "comprobante_id"),
+    pendientes("v_retenciones_4ta", "empresa_id, periodo"),
+  ]);
+  const nDet = detPend?.length ?? 0;
+  const nRet = new Set(((retPend ?? []) as unknown as { empresa_id: number; periodo: string }[]).map((r) => `${r.empresa_id}-${r.periodo}`)).size;
+  const nPend = imp === "det" ? nDet : nRet;
 
   let contenido: React.ReactNode;
   if (est === "pag") {
@@ -118,15 +131,15 @@ export default async function ImpuestosPage({ searchParams }: PageProps<"/contab
           param="imp"
           current={imp}
           options={[
-            { value: "det", label: "Detracciones" },
-            { value: "ret", label: "Retenciones 4ta" },
+            { value: "det", label: "Detracciones", cuenta: nDet },
+            { value: "ret", label: "Retenciones 4ta", cuenta: nRet },
           ]}
         />
         <Tabs
           param="est"
           current={est}
           options={[
-            { value: "pend", label: "Por pagar" },
+            { value: "pend", label: "Por pagar", cuenta: nPend },
             { value: "pag", label: "Pagadas" },
           ]}
         />

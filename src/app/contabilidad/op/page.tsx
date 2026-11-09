@@ -42,13 +42,25 @@ export default async function OrdenesPagoPage({ searchParams }: PageProps<"/cont
     const like = `%${q.replace(/[%,()]/g, " ")}%`;
     query = query.or(`numero.ilike.${like},concepto.ilike.${like}`);
   }
-  const [{ data, error }, { data: obras }, { data: proveedores }, { data: cuentas }, { data: rechazadas }] = await Promise.all([
+  // Cuántas hay en cada pestaña (un circulito), con la misma obra y búsqueda.
+  const contar = async (estado: string) => {
+    let c = supabase.from("ordenes_pago").select("id", { count: "exact", head: true }).eq("estado", estado);
+    if (fObra) c = c.eq("obra_id", Number(fObra));
+    if (q) {
+      const like = `%${q.replace(/[%,()]/g, " ")}%`;
+      c = c.or(`numero.ilike.${like},concepto.ilike.${like}`);
+    }
+    return (await c).count ?? 0;
+  };
+  const [{ data, error }, { data: obras }, { data: proveedores }, { data: cuentas }, { data: rechazadas }, cuentasEstado] = await Promise.all([
     query,
     supabase.from("obras").select("id, nombre").order("nombre"),
     supabase.from("proveedores").select("id, ruc_o_cod, razon_social").order("razon_social"),
     supabase.from("cuentas_contables").select("codigo, denominacion").order("codigo"),
     supabase.from("rechazos").select("orden_pago_id").not("orden_pago_id", "is", null),
+    Promise.all(Object.values(ESTADOS).map(contar)),
   ]);
+  const cuentaDe = (e: keyof typeof ESTADOS) => cuentasEstado[Object.keys(ESTADOS).indexOf(e)];
   if (error) throw new Error(error.message);
   const conRechazo = new Set((rechazadas ?? []).map((r) => r.orden_pago_id));
 
@@ -61,10 +73,10 @@ export default async function OrdenesPagoPage({ searchParams }: PageProps<"/cont
           param="est"
           current={est}
           options={[
-            { value: "bor", label: "Borrador" },
-            { value: "teso", label: "Tesorería" },
-            { value: "pag", label: "Pagadas" },
-            { value: "anu", label: "Anuladas" },
+            { value: "bor", label: "Borrador", cuenta: cuentaDe("bor") },
+            { value: "teso", label: "Tesorería", cuenta: cuentaDe("teso") },
+            { value: "pag", label: "Pagadas", cuenta: cuentaDe("pag") },
+            { value: "anu", label: "Anuladas", cuenta: cuentaDe("anu") },
           ]}
         />
         <div className="flex flex-wrap gap-2">
