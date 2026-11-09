@@ -479,7 +479,7 @@ Residente y RRHH **no entran**. Sus roles siguen en la base
 - **Quién firma por cada empresa:** ya se elige en Admin › Empresas (sin elegir, el gerente con la firma más
   reciente); falta que respondan si es uno por empresa. Desde el 09/11 el contrato lleva su firma pero no su nombre ni su
   DNI; los gerentes suben su firma («Mi firma») en su momento.
-- **Contabilidad:** crear las cuentas de Ángeles (Jefe) y Jerson (Asistente) cuando haya su correo.
+- **Contabilidad:** crear las cuentas del Jefe y del Asistente de Contabilidad cuando haya sus correos.
 - **Observaciones de datos:**
   - Virgen del Mar numera sus órdenes desde 1000140 porque el Excel trae una OC 1000139 (parece un error de tipeo); se deja como
     en el Excel.
