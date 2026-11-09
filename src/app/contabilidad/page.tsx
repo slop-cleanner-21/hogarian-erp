@@ -1,5 +1,7 @@
 import { ROLES_CONTABILIDAD } from "@/lib/prod1";
+import { X } from "lucide-react";
 import type { Metadata } from "next";
+import Link from "next/link";
 import { FiltroOrden } from "@/components/filtro-orden";
 import { SearchBox, Tabs, VerMas } from "@/components/list-controls";
 import { TopBar, UserMenu } from "@/components/shell";
@@ -29,10 +31,15 @@ export default async function CuentasPage({ searchParams }: PageProps<"/contabil
   // Desde Compras: solo los ítems de un comprobante.
   const comprobanteId = Number(sp.comprobante) || null;
   let itemIds: number[] | null = null;
+  let comprobante: string | null = null;
   if (comprobanteId) {
-    const { data, error } = await supabase.from("v_oc_items").select("item_id").eq("comprobante_id", comprobanteId);
+    const [{ data, error }, { data: c }] = await Promise.all([
+      supabase.from("v_oc_items").select("item_id").eq("comprobante_id", comprobanteId),
+      supabase.from("comprobantes").select("serie, numero").eq("id", comprobanteId).maybeSingle(),
+    ]);
     if (error) throw new Error(error.message);
     itemIds = [...new Set(data.map((d) => d.item_id!))];
+    comprobante = c ? `${c.serie}-${c.numero}` : null;
   }
 
   const filas = async (): Promise<FilaItem[]> => {
@@ -105,7 +112,7 @@ export default async function CuentasPage({ searchParams }: PageProps<"/contabil
   return (
     <>
       <TopBar
-        title="Cuentas de ítems"
+        title="Cuentas"
         back={comprobanteId ? true : undefined}
         right={<UserMenu id={sesion.userId} nombre={sesion.nombre} rol={sesion.rol} />}
       />
@@ -126,6 +133,18 @@ export default async function CuentasPage({ searchParams }: PageProps<"/contabil
           />
         </div>
         <TabsCuentas tab={tab} />
+        {comprobanteId && (
+          // Desde Compras: solo los ítems de ese comprobante; la X muestra todos.
+          <Link
+            href={`/contabilidad?tab=${tab}`}
+            prefetch={false}
+            aria-label="Ver todos los ítems"
+            className="num flex min-h-11 w-fit items-center gap-2 rounded-full border border-line bg-surface pl-4 pr-3 text-[15px] active:bg-ink/8"
+          >
+            Comprobante {comprobante ?? comprobanteId}
+            <X size={18} className="shrink-0 text-ink-3" />
+          </Link>
+        )}
         <CuentasList items={items} cuentas={(cuentas ?? []) as CuentaContable[]} filtros={{ tab, q, rubro, comprobanteId }} />
         <VerMas visibles={items.length} limite={limite} />
       </main>

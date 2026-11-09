@@ -8,6 +8,8 @@ export type DocumentoPagado = {
   /** Solo en órdenes de pago: su id y la cuenta contable (la asigna Contabilidad). */
   ordenPagoId: number | null;
   cuenta: string | null;
+  /** Dónde se ve completo: la consulta de la orden o el detalle de la OP. */
+  href: string | null;
 };
 
 export type PagoFila = {
@@ -33,6 +35,7 @@ type Raw = {
   asientos: { id: number }[];
   pago_aplicaciones: {
     monto: number;
+    obra_id: number | null;
     numero_oc: string | null;
     comprobantes: { serie: string; numero: string; proveedores: Prov } | null;
     ordenes_compra: { tipo: string; proveedores: Prov } | null;
@@ -63,7 +66,7 @@ export async function listarPagos({
        empresas(nombre),
        asientos(id),
        pago_aplicaciones(
-         monto, numero_oc,
+         monto, obra_id, numero_oc,
          comprobantes(serie, numero, proveedores(razon_social)),
          ordenes_compra(tipo, proveedores(razon_social)),
          ordenes_pago(id, numero, concepto, cuenta_contable, proveedores(razon_social))
@@ -110,6 +113,11 @@ export async function listarPagos({
       monto: Number(a.monto),
       ordenPagoId: a.ordenes_pago?.id ?? null,
       cuenta: a.ordenes_pago?.cuenta_contable ?? null,
+      href: a.ordenes_pago
+        ? `/contabilidad/op/${a.ordenes_pago.id}`
+        : a.obra_id && a.numero_oc
+          ? `/consulta/orden/${a.obra_id}/${encodeURIComponent(a.numero_oc)}`
+          : null,
     })),
   }));
 }

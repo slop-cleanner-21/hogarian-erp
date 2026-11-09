@@ -375,3 +375,30 @@ test.describe("@contabilidad cuántos hay en cada pestaña", () => {
     await revisar(imp, [["Detracciones", det], ["Retenciones 4ta", ret], ["Por pagar", det]]);
   });
 });
+
+test.describe("@contabilidad enlaces y avisos de la auditoría", () => {
+  test("en un pago, cada documento abre su orden; Cuentas desde un comprobante dice cuál y se quita; lo que no existe, en español", async ({ abrir }) => {
+    const [pago, obra, numero, contabilizado] =
+      sql(`select a.pago_id, a.obra_id, a.numero_oc, exists (select 1 from asientos s where s.pago_id = a.pago_id)
+             from pago_aplicaciones a join pagos p on p.id = a.pago_id
+            where a.obra_id is not null and p.numero_operacion is not null
+              and (select count(*) from pagos x where x.numero_operacion = p.numero_operacion) = 1
+            order by a.pago_id desc limit 1`)[0] ?? [];
+    test.skip(!pago, "sin pagos de órdenes");
+    const operacion = sql1(`select numero_operacion from pagos where id = ${pago}`);
+    const page = await abrir("contabilidad", `/contabilidad/pagos?tab=${contabilizado === "t" ? "con" : "sin"}&q=${encodeURIComponent(operacion)}`);
+    await page.locator("main li button").first().click();
+    await expect(page.getByRole("dialog").locator(`a[href="/consulta/orden/${obra}/${encodeURIComponent(numero)}"]`)).toBeVisible();
+
+    const [comp, doc] = sql("select id, serie || '-' || numero from comprobantes where anulado_at is null order by id limit 1")[0];
+    const cuentas = await abrir("contabilidad", `/contabilidad?comprobante=${comp}&tab=con`);
+    const chip = cuentas.getByRole("link", { name: "Ver todos los ítems" });
+    await expect(chip).toHaveText(`Comprobante ${doc}`);
+    await chip.click();
+    await expect(cuentas).toHaveURL((u) => !u.searchParams.has("comprobante"));
+
+    // Con la pantalla de carga de /contabilidad la respuesta ya salió (200): lo que importa es lo que se ve.
+    await cuentas.goto("/contabilidad/op/999999");
+    await expect(cuentas.getByRole("heading", { name: "No existe" })).toBeVisible();
+  });
+});

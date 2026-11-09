@@ -1,5 +1,7 @@
 "use client";
 
+import { ChevronRight } from "lucide-react";
+import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useEffect, useState, useTransition } from "react";
 import { asignarCuentaOP, contabilizarPago, vouchersPago } from "@/app/contabilidad/actions";
@@ -122,7 +124,14 @@ function PagoSheet({
           {pago.documentos.map((d, i) => (
             <li key={i} className="flex items-baseline gap-3 border-b border-line px-3 py-2.5 last:border-0">
               <div className="min-w-0 flex-1">
-                <div className="num font-medium">{d.label}</div>
+                {d.href ? (
+                  <Link href={d.href} prefetch={false} className="num flex min-h-11 items-center gap-1 font-medium text-primary">
+                    {d.label}
+                    <ChevronRight size={16} className="shrink-0" />
+                  </Link>
+                ) : (
+                  <div className="num font-medium">{d.label}</div>
+                )}
                 {d.detalle && <div className="text-sm text-ink-2">{d.detalle}</div>}
                 {contabilidad && d.ordenPagoId && (
                   <div className="mt-2">
