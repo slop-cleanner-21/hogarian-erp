@@ -73,7 +73,8 @@ export function Tabs({
   porFila,
 }: {
   param: string;
-  options: { value: string; label: string; icon?: React.ReactNode }[];
+  /** `cuenta`: cuántos hay en esa pestaña (un circulito; 0 o sin dato, nada). */
+  options: { value: string; label: string; icon?: React.ReactNode; cuenta?: number }[];
   current: string;
   /** Parámetros que dejan de tener sentido al cambiar de pestaña (p. ej. un filtro de estado). */
   quitar?: string[];
@@ -120,7 +121,7 @@ export function Tabs({
             prefetch={false}
             onClick={() => setTocada({ value: o.value, desde: current })}
             className={cn(
-              "flex h-11 items-center justify-center gap-1 whitespace-nowrap rounded-field",
+              "relative flex h-11 items-center justify-center gap-1 whitespace-nowrap rounded-field",
               deslizable ? "shrink-0 px-3.5 text-[15px]" : porFila ? "px-0.5 text-[14px]" : "px-1 text-[15px]",
               active ? "bg-surface font-semibold" : "text-ink-2",
             )}
@@ -128,6 +129,17 @@ export function Tabs({
             {o.icon}
             {/* Un salto de línea en el nombre lo parte en dos líneas (nombres largos en pestañas angostas). */}
             {o.label.includes("\n") ? <span className="whitespace-pre-line text-center leading-[1.15]">{o.label}</span> : o.label}
+            {!!o.cuenta && (
+              // El número va como contenido CSS: no cambia el nombre de la pestaña (ni para el lector de pantalla ni para las pruebas).
+              <span
+                aria-hidden
+                data-cuenta={o.cuenta > 999 ? "999+" : o.cuenta}
+                className={cn(
+                  "num absolute -top-1 right-0 flex h-[18px] min-w-[18px] items-center justify-center rounded-full px-1 text-[11px] font-semibold leading-none after:content-[attr(data-cuenta)]",
+                  active ? "bg-primary text-primary-ink" : "bg-ink-3 text-surface",
+                )}
+              />
+            )}
           </Link>
         );
       })}

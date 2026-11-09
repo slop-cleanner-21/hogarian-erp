@@ -345,6 +345,16 @@ test.describe("@prod1 @logistica pestañas por estado y «Enviada»", () => {
       expect(await t.evaluate((e) => e.scrollWidth <= e.clientWidth), await t.innerText()).toBe(true);
     }
     await expect(page.getByRole("tab", { name: "Cotizando" })).toHaveAttribute("aria-selected", "true");
+    // Cada pestaña con cuántas órdenes tiene (un circulito; sin él, ninguna).
+    const cuenta = (estado: string) => Number(sql1(`select count(*) from ordenes_compra where tipo = 'OC' and estado = '${estado}'`));
+    for (const [pestana, estado] of [["Cotizando", "EMITIDA"], ["Tesorería", "EN_TESORERIA"], ["Anulada", "ANULADA"]]) {
+      const n = cuenta(estado);
+      const circulo = page.getByRole("tab", { name: pestana }).locator("[data-cuenta]");
+      if (n) await expect(circulo, pestana).toHaveAttribute("data-cuenta", n > 999 ? "999+" : String(n));
+      else await expect(circulo, pestana).toHaveCount(0);
+    }
+    const total = Number(sql1("select count(*) from ordenes_compra where tipo = 'OC'"));
+    await expect(page.getByRole("tab", { name: "Todas" }).locator("[data-cuenta]")).toHaveAttribute("data-cuenta", total > 999 ? "999+" : String(total));
     // En OS la pestaña es «Contrato».
     const os = await abrir("logistica", "/logistica?tipo=OS");
     await expect(os.getByRole("tab")).toHaveText(["Borrador", "Cotizando", "Facturar", "Contrato", "Tesorería", "Pagada", "Enviada", "Recibida", "Anulada", "Todas"]);
