@@ -606,13 +606,14 @@ test.describe("@tesoreria bandejas", () => {
 });
 
 test.describe("@tesoreria cuántos hay en cada pestaña", () => {
-  test("OC / OS y Por pagar / Pagado / Rechazos llevan su circulito con lo mismo que la base", async ({ abrir }) => {
+  test("OC / OS (todo el documento: por pagar, pagado y rechazos) y Por pagar / Pagado / Rechazos llevan su circulito con lo mismo que la base", async ({ abrir }) => {
     const page = await abrir("tesoreria", "/tesoreria?empresa=todas&area=log&doc=OC&est=pend");
     const n = (q: string) => Number(sql1(q));
+    const total = (doc: string) => n(`select (select count(*) from v_por_pagar where doc = '${doc}') + (select count(*) from v_rechazos where doc = '${doc}')`);
     const esperado: [string, number][] = [
-      ["OC", n("select count(*) from v_por_pagar where estado = 'PENDIENTE' and doc = 'OC'")],
-      ["OS", n("select count(*) from v_por_pagar where estado = 'PENDIENTE' and doc = 'OS'")],
-      ["OP", n("select count(*) from v_por_pagar where estado = 'PENDIENTE' and doc = 'OP'")],
+      ["OC", total("OC")],
+      ["OS", total("OS")],
+      ["OP", total("OP")],
       ["Por pagar", n("select count(*) from v_por_pagar where estado = 'PENDIENTE' and doc = 'OC'")],
       ["Pagado", n("select count(*) from v_por_pagar where estado = 'PAGADO' and doc = 'OC'")],
       ["Rechazos", n("select count(*) from v_rechazos where doc = 'OC'")],

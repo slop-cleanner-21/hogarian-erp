@@ -103,8 +103,8 @@ export default async function PagosPage({ searchParams }: PageProps<"/tesoreria"
     fObra = obraValida;
     listaP = null;
   }
-  // Cuántos hay en cada pestaña (un circulito), con los mismos filtros: OC, OS y OP en el estado elegido, y cada estado
-  // del documento elegido. Solo cuentan (head): no traen filas.
+  // Cuántos hay en cada pestaña (un circulito), con los mismos filtros: cada estado del documento elegido, y en OC / OS /
+  // OP el total del documento (por pagar + pagado + rechazos). Solo cuentan (head): no traen filas.
   const contar = async (estado: "pend" | "pag" | "rec", d: string) => {
     const { count } =
       estado === "rec"
@@ -116,7 +116,8 @@ export default async function PagosPage({ searchParams }: PageProps<"/tesoreria"
           );
     return count ?? 0;
   };
-  const cuentasP = Promise.all([contar(est, "OC"), contar(est, "OS"), contar(est, "OP"), contar("pend", doc), contar("pag", doc), contar("rec", doc)]);
+  const totalDe = async (d: string) => (await Promise.all([contar("pend", d), contar("pag", d), contar("rec", d)])).reduce((a, n) => a + n, 0);
+  const cuentasP = Promise.all([totalDe("OC"), totalDe("OS"), totalDe("OP"), contar("pend", doc), contar("pag", doc), contar("rec", doc)]);
   const galletas = await cookies();
   const diseno = leerDiseno(galletas.get(cookieDiseno("pagos"))?.value);
   const fijo = leerFijar(galletas.get(cookieFijar("pagos"))?.value);
