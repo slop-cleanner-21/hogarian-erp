@@ -18,6 +18,7 @@ import { SearchSelect } from "@/components/ui/search-select";
 import { ComprobanteArchivo, Voucher } from "@/components/voucher";
 import { Sheet } from "@/components/ui/sheet";
 import { cn, fecha, hoyISO, money, qty, soles, solesPu } from "@/lib/format";
+import { pctRetenido } from "@/lib/garantia";
 import { createClient } from "@/lib/supabase/client";
 import type { VOcItem, VOrden } from "@/lib/types";
 import { CLASE_TONO, textoDiferencia, tonoPrecio } from "@/lib/precio";
@@ -346,7 +347,7 @@ export function DetallePago({
                 <span>{soles(total + descuentos + garantia)}</span>
               </div>
               <div className="flex justify-between text-ink-2">
-                <span>Retención por garantía</span>
+                <span>Retención por garantía {pctRetenido(garantia, total + descuentos + garantia)}</span>
                 <span>− {soles(garantia)}</span>
               </div>
             </>

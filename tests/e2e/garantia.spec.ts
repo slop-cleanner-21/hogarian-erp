@@ -228,7 +228,7 @@ test.describe("@logistica pantallas de garantía y borradores", () => {
       numero = decodeURIComponent(new URL(page.url()).pathname.split("/").pop()!);
       expect(sql1(`select ret_garantia_pct from oc_items where obra_id = ${obra} and numero_oc = '${numero}' limit 1`)).toBe("7.00");
       expect(sql1(`select count(*) from orden_borradores where user_id = '${uid}'`), "se borra al emitir").toBe("0");
-      await expect(page.locator("main")).toContainText("Retención por garantía");
+      await expect(page.locator("main")).toContainText("Retención por garantía (7 %)");
     } finally {
       sql(`delete from orden_borradores where user_id = '${uid}'`);
       if (numero) sql(`delete from oc_items where obra_id = ${obra} and numero_oc = '${numero}'; delete from ordenes_compra where obra_id = ${obra} and numero = '${numero}';`);

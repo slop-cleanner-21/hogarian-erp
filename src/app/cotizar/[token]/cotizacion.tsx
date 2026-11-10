@@ -9,7 +9,7 @@ import { FileText, Receipt } from "lucide-react";
 import { fecha, qty, soles, solesPu } from "@/lib/format";
 import { guardar, leer } from "@/lib/recordar";
 
-import { retenidoDe } from "@/lib/garantia";
+import { pctRetenido, retenidoDe } from "@/lib/garantia";
 import { Faltan } from "@/components/ui/faltan";
 
 export type CotizacionData = {
@@ -161,7 +161,7 @@ function Formulario({ token, data, conBorrador }: { token: string; data: Cotizac
                 <span>{soles(subtotal)}</span>
               </div>
               <div className="num flex justify-between text-[15px] text-ink-2">
-                <span>Retención por garantía</span>
+                <span>Retención por garantía {pctRetenido(garantia, subtotal)}</span>
                 <span>− {soles(garantia)}</span>
               </div>
             </>
