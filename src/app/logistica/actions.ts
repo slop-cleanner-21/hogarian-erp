@@ -37,6 +37,8 @@ const CrearOrden = z
     items: z
       .array(z.object({ partida_id: z.number().int(), cantidad: z.number().positive(), ret_garantia_pct: z.number().min(0).lt(100).optional() }))
       .min(1, "Selecciona al menos una partida"),
+    /** OS: los servicios que no llevan contrato (la marca es del ítem: queda en el catálogo). */
+    sinContrato: z.array(z.object({ item_id: z.number().int().positive(), sin_contrato: z.boolean() })).default([]),
     /** Si viene de un borrador de la cuenta: se borra al emitir. */
     borradorId: z.number().int().positive().optional(),
   })
@@ -75,6 +77,11 @@ export async function crearOrden(input: z.input<typeof CrearOrden>): Promise<Res
       p_fecha_inicio: p.data.fechaInicio!,
     });
     if (eo) return fail(eo.message);
+    for (const s of p.data.sinContrato) {
+      const { error: es } = await supabase.from("items").update({ sin_contrato: s.sin_contrato }).eq("id", s.item_id).neq("rubro", "MATERIAL");
+      if (es) return fail(es.message);
+    }
+    if (p.data.sinContrato.length) revalidatePath("/logistica/items");
   }
   if (p.data.borradorId) await supabase.from("orden_borradores").delete().eq("id", p.data.borradorId);
   revalidatePath("/logistica");
@@ -329,6 +336,15 @@ export async function guardarProveedor(input: z.input<typeof Proveedor>): Promis
 export async function actualizarTipoMaterial(itemId: number, tipo: string | null): Promise<Result> {
   const supabase = await db();
   const { error } = await supabase.from("items").update({ tipo_material: tipo }).eq("id", itemId);
+  if (error) return fail(error.message);
+  revalidatePath("/logistica/items");
+  return { ok: true, data: undefined };
+}
+
+/** Logística marca un servicio que no lleva contrato (sus OS van a Tesorería sin contrato firmado). */
+export async function actualizarSinContrato(itemId: number, sinContrato: boolean): Promise<Result> {
+  const supabase = await db();
+  const { error } = await supabase.from("items").update({ sin_contrato: sinContrato }).eq("id", itemId).neq("rubro", "MATERIAL");
   if (error) return fail(error.message);
   revalidatePath("/logistica/items");
   return { ok: true, data: undefined };

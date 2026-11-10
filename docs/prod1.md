@@ -67,6 +67,12 @@ Contabilidad, Residente y RRHH **no entran**. Sus roles siguen en la base
     el gerente que firma por esa empresa en «Mi firma» (una por cada empresa suya), o el Admin (todas): debajo va la empresa (su rol en el contrato, razón social y RUC), como el proveedor; sin firma subida, el espacio en
     blanco para firmar. La empresa comparece «debidamente representada». El contrato del link del proveedor va sin la imagen de la
     firma (cualquiera con el link podría copiarla).
+  - **Servicios sin contrato** (migración `prod1_servicio_sin_contrato`): hay servicios que no dan para un contrato (un alquiler de
+    winche por horas). Logística marca el servicio (`items.sin_contrato`) en Ítems › Servicios (columna «Sin contrato») o al crear la
+    OS (bloque «Contrato», por servicio; queda en el catálogo). Una OS cuyos servicios son **todos** sin contrato va a Tesorería sin el
+    firmado (`os_lleva_contrato` en `enviar_a_tesoreria` / `enviar_si_lista`), su detalle dice «Contrato · No lleva» y el link del
+    proveedor no le ofrece uno para firmar; con uno que sí lo lleve, se sigue pidiendo. La marca es del servicio y no de la orden, para
+    que no sea una forma de saltarse el contrato en cualquier OS.
   - Arriba del contrato va el **logo de la empresa** (PNG para PDF en `public/empresas/pdf/`: react-pdf no lee
     WebP ni SVG; `logoPdfEmpresa`).
 - **Link del proveedor:** mientras la orden está «Cotizando» cotiza en él; desde que se confirman los precios, el

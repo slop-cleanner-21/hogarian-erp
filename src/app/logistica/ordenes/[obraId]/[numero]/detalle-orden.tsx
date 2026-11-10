@@ -90,6 +90,7 @@ export function DetalleOrden({
   contexto,
   documentos,
   contratoFirmado,
+  sinContrato = false,
   descuentos = { detraccion: 0, retencion: 0 },
   diseno = "lista",
   avance = {},
@@ -133,6 +134,8 @@ export function DetalleOrden({
   documentos: React.ReactNode;
   /** OS: ya se subió el contrato firmado (requisito para enviar a Tesorería). */
   contratoFirmado: boolean;
+  /** OS cuyos servicios no llevan contrato: va a Tesorería sin el firmado. */
+  sinContrato?: boolean;
   /** De los comprobantes: lo que Tesorería no le paga al proveedor (detracción y retención de 4ta). */
   descuentos?: { detraccion: number; retencion: number };
   /** Diseño de los ítems (botón de la barra superior); «lista» es el de siempre y el de la edición de precios. */
@@ -789,6 +792,11 @@ export function DetalleOrden({
         {/* La OS histórica no lleva el contrato de prod 1: solo sus documentos (el firmado es opcional). */}
         {orden.tipo === "OS" && historico && orden.estado !== "ANULADA" ? (
           documentos
+        ) : orden.tipo === "OS" && sinContrato && !contratoFirmado && orden.estado !== "ANULADA" ? (
+          <section id="contrato" aria-label="Contrato" className="flex items-center justify-between rounded-panel bg-surface px-4 py-3">
+            <h2 className="font-semibold">Contrato</h2>
+            <span className="text-ink-2">No lleva</span>
+          </section>
         ) : orden.tipo === "OS" && orden.estado !== "EMITIDA" && orden.estado !== "ANULADA" ? (
           <ContratoOS orden={orden} items={items} contactos={contactos} firmado={contratoFirmado} documentos={documentos} datos={contrato} />
         ) : (
@@ -846,7 +854,7 @@ export function DetalleOrden({
         )}
       {orden.estado === "FACTURADA" && sinComprobante.length === 0 && (
         <ActionBar>
-          {orden.tipo === "OS" && !contratoFirmado ? (
+          {orden.tipo === "OS" && !contratoFirmado && !sinContrato ? (
             <Button
               variant="secondary"
               className="flex-1"
@@ -975,7 +983,7 @@ export function DetalleOrden({
           retencionProveedor={retencionProveedor}
           comprobanteOS={orden.tipo === "OS" ? (contrato?.comprobante ?? null) : null}
           guiaRegistrada={(requiereGuia && !faltaGuia) || historico}
-          contratoFirmado={contratoFirmado || historico}
+          contratoFirmado={contratoFirmado || historico || sinContrato}
           historico={historico}
         />
       )}

@@ -152,6 +152,16 @@ export default async function OrdenPage({ params }: PageProps<"/logistica/ordene
     orden.tipo === "OS" ? representanteContratos(orden.empresa_id ?? null, { conFirma: false }) : Promise.resolve(null),
   ]);
 
+  // OS: sus servicios no llevan contrato (todos marcados «sin contrato» por Logística).
+  const sinContratoP =
+    orden.tipo === "OS" && (items ?? []).length
+      ? supabase
+          .from("items")
+          .select("id, sin_contrato")
+          .in("id", [...new Set((items ?? []).map((i) => i.item_id!))])
+          .then((r) => (r.data ?? []).length > 0 && (r.data ?? []).every((i) => i.sin_contrato))
+      : Promise.resolve(false);
+
   // OS: el proveedor se puede cambiar hasta que se le envía el contrato (sin comprobante).
   const cambiaProveedor =
     orden.tipo === "OS" &&
@@ -261,6 +271,7 @@ export default async function OrdenPage({ params }: PageProps<"/logistica/ordene
         vistas: vistas ?? 0,
       }}
       contratoFirmado={adjuntos.some((a) => a.tipo === "CONTRATO")}
+      sinContrato={orden.tipo === "OS" && !cot?.es_retencion && (await sinContratoP)}
       descuentos={{
         detraccion: (comps ?? []).reduce((a, c) => a + Number(c.detraccion ?? 0), 0),
         retencion: (comps ?? []).reduce((a, c) => a + Number(c.retencion ?? 0), 0),

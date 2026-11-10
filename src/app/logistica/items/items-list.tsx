@@ -16,7 +16,7 @@ import type { Item, Rubro } from "@/lib/types";
 /** Ítem del catálogo completo (para avisar de parecidos al crear uno). */
 export type ItemCatalogo = { id: number; descripcion: string; unidad: string | null; rubro: Rubro };
 import { crearItem } from "@/app/gerencia/actions";
-import { actualizarTipoMaterial } from "../actions";
+import { actualizarSinContrato, actualizarTipoMaterial } from "../actions";
 import { NuevoTipoSheet } from "../nuevo-tipo";
 import { Faltan } from "@/components/ui/faltan";
 
@@ -60,6 +60,19 @@ export function ItemsList({
     (prev, [id, t]: [number, string | null]) => new Map(prev).set(id, t),
   );
   const tipoDe = (i: Item) => (tiposOpt.has(i.id) ? tiposOpt.get(i.id)! : i.tipo_material);
+  const [sinOpt, setSinOpt] = useOptimistic(
+    new Map<number, boolean>(),
+    (prev, [id, v]: [number, boolean]) => new Map(prev).set(id, v),
+  );
+  const sinContrato = (i: Item) => (sinOpt.has(i.id) ? sinOpt.get(i.id)! : i.sin_contrato);
+  // Logística: columna «Sin contrato» de los servicios.
+  const conContrato = clase === "serv" && puedeClasificar;
+  const marcarSinContrato = (item: Item, v: boolean) =>
+    startTransition(async () => {
+      setSinOpt([item.id, v]);
+      const res = await actualizarSinContrato(item.id, v);
+      setError(res.ok ? null : res.error);
+    });
   // Tipo nuevo pedido desde la hoja de un ítem: al crearse, se le asigna.
   const [nuevoTipo, setNuevoTipo] = useState<{ item: Item; texto: string } | null>(null);
 
@@ -76,18 +89,20 @@ export function ItemsList({
     <>
       {error && <p role="alert" className="text-danger">{error}</p>}
       <Lista
+        columnas={conContrato ? "grid-cols-[1fr_auto_3.5rem]" : undefined}
         encabezado={[
           <Pila key="i">{["Descripción", clase === "mat" ? "Tipo de material" : "Rubro y especialidad"]}</Pila>,
           "Unidad",
+          ...(conContrato ? [<div key="c" className="text-center">Sin contrato</div>] : []),
         ]}
       >
         {items.map((i) => (
-          <li key={i.id} className="border-b border-line last:border-0">
+          <li key={i.id} className="flex items-center border-b border-line last:border-0">
             <button
               type="button"
               disabled={!puedeClasificar}
               onClick={() => setActivo(i)}
-              className="flex w-full items-center gap-3 px-4 py-3 text-left active:bg-ink/8 disabled:active:bg-transparent"
+              className="flex min-w-0 flex-1 items-center gap-3 px-4 py-3 text-left active:bg-ink/8 disabled:active:bg-transparent"
             >
               <div className="min-w-0 flex-1">
                 <div className="leading-snug">{i.descripcion}</div>
@@ -103,6 +118,20 @@ export function ItemsList({
               </div>
               <span className="shrink-0 text-sm text-ink-3">{i.unidad}</span>
             </button>
+            {clase === "serv" &&
+              (puedeClasificar ? (
+                <label className="flex w-[4.5rem] shrink-0 cursor-pointer items-center justify-center self-stretch pr-4">
+                  <input
+                    type="checkbox"
+                    className="h-5 w-5 accent-primary"
+                    checked={sinContrato(i)}
+                    onChange={(e) => marcarSinContrato(i, e.target.checked)}
+                    aria-label={`${i.descripcion}: sin contrato`}
+                  />
+                </label>
+              ) : (
+                sinContrato(i) && <span className="shrink-0 pr-4 text-sm text-ink-3">Sin contrato</span>
+              ))}
           </li>
         ))}
         {items.length === 0 && <li className="px-4 py-10 text-center text-ink-3">Sin resultados</li>}

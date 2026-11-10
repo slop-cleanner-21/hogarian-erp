@@ -59,6 +59,7 @@ export default async function NuevaOrdenPage({ searchParams }: PageProps<"/logis
   let partidas: VPartida[] = [];
   let siguiente = "";
   let historial: Venta[] = [];
+  let sinContrato: number[] = [];
   let atender: { numero: string; lineas: Record<number, number> } | null = null;
   const requeridos: Record<number, number> = {};
   if (obraId) {
@@ -97,6 +98,11 @@ export default async function NuevaOrdenPage({ searchParams }: PageProps<"/logis
       }
     }
     historial = [...ventas.values()];
+    // OS: los servicios marcados «sin contrato» (pocos).
+    if (tipo === "OS")
+      sinContrato = (
+        await todas((a, b) => supabase.from("items").select("id").eq("sin_contrato", true).order("id").range(a, b))
+      ).map((i) => i.id);
     // Atender un requerimiento: lo que falta de sus partidas de este tipo, sin pasar el saldo.
     const reqId = Number(sp.req) || null;
     if (reqId) {
@@ -142,6 +148,7 @@ export default async function NuevaOrdenPage({ searchParams }: PageProps<"/logis
       }))}
       partidas={partidas}
       historial={historial}
+      sinContrato={sinContrato}
       requeridos={requeridos}
       atender={atender}
       tiposMaterial={(tiposMaterial ?? []).map((t) => t.codigo)}
