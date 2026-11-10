@@ -37,7 +37,7 @@ type Raw = {
     monto: number;
     obra_id: number | null;
     numero_oc: string | null;
-    comprobantes: { serie: string; numero: string; proveedores: Prov } | null;
+    comprobantes: { serie: string; numero: string; proveedores: Prov; oc_items: { obra_id: number; numero_oc: string }[] } | null;
     ordenes_compra: { tipo: string; proveedores: Prov } | null;
     ordenes_pago: { id: number; numero: string; concepto: string; cuenta_contable: string | null; proveedores: Prov } | null;
   }[];
@@ -67,7 +67,7 @@ export async function listarPagos({
        asientos(id),
        pago_aplicaciones(
          monto, obra_id, numero_oc,
-         comprobantes(serie, numero, proveedores(razon_social)),
+         comprobantes(serie, numero, proveedores(razon_social), oc_items(obra_id, numero_oc)),
          ordenes_compra(tipo, proveedores(razon_social)),
          ordenes_pago(id, numero, concepto, cuenta_contable, proveedores(razon_social))
        )`,
@@ -117,7 +117,10 @@ export async function listarPagos({
         ? `/contabilidad/op/${a.ordenes_pago.id}`
         : a.obra_id && a.numero_oc
           ? `/consulta/orden/${a.obra_id}/${encodeURIComponent(a.numero_oc)}`
-          : null,
+          : a.comprobantes?.oc_items?.[0]
+            ? // El pago de un comprobante: la orden que factura.
+              `/consulta/orden/${a.comprobantes.oc_items[0].obra_id}/${encodeURIComponent(a.comprobantes.oc_items[0].numero_oc)}`
+            : null,
     })),
   }));
 }

@@ -419,3 +419,72 @@ export async function detallePagoImpuesto(id: number): Promise<Result<DetallePag
     },
   };
 }
+
+// ------------------------------------------------------------ asientos manuales, lote y cierre
+export type ResultadoLote = { contabilizados: number; errores: { id: number; documento: string; error: string }[] };
+
+const Linea = z.object({
+  cuenta: z.string().trim().min(1, "Elige la cuenta de cada línea"),
+  debe: z.number().min(0),
+  haber: z.number().min(0),
+  glosa: z.string().trim().max(200).nullable().default(null),
+});
+const AsientoManual = z.object({
+  empresaId: z.number().int().positive("Elige la empresa"),
+  fecha: z.string().regex(/^\d{4}-\d{2}-\d{2}$/, "Ingresa la fecha"),
+  glosa: z.string().trim().min(3, "Ingresa la glosa").max(300),
+  lineas: z.array(Linea).min(2, "El asiento lleva al menos dos líneas"),
+});
+
+/** Asiento manual (apertura, ventas, depósitos, planillas, ajustes): cuadrado, con cuentas del plan. */
+export async function registrarAsientoManual(input: z.input<typeof AsientoManual>): Promise<Result<number>> {
+  const p = AsientoManual.safeParse(input);
+  if (!p.success) return { ok: false, error: p.error.issues[0].message };
+  const supabase = await db();
+  const { data, error } = await supabase.rpc("registrar_asiento_manual", {
+    p_empresa_id: p.data.empresaId,
+    p_fecha: p.data.fecha,
+    p_glosa: p.data.glosa,
+    p_lineas: p.data.lineas,
+  });
+  if (error) return { ok: false, error: error.message };
+  revalidatePath("/contabilidad/eeff");
+  return { ok: true, data: Number(data) };
+}
+
+export async function anularAsientoManual(id: number): Promise<Result> {
+  const supabase = await db();
+  const { error } = await supabase.rpc("anular_asiento_manual", { p_id: id });
+  if (error) return { ok: false, error: error.message };
+  revalidatePath("/contabilidad/eeff");
+  return { ok: true, data: undefined };
+}
+
+/** Contabiliza los comprobantes que se puedan; de los demás, por qué no. */
+export async function contabilizarComprobantes(ids: number[]): Promise<Result<ResultadoLote>> {
+  if (!ids.length) return { ok: false, error: "No hay comprobantes por contabilizar" };
+  const supabase = await db();
+  const { data, error } = await supabase.rpc("contabilizar_comprobantes", { p_ids: ids });
+  if (error) return { ok: false, error: error.message };
+  revalidatePath("/contabilidad/compras");
+  return { ok: true, data: data as unknown as ResultadoLote };
+}
+
+export async function contabilizarPagos(ids: number[]): Promise<Result<ResultadoLote>> {
+  if (!ids.length) return { ok: false, error: "No hay pagos por contabilizar" };
+  const supabase = await db();
+  const { data, error } = await supabase.rpc("contabilizar_pagos", { p_ids: ids });
+  if (error) return { ok: false, error: error.message };
+  revalidatePath("/contabilidad/pagos");
+  return { ok: true, data: data as unknown as ResultadoLote };
+}
+
+export async function cerrarPeriodo(empresaId: number, periodo: string, cerrar: boolean): Promise<Result> {
+  const supabase = await db();
+  const { error } = cerrar
+    ? await supabase.rpc("cerrar_periodo", { p_empresa_id: empresaId, p_periodo: periodo })
+    : await supabase.rpc("reabrir_periodo", { p_empresa_id: empresaId, p_periodo: periodo });
+  if (error) return { ok: false, error: error.message };
+  revalidatePath("/contabilidad/compras");
+  return { ok: true, data: undefined };
+}

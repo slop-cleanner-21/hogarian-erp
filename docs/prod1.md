@@ -455,6 +455,33 @@ Residente y RRHH **no entran**. Sus roles siguen en la base
   - Mientras la app no registre ventas, saldos iniciales ni depósitos, muestran solo lo de compras y pagos: el banco sale con
     saldo acreedor y el resultado, como pérdida.
 - **TXT del SIRE** (registro de compras, libro 080400): el único TXT del MVP; ya portado (Compras › Descargar).
+- **Libros y asientos manuales** (Contabilidad › EEFF, vistas Diario y Mayor; migración `prod1_contabilidad_2`):
+  - **Diario:** los asientos del mes, numerados por fecha, con sus líneas y su origen (compra, pago, impuesto, manual); se baja en
+    CSV (`/contabilidad/eeff/diario`, sin fórmulas, punto y coma y BOM para Excel en español).
+  - **Mayor:** los movimientos de una cuenta en el ejercicio hasta el mes, con el saldo de cada uno.
+  - **Asiento manual** («+ Asiento»): apertura (al 01/01), ventas o valorizaciones, depósitos, planillas, ajustes. La base exige al
+    menos dos líneas, cuentas del plan, cada línea en el Debe o en el Haber y que cuadre (`registrar_asiento_manual`). Solo un
+    manual se anula (`anular_asiento_manual`); los demás salen de su comprobante, pago o pago de impuestos. Entran a los EEFF.
+- **Contabilizar en lote:** en Compras, «Contabilizar n» (lo listado sin asiento y con todos sus ítems con cuenta); en Pagos,
+  «Contabilizar n» (los listados por contabilizar). Contabiliza lo que se puede y lista lo que no, con el motivo
+  (`contabilizar_comprobantes`, `contabilizar_pagos`).
+- **Cierre de periodo** (Compras, por empresa y mes; solo un mes ya terminado; `periodos_cerrados`, `cerrar_periodo`,
+  `reabrir_periodo`): con el mes cerrado, sus comprobantes no se corrigen ni anulan y no se hacen ni anulan asientos con esa
+  fecha. Un comprobante nuevo de un mes cerrado se anota en el siguiente mes abierto. Contabilidad lo reabre si hace falta. La
+  retención que se revisa al pagar no toca un recibo de un mes cerrado.
+- **Archivos para SUNAT** (`src/lib/sunat.ts`):
+  - **Pago masivo de detracciones** (Impuestos › Detracciones, «TXT» con las elegidas de una empresa): el TXT del instructivo de
+    SUNAT por internet: `D<RUC><lote>.txt`, cabecera de 68 caracteres y una línea de 107 por depósito, importes en soles enteros
+    (redondeados, como pide SUNAT), con el código de bien o servicio de cada una (por defecto según su %: 4 % → 030, 10 % → 019,
+    otro → 037) y la cuenta de detracciones del proveedor (sin ella no se arma). El N° de lote (AANNNN) lo pone Contabilidad.
+  - **PLAME, cuarta categoría** (Impuestos › Retenciones, en el mes): un ZIP con `0601AAAAMM<RUC>.ps4` (prestadores) y `.4ta`
+    (todos los recibos pagados ese mes, con o sin retención), separados por «|». Primero se importa el .ps4. El orden de los
+    campos sale de dos fuentes (el anexo oficial está escaneado): revisarlo en la primera importación.
+- **Vencimientos y avisos:** cada detracción por pagar dice cuándo vence (el 5.º día hábil del mes siguiente al de su
+  comprobante, sin fines de semana ni feriados nacionales; en rojo si ya venció). Al pagar Tesorería una factura con detracción o
+  un recibo con retención, a Contabilidad le llega el aviso («Detracción por depositar», «Retención de 4ta por declarar»; se
+  eligen en Avisos). Los vencimientos de las retenciones siguen el cronograma de SUNAT por último dígito del RUC: aún no se
+  muestran.
 
 ### Heredado del MVP (ya implementado)
 

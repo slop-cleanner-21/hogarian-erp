@@ -10,6 +10,7 @@ import { FiltroOrden } from "@/components/filtro-orden";
 import { filtro, ordenDe } from "@/lib/filtros";
 import { ComprasList } from "./compras-list";
 import { DescargasCompras } from "./descargas";
+import { AccionesPeriodo } from "./acciones-periodo";
 import { RecordarFiltros } from "@/components/recordar-filtros";
 
 export const metadata: Metadata = { title: "Compras" };
@@ -73,6 +74,10 @@ export default async function ComprasPage({
   );
 
   const fEstado = filtro(sp, "estado");
+  const { data: cerradoP } = periodo
+    ? await supabase.rpc("periodo_cerrado", { p_empresa_id: Number(empresaId), p_periodo: periodo })
+    : { data: false };
+  const cerrado = cerradoP === true;
   const fExp = filtro(sp, "exp");
   const fTipo = filtro(sp, "tipo");
   const orden = ordenDe(
@@ -214,6 +219,15 @@ export default async function ComprasPage({
             ]}
           />
         </div>
+        {periodo && (
+          <AccionesPeriodo
+            empresaId={Number(empresaId)}
+            periodo={periodo}
+            cerrado={cerrado}
+            // Lo que se puede contabilizar: sin asiento y con todos sus ítems con cuenta (de lo listado).
+            porContabilizar={filas.filter((f) => !f.asiento_id && (f.items_sin_cuenta ?? 0) === 0).map((f) => f.comprobante_id)}
+          />
+        )}
         <ComprasList filas={filas} expediente={expediente} />
         {filas.length > 0 && (
           <section className="num grid grid-cols-3 gap-2 rounded-panel bg-surface p-4 text-right">

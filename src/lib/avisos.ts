@@ -14,6 +14,8 @@ export const EVENTOS_AVISO: EventoAviso[] = [
   { tipo: "POR_PAGAR", label: "Llegó una orden por pagar", area: "Tesorería", roles: ["TESORERIA"] },
   { tipo: "REENVIO", label: "Logística reenvió una orden corregida", area: "Tesorería", roles: ["TESORERIA"] },
   { tipo: "OS_PRECIO", label: "Una OS llegó con precios distintos al presupuesto", area: "Tesorería", roles: ["TESORERIA"] },
+  { tipo: "DETRACCION_POR_PAGAR", label: "Tesorería pagó una factura con detracción (por depositar)", area: "Contabilidad", roles: ["CONTABILIDAD", "ASISTENTE_CONTABILIDAD"] },
+  { tipo: "RETENCION_POR_PAGAR", label: "Tesorería pagó un recibo con retención de 4ta (por declarar)", area: "Contabilidad", roles: ["CONTABILIDAD", "ASISTENTE_CONTABILIDAD"] },
   { tipo: "PRESUPUESTO", label: "Gerencia publicó un presupuesto", area: "Operaciones", roles: ["JEFE_OPERACIONES", "OPERACIONES"] },
   // Las sugerencias solo se leen en Admin › Sugerencias: Gerencia no puede sumarse.
   { tipo: "SUGERENCIA", label: "Llegó una sugerencia", area: "Administración", roles: ["ADMIN"], soloSuRol: true },

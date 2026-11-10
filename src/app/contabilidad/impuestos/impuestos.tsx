@@ -1,13 +1,15 @@
 "use client";
 
-import { Check, FileText, Paperclip } from "lucide-react";
+import { Check, Download, FileText, Paperclip } from "lucide-react";
 import { useRouter } from "next/navigation";
 import { useEffect, useMemo, useRef, useState, useTransition } from "react";
 import { ActionBar } from "@/components/action-bar";
 import { AsientoView } from "@/components/asiento-view";
 import { subirArchivos } from "@/components/documentos";
 import { Lista, Pila } from "@/components/lista";
-import { Button } from "@/components/ui/button";
+import { Button, ButtonLink } from "@/components/ui/button";
+import { SearchSelect } from "@/components/ui/search-select";
+import { CODIGOS_DETRACCION, codigoPorPorcentaje, quintoDiaHabil } from "@/lib/sunat";
 import { Faltan } from "@/components/ui/faltan";
 import { Field, Input, inputClass } from "@/components/ui/field";
 import { Sheet } from "@/components/ui/sheet";
@@ -128,6 +130,7 @@ export function DetraccionesPorPagar({ filas }: { filas: FilaDetraccion[] }) {
   const [elegidas, setElegidas] = useState<Set<number>>(new Set());
   const [pagar, setPagar] = useState(false);
   const [cuentaDe, setCuentaDe] = useState<FilaDetraccion | null>(null);
+  const [txt, setTxt] = useState(false);
   // Solo cuenta lo elegido que sigue en la lista (si otro ya lo pagó, al recargar sale).
   const sel = filas.filter((f) => elegidas.has(f.comprobanteId));
   const empresaSel = sel[0]?.empresaId ?? null;
@@ -164,6 +167,7 @@ export function DetraccionesPorPagar({ filas }: { filas: FilaDetraccion[] }) {
                     <span>{fecha(f.emision)}</span>
                     <span>{f.empresa}</span>
                     {f.pagadoProveedor && <span>Factura pagada {fecha(f.pagadoProveedor)}</span>}
+                    <Vence periodo={f.emision.slice(0, 7).replace("-", "")} />
                   </span>
                 </span>
                 <span className="rotulo shrink-0 whitespace-nowrap text-[19px] font-medium">{soles(f.detraccion)}</span>
@@ -182,6 +186,9 @@ export function DetraccionesPorPagar({ filas }: { filas: FilaDetraccion[] }) {
       </Lista>
       {sel.length > 0 && (
         <ActionBar sobreNav>
+          <Button variant="secondary" onClick={() => setTxt(true)}>
+            <Download size={18} /> TXT
+          </Button>
           <Button className="flex-1" onClick={() => setPagar(true)}>
             Pagar {sel.length} · {soles(total)}
           </Button>
@@ -217,6 +224,7 @@ export function DetraccionesPorPagar({ filas }: { filas: FilaDetraccion[] }) {
         </Sheet>
       )}
       {cuentaDe && <CuentaDetraccionesSheet fila={cuentaDe} onClose={() => setCuentaDe(null)} />}
+      {txt && sel.length > 0 && <TxtDetracciones filas={sel} onClose={() => setTxt(false)} />}
     </>
   );
 }
@@ -305,6 +313,13 @@ export function RetencionesPorPagar({ grupos }: { grupos: GrupoRetencion[] }) {
                 </li>
               ))}
             </ul>
+            <ButtonLink
+              href={`/contabilidad/impuestos/plame?empresa=${activo.empresaId}&periodo=${activo.periodo}`}
+              prefetch={false}
+              variant="secondary"
+            >
+              <Download size={18} /> Archivos para el PLAME
+            </ButtonLink>
             <FormPago
               empresaId={activo.empresaId}
               etiquetaNumero="N° de orden u operación"
@@ -463,6 +478,75 @@ function PagoSheet({ pago, onClose }: { pago: PagoImpuesto; onClose: () => void 
             {error}
           </p>
         )}
+      </div>
+    </Sheet>
+  );
+}
+
+/** Plazo de la detracción: el 5.º día hábil del mes siguiente al de su comprobante (en rojo si ya pasó). */
+function Vence({ periodo }: { periodo: string }) {
+  const dia = quintoDiaHabil(periodo);
+  const vencida = dia < hoyISO();
+  return <span className={cn(vencida && "font-semibold text-danger")}>{vencida ? "Venció" : "Vence"} {fecha(dia)}</span>;
+}
+
+/** El TXT del pago masivo de SUNAT: lote y el código de bien o servicio de cada una (sale de su porcentaje). */
+function TxtDetracciones({ filas, onClose }: { filas: FilaDetraccion[]; onClose: () => void }) {
+  const [lote, setLote] = useState(`${hoyISO().slice(2, 4)}0001`);
+  const [codigos, setCodigos] = useState<Record<number, string>>(() =>
+    Object.fromEntries(filas.map((f) => [f.comprobanteId, codigoPorPorcentaje((f.detraccion / f.total) * 100)])),
+  );
+  const sinCuenta = filas.filter((f) => !f.cuenta || !/^\d{11}$/.test(f.cuenta));
+  const falta = [!/^\d{6}$/.test(lote) && "lote de 6 dígitos", ...sinCuenta.map((f) => `cuenta de detracciones de ${f.proveedor}`)];
+  const href = `/contabilidad/impuestos/detracciones?ids=${filas.map((f) => f.comprobanteId).join(",")}&lote=${lote}&codigos=${filas
+    .map((f) => `${f.comprobanteId}:${codigos[f.comprobanteId]}`)
+    .join(",")}`;
+  const opciones = CODIGOS_DETRACCION.map((c) => ({ value: c.codigo, label: `${c.codigo} ${c.nombre}` }));
+  const redondeado = filas.reduce((a, f) => a + Math.round(f.detraccion), 0);
+  return (
+    <Sheet
+      open
+      onClose={onClose}
+      title="Pago masivo de detracciones"
+      full
+      footer={
+        <div className="flex flex-col gap-2">
+          <Faltan items={falta} />
+          {falta.some(Boolean) ? (
+            <Button size="lg" disabled>
+              Descargar TXT · {soles(redondeado)}
+            </Button>
+          ) : (
+            <ButtonLink href={href} prefetch={false} size="lg">
+              <Download size={18} /> Descargar TXT · {soles(redondeado)}
+            </ButtonLink>
+          )}
+        </div>
+      }
+    >
+      <div className="flex flex-col gap-4 p-4">
+        <Field label="N° de lote (año y correlativo)">
+          <Input value={lote} onChange={(e) => setLote(e.target.value.replace(/\D/g, "").slice(0, 6))} inputMode="numeric" className="num" />
+        </Field>
+        <ul aria-label="Depósitos" className="flex flex-col gap-3">
+          {filas.map((f) => (
+            <li key={f.comprobanteId} className="flex flex-col gap-2 rounded-panel border border-line p-3">
+              <div className="grid grid-cols-[1fr_auto] gap-x-3">
+                <span className="truncate">{f.proveedor}</span>
+                <span className="num whitespace-nowrap text-right">{soles(Math.round(f.detraccion))}</span>
+                <span className="num text-sm text-ink-3">{f.documento}</span>
+                <span className={cn("num text-right text-sm", f.cuenta ? "text-ink-3" : "font-semibold text-warn")}>{f.cuenta ?? "Sin cuenta"}</span>
+              </div>
+              <SearchSelect
+                label={`Bien o servicio de ${f.documento}`}
+                value={codigos[f.comprobanteId]}
+                onChange={(v) => setCodigos((c) => ({ ...c, [f.comprobanteId]: v }))}
+                multilinea
+                options={opciones}
+              />
+            </li>
+          ))}
+        </ul>
       </div>
     </Sheet>
   );

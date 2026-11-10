@@ -8,6 +8,7 @@ import { filtro, limite as limiteDe, ordenDe } from "@/lib/filtros";
 import { listarPagos } from "@/lib/queries";
 import { createClient, requireSesion } from "@/lib/supabase/server";
 import { RecordarFiltros } from "@/components/recordar-filtros";
+import { ContabilizarTodos } from "./contabilizar-todos";
 
 const ORDEN_PAGOS = [
   { value: "fecha.desc", label: "Fecha, más recientes" },
@@ -70,6 +71,7 @@ export default async function PagosContablesPage({ searchParams }: PageProps<"/c
             { value: "con", label: "Contabilizados" },
           ]}
         />
+        {tab === "sin" && <ContabilizarTodos ids={pagos.map((p) => p.id)} />}
         <PagosList pagos={pagos} contabilidad cuentas={cuentas ?? []} />
         <VerMas visibles={pagos.length} limite={limite} />
       </main>

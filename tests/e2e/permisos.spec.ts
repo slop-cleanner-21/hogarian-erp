@@ -65,6 +65,7 @@ const LECTURA = tabla(`
   partidas                     T   T   T   P   T   0   0   0
   perfil_obras                 T   T   T   P   T   T   T   0
   perfiles                     T   T   T   T   T   T   T   T
+  periodos_cerrados            T   T   T   0   T   0   0   0
   perfil_privado               0   0   0   0   0   0   0   0
   perfil_roles                 M   M   M   M   M   M   M   M
   sugerencias                  X   X   X   X   X   X   X   X
@@ -126,6 +127,13 @@ const RPC: Record<string, string> = {
   anular_orden_pago: "CON",
   // Pagos de detracciones y retenciones de 4ta (20261109160000_prod1_pagos_impuestos).
   anular_pago_impuesto: "CON",
+  // Contabilidad (2): asientos manuales, en lote y cierre de periodo (20261110120000_prod1_contabilidad_2).
+  registrar_asiento_manual: "CON",
+  anular_asiento_manual: "CON",
+  contabilizar_comprobantes: "CON",
+  contabilizar_pagos: "CON",
+  cerrar_periodo: "CON",
+  reabrir_periodo: "CON",
   guardar_cuenta_detracciones: "LOG CON",
   registrar_pago_detraccion: "CON",
   registrar_pago_retencion: "CON",
@@ -189,7 +197,7 @@ const RPC: Record<string, string> = {
 };
 // Funciones de lectura o internas que no necesitan fila en RPC; anular_requerimiento va aparte (mira el
 // requerimiento antes que el rol, así que se prueba en SQL revertido).
-const SIN_ROL = /^(fn_|rol_|mi_rol$|es_residente$|obras_residente$|orden_visible_residente$|ruta_obra_residente$|exigir_rol$|faltante$|glosa_rhe_defecto$|siguiente_numero_oc$|token_cotizacion_de$|rol_prod1$|get_cotizacion$|enviar_cotizacion$|anular_requerimiento$|sesion_bloqueada$|cambiar_rol$|enviar_sugerencia$|bloqueo_estado$|bloqueo_activar$|sumas_cuentas$|rango_asientos$)/;
+const SIN_ROL = /^(fn_|rol_|mi_rol$|es_residente$|obras_residente$|orden_visible_residente$|ruta_obra_residente$|exigir_rol$|faltante$|glosa_rhe_defecto$|siguiente_numero_oc$|token_cotizacion_de$|rol_prod1$|get_cotizacion$|enviar_cotizacion$|anular_requerimiento$|sesion_bloqueada$|cambiar_rol$|enviar_sugerencia$|bloqueo_estado$|bloqueo_activar$|sumas_cuentas$|rango_asientos$|periodo_cerrado$)/;
 // sumas_cuentas y rango_asientos solo leen, con los permisos de quien consulta: eeff.spec prueba que solo Contabilidad ve algo.
 const DENEGADO =
   /No tienes permiso|^Solo (Recursos Humanos|Operaciones|Gerencia|Logística|Contabilidad|Tesorería|el Jefe|los residentes|quien lo creó)|Inicia sesión|permission denied for function/i;

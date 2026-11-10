@@ -2397,6 +2397,36 @@ export type Database = {
         };
         Relationships: [];
       };
+      periodos_cerrados: {
+        Row: {
+          cerrado_at: string;
+          cerrado_por: string | null;
+          empresa_id: number;
+          periodo: string;
+        };
+        ComputedFields: never;
+        Insert: {
+          cerrado_at?: string;
+          cerrado_por?: string | null;
+          empresa_id: number;
+          periodo: string;
+        };
+        Update: {
+          cerrado_at?: string;
+          cerrado_por?: string | null;
+          empresa_id?: number;
+          periodo?: string;
+        };
+        Relationships: [
+          {
+            foreignKeyName: "periodos_cerrados_empresa_id_fkey";
+            columns: ["empresa_id"];
+            isOneToOne: false;
+            referencedRelation: "empresas";
+            referencedColumns: ["id"];
+          },
+        ];
+      };
       personas: {
         Row: {
           cargo: string;
@@ -4546,6 +4576,7 @@ export type Database = {
         Args: { p_obra_id: number; p_partidas: Json };
         Returns: string;
       };
+      anular_asiento_manual: { Args: { p_id: number }; Returns: undefined };
       anular_orden: {
         Args: { p_motivo: string; p_numero: string; p_obra_id: number };
         Returns: undefined;
@@ -4611,6 +4642,10 @@ export type Database = {
         Returns: undefined;
       };
       cerrar_obra: { Args: { p_obra_id: number }; Returns: number };
+      cerrar_periodo: {
+        Args: { p_empresa_id: number; p_periodo: string };
+        Returns: undefined;
+      };
       confirmar_precios: {
         Args: { p_numero: string; p_obra_id: number };
         Returns: undefined;
@@ -4619,7 +4654,9 @@ export type Database = {
         Args: { p_comprobante_id: number };
         Returns: number;
       };
+      contabilizar_comprobantes: { Args: { p_ids: number[] }; Returns: Json };
       contabilizar_pago: { Args: { p_pago_id: number }; Returns: number };
+      contabilizar_pagos: { Args: { p_ids: number[] }; Returns: Json };
       contrasena_correcta: {
         Args: { p_clave: string; p_user: string };
         Returns: boolean;
@@ -4778,6 +4815,10 @@ export type Database = {
         Returns: number;
       };
       fn_pu_max: { Args: { p_pu: number; p_tol: number }; Returns: number };
+      fn_recalcular_retencion_4ta: {
+        Args: { p_comprobante_ids?: number[]; p_proveedor_id: number };
+        Returns: number;
+      };
       fn_requerido_partida: { Args: { p_partida_id: number }; Returns: number };
       fn_retencion: {
         Args: { p_item_id: number; p_obra_id: number };
@@ -4968,6 +5009,10 @@ export type Database = {
         };
         Returns: number;
       };
+      periodo_cerrado: {
+        Args: { p_empresa_id: number; p_periodo: string };
+        Returns: boolean;
+      };
       publicar_presupuesto: { Args: { p_obra_id: number }; Returns: undefined };
       rango_asientos: {
         Args: { p_empresa_id: number };
@@ -4975,6 +5020,10 @@ export type Database = {
           desde: string;
           hasta: string;
         }[];
+      };
+      reabrir_periodo: {
+        Args: { p_empresa_id: number; p_periodo: string };
+        Returns: undefined;
       };
       rechazar_documento: {
         Args: {
@@ -5001,6 +5050,15 @@ export type Database = {
       };
       refrescar_retencion_orden: {
         Args: { p_numero: string; p_obra_id: number };
+        Returns: number;
+      };
+      registrar_asiento_manual: {
+        Args: {
+          p_empresa_id: number;
+          p_fecha: string;
+          p_glosa: string;
+          p_lineas: Json;
+        };
         Returns: number;
       };
       registrar_avance: {
