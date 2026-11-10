@@ -1,3 +1,4 @@
+import fs from "node:fs";
 import path from "node:path";
 import { expect, test } from "./fixtures";
 import { sql, sql1, sqlScript, uidDe } from "./lib";
@@ -114,12 +115,48 @@ test.describe("@prod1 @logistica facturar: guía y retención", () => {
     const [obra, numero] = fila;
     try {
       const page = await abrir("logistica", `/logistica/ordenes/${obra}/${numero}?tipo=OS`);
-      await page.locator('#contrato input[type="file"]').setInputFiles(path.resolve("tests/e2e/archivos/ariant.png"));
+      // Otro archivo que el comprobante (las demos usan esta misma imagen como factura): el contrato no puede ser la factura.
+      const contrato = Buffer.concat([fs.readFileSync(path.resolve("tests/e2e/archivos/ariant.png")), Buffer.from("contrato")]);
+      await page.locator('#contrato input[type="file"]').setInputFiles({ name: "contrato-firmado.png", mimeType: "image/png", buffer: contrato });
       await expect.poll(() => sql1(`select estado from ordenes_compra where obra_id = ${obra} and numero = '${numero}'`), { timeout: 15_000 }).toBe("EN_TESORERIA");
     } finally {
       sql(`delete from adjuntos where tipo = 'CONTRATO' and obra_id = ${obra} and numero_oc = '${numero}';
            update ordenes_compra set estado = 'FACTURADA' where obra_id = ${obra} and numero = '${numero}';
            delete from notificaciones where href like '%/${obra}/${numero}' and created_at > now() - interval '10 minutes';`);
+    }
+  });
+
+  test("el contrato firmado no puede ser el comprobante de la orden: avisa y la orden no se mueve", async ({ abrir }, info) => {
+    test.skip(info.project.name !== "m390", "escribe en la base");
+    const fila = sql(
+      `select o.obra_id, o.numero, min(i.comprobante_id) from ordenes_compra o join oc_items i on i.obra_id = o.obra_id and i.numero_oc = o.numero
+        where o.tipo = 'OS' and o.estado = 'FACTURADA' and not o.es_retencion and i.comprobante_id is not null
+          and not exists (select 1 from adjuntos a where a.tipo = 'CONTRATO' and a.obra_id = o.obra_id and a.numero_oc = o.numero)
+        group by 1, 2 order by o.obra_id desc, o.numero limit 1`,
+    )[0];
+    test.skip(!fila, "no hay OS facturada sin contrato firmado");
+    const [obra, numero, comp] = fila;
+    const env = Object.fromEntries(
+      fs.readFileSync(".env.local", "utf8").split(/\r?\n/).filter((l) => /^[A-Z_]+=/.test(l)).map((l) => [l.slice(0, l.indexOf("=")), l.slice(l.indexOf("=") + 1).replace(/^["']|["']$/g, "")]),
+    );
+    const sb = "http://127.0.0.1:55321";
+    const auth = { apikey: env.SUPABASE_SECRET_KEY, Authorization: `Bearer ${env.SUPABASE_SECRET_KEY}` };
+    const archivo = path.resolve("tests/e2e/archivos/ariant.png");
+    const ruta = `e2e/contrato-igual-${Date.now()}.png`;
+    const antes = sql1(`select coalesce(archivo_path, '') from comprobantes where id = ${comp}`);
+    // El comprobante de la orden pasa a ser ese mismo archivo.
+    const r = await fetch(`${sb}/storage/v1/object/comprobantes/${ruta}`, { method: "POST", headers: { ...auth, "Content-Type": "image/png" }, body: fs.readFileSync(archivo) });
+    expect(r.ok).toBe(true);
+    try {
+      sql(`select set_config('app.skip_audit', 'on', false) is null; update comprobantes set archivo_path = '${ruta}' where id = ${comp}`);
+      const page = await abrir("logistica", `/logistica/ordenes/${obra}/${numero}?tipo=OS`);
+      await page.locator('#contrato input[type="file"]').setInputFiles(archivo);
+      await expect(page.getByText(/^Ese archivo es el comprobante .* de la orden, no el contrato/)).toBeVisible({ timeout: 15_000 });
+      expect(sql1(`select count(*) from adjuntos where tipo = 'CONTRATO' and obra_id = ${obra} and numero_oc = '${numero}'`)).toBe("0");
+      expect(sql1(`select estado from ordenes_compra where obra_id = ${obra} and numero = '${numero}'`)).toBe("FACTURADA");
+    } finally {
+      sql(`select set_config('app.skip_audit', 'on', false) is null; update comprobantes set archivo_path = ${antes ? `'${antes}'` : "null"} where id = ${comp}`);
+      await fetch(`${sb}/storage/v1/object/comprobantes`, { method: "DELETE", headers: { ...auth, "Content-Type": "application/json" }, body: JSON.stringify({ prefixes: [ruta] }) });
     }
   });
 
