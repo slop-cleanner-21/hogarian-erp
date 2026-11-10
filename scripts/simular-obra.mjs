@@ -366,7 +366,7 @@ async function simularOrden({ tipo, lineas, proveedorId, destino, diaBase, opcio
   const fComp = dia(diaBase + 6);
   const comprobanteId = Number(await rpc(logistica, "registrar_comprobante", {
     p_proveedor_id: proveedorId, p_tipo: rxh ? "RXH" : "FACTURA", p_serie: rxh ? "E001" : "F001", p_numero: String(correlativo++),
-    p_fecha: fechaISO(fComp), p_total: total, p_retencion: rxh && total > 1500 ? redondear(total * 0.08) : 0, p_archivo_path: null,
+    p_fecha: fechaISO(fComp), p_total: total, p_retencion: null, p_archivo_path: null, // la retención la calcula la base (% y suspensión de 4ta)
     p_item_ids: lin.map((l) => l.id),
   }));
   if (destino === "FACTURADA") {
