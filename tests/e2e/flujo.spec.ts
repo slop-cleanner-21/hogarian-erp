@@ -1,4 +1,5 @@
 import crypto from "node:crypto";
+import fs from "node:fs";
 import path from "node:path";
 import type { Browser, BrowserContext, Page } from "@playwright/test";
 import { expect, test } from "./fixtures";
@@ -486,7 +487,7 @@ test.describe("@flujo flujo completo por las pantallas", () => {
       await expect(prov.page.getByRole("heading", { name: `OS ${os}` })).toBeVisible();
       await prov.page.getByLabel(`Precio unitario ${SERVICIO}`).fill(String(PU_SERVICIO));
       // Ve lo que se le retiene y el total por el que facturará.
-      await expect(prov.page.locator("main")).toContainText(`Retención por garantía− ${sol(GARANTIA)}`);
+      await expect(prov.page.locator("main")).toContainText(`Retención por garantía (5 %)− ${sol(GARANTIA)}`);
       await expect(prov.page.locator("main")).toContainText(`Total${sol(NETO_SERVICIO)}`);
       await prov.page.getByRole("button", { name: "Enviar cotización" }).click();
       await expect(prov.page.getByRole("status")).toHaveText("Cotización enviada");
@@ -538,13 +539,16 @@ test.describe("@flujo flujo completo por las pantallas", () => {
 
       // La pantalla ya tomó la factura (si no, el campo se reemplaza al refrescarse y el archivo se pierde).
       await expect(page.getByRole("button", { name: "Registrar comprobante" })).toHaveCount(0);
-      await page.locator('#contrato input[type="file"]').setInputFiles(ARCHIVO);
+      // El contrato firmado es otro archivo que el recibo (si es el mismo, la app no lo acepta).
+      await page
+        .locator('#contrato input[type="file"]')
+        .setInputFiles({ name: "contrato-firmado.png", mimeType: "image/png", buffer: Buffer.concat([fs.readFileSync(ARCHIVO), Buffer.from("contrato")]) });
       await expect.poll(() => estado(obraId, os), { timeout: 15_000 }).toBe("EN_TESORERIA");
     });
 
     await test.step("Tesorería paga el neto (sin la garantía ni la retención de 4ta)", async () => {
       const page = await abrir("tesoreria", `/tesoreria/pago/${obraId}/${os}`);
-      await expect(page.locator("main")).toContainText(`Retención por garantía− ${sol(GARANTIA)}`);
+      await expect(page.locator("main")).toContainText(`Retención por garantía (5 %)− ${sol(GARANTIA)}`);
       await expect(page.getByRole("textbox", { name: "Monto", exact: true })).toHaveValue(sol(NETO_SERVICIO - RETENCION));
       await elegir(page, page.locator("main"), "Banco", "BCP");
       await page.getByRole("textbox", { name: "N° de operación", exact: true }).fill(`OS${sufijo}`);
