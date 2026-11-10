@@ -93,10 +93,13 @@ const proveedor = (o: Orden, pct: number, suspension: string | null) =>
   `update proveedores set retencion_4ta_pct = ${pct}, suspension_4ta_fecha = ${suspension ?? "null"},
      suspension_4ta_path = ${suspension ? "'proveedores/e2e/suspension.pdf'" : "null"}, suspension_4ta_operacion = null where id = ${o.proveedor};`;
 
-/** Lo que pesa el ítem con detracción en la orden (su parcial sobre el total), para calcular la esperada. */
+/**
+ * Lo que pesa el ítem con detracción en la orden (el parcial de todas sus líneas sobre el total), para calcular la
+ * esperada. Una orden puede tener el mismo ítem en varias líneas (partidas de etapas distintas): todas la llevan.
+ */
 const peso = (o: Orden) =>
   Number(
-    sql1(`select (select parcial from v_oc_items_calc where id = ${o.items[0]}) / sum(parcial)
+    sql1(`select sum(parcial) filter (where item_id = (select item_id from v_oc_items_calc where id = ${o.items[0]})) / sum(parcial)
             from v_oc_items_calc where obra_id = ${o.obra} and numero_oc = '${o.numero}'`),
   );
 const esperada = (o: Orden, total: number) => Math.round(total * peso(o) * 10) / 100;

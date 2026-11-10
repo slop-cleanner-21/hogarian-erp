@@ -466,17 +466,22 @@ test.describe("@prod1 @gerencia lista de obras", () => {
   test("cada obra en su tarjeta con el nombre completo, sus partidas y el monto del presupuesto según SQL", async ({ abrir }) => {
     const page = await abrir("gerencia", "/gerencia/obras?tab=pub");
     const fmt = new Intl.NumberFormat("es-PE", { minimumFractionDigits: 2, maximumFractionDigits: 2 });
-    const obras = sql(`select o.id, o.nombre, count(p.id), coalesce(sum(p.cantidad * coalesce(p.pu, 0)), 0) from obras o
-                       left join partidas p on p.obra_id = o.id where o.presupuesto_estado = 'PUBLICADO'
-                         and o.nombre not like 'E2E FLUJO %' group by 1, 2 order by 2`);
-    // Sin la obra que crea flujo.spec en paralelo.
-    await expect(page.locator("main li a[href^='/gerencia/obras/']").filter({ hasNotText: "E2E FLUJO" })).toHaveCount(obras.length);
-    for (const [id, nombre, n, monto] of obras.slice(0, 6)) {
-      const tarjeta = page.locator(`main a[href='/gerencia/obras/${id}']`);
-      await expect(tarjeta, nombre).toContainText(nombre);
-      await expect(tarjeta, nombre).toContainText(`${n} ${n === "1" ? "partida" : "partidas"}`);
-      await expect(tarjeta, nombre).toContainText(`S/ ${fmt.format(Number(monto))}`);
-    }
+    // Otras pruebas agregan y quitan partidas de las obras demo en paralelo: la pantalla y la base se leen juntas
+    // y, si alguna cambió entre medio, se vuelve a leer.
+    await expect(async () => {
+      await page.reload();
+      const obras = sql(`select o.id, o.nombre, count(p.id), coalesce(sum(p.cantidad * coalesce(p.pu, 0)), 0) from obras o
+                         left join partidas p on p.obra_id = o.id where o.presupuesto_estado = 'PUBLICADO'
+                           and o.nombre not like 'E2E FLUJO %' group by 1, 2 order by 2`);
+      // Sin la obra que crea flujo.spec en paralelo.
+      await expect(page.locator("main li a[href^='/gerencia/obras/']").filter({ hasNotText: "E2E FLUJO" })).toHaveCount(obras.length, { timeout: 5000 });
+      for (const [id, nombre, n, monto] of obras.slice(0, 6)) {
+        const tarjeta = page.locator(`main a[href='/gerencia/obras/${id}']`);
+        await expect(tarjeta, nombre).toContainText(nombre, { timeout: 5000 });
+        await expect(tarjeta, nombre).toContainText(`${n} ${n === "1" ? "partida" : "partidas"}`, { timeout: 1000 });
+        await expect(tarjeta, nombre).toContainText(`S/ ${fmt.format(Number(monto))}`, { timeout: 1000 });
+      }
+    }).toPass({ timeout: 40_000 });
   });
 });
 
@@ -588,7 +593,7 @@ test.describe("@prod1 @gerencia presupuesto de la obra: filtros y adicionales", 
 
 test.describe("@prod1 @logistica «Requiere guía» queda fijo al facturar", () => {
   const orden = (estado: string) =>
-    sql(`select obra_id, numero from ordenes_compra where tipo = 'OC' and estado = '${estado}' and historico order by obra_id, numero limit 1`)[0];
+    sql(`select obra_id, numero from ordenes_compra where tipo = 'OC' and estado = '${estado}' order by historico desc, obra_id, numero limit 1`)[0];
   /** La RPC como Logística, en una transacción que se deshace. */
   const cambiar = ([obra, numero]: string[], requiere: boolean) =>
     sqlScript(`begin;

@@ -22,8 +22,9 @@ export async function registrarAdjunto(input: z.input<typeof Adjunto>, revalidar
   const p = Adjunto.safeParse(input);
   if (!p.success) return { ok: false, error: p.error.issues[0].message };
   const supabase = await createClient();
-  // El contrato firmado no puede ser la factura o el recibo de la orden (pasó en la OS 1000148: se subió la factura como
-  // contrato y la orden se fue sola a Tesorería sin contrato).
+  // El contrato firmado no puede ser la factura o el recibo de la orden (pasó en las OS 1000148 y 1000149: se subió el
+  // comprobante como contrato y la orden se fue sola a Tesorería sin contrato). La base también lo revisa
+  // (fn_contrato_no_comprobante), para los pedidos de una versión anterior de la app.
   if (p.data.tipo === "CONTRATO") {
     const igual = await esUnComprobante(supabase, p.data.obraId, p.data.numeroOc, p.data.path);
     if (igual) {
