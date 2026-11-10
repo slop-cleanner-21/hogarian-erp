@@ -53,7 +53,7 @@ import { CORRECCION_TAREA, HistorialRechazos, type RechazoVer } from "@/componen
 import { Plegable } from "@/components/plegable";
 import Link from "next/link";
 import { ContratoOS, type DatosContrato } from "./contrato-os";
-import { retenidoDe } from "@/lib/garantia";
+import { pctRetenido, retenidoDe } from "@/lib/garantia";
 import { faltaSuspension, retencion4ta, suspensionVigente } from "@/lib/retencion";
 import { ItemsOrden } from "@/components/items-orden";
 import { SelectorDiseno } from "@/components/selector-diseno";
@@ -728,7 +728,7 @@ export function DetalleOrden({
                 <span>{soles((editable ? total : Number(orden.total)) + retenido)}</span>
               </div>
               <div className="flex justify-between text-ink-2">
-                <span>Retención por garantía</span>
+                <span>Retención por garantía {pctRetenido(retenido, (editable ? total : Number(orden.total)) + retenido)}</span>
                 <span>− {soles(retenido)}</span>
               </div>
             </>
