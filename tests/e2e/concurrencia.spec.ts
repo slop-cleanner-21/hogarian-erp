@@ -338,9 +338,9 @@ test.describe("@avisos cada uno elige sus avisos", () => {
       const page = await abrir("admin", "/avisos");
       await page.getByRole("button", { name: "Elegir avisos" }).click();
       const hoja = page.getByRole("dialog", { name: "Elegir avisos" });
-      await expect(hoja.getByRole("heading", { level: 3 })).toHaveText(["Logística", "Tesorería", "Operaciones", "Administración"]);
+      await expect(hoja.getByRole("heading", { level: 3 })).toHaveText(["Logística", "Tesorería", "Contabilidad", "Operaciones", "Administración"]);
       // Los de los demás, apagados; el suyo (las sugerencias), encendido.
-      for (const area of ["Logística", "Tesorería", "Operaciones"]) {
+      for (const area of ["Logística", "Tesorería", "Contabilidad", "Operaciones"]) {
         for (const s of await hoja.getByRole("region", { name: area }).getByRole("switch", { name: "Avisar" }).all()) await expect(s).toHaveAttribute("aria-checked", "false");
       }
       await expect(hoja.getByRole("listitem", { name: "Llegó una sugerencia" }).getByRole("switch", { name: "Avisar" })).toHaveAttribute("aria-checked", "true");
