@@ -68,6 +68,10 @@ Residente y RRHH **no entran**. Sus roles siguen en la base
     el gerente que firma por esa empresa en «Mi firma» (una por cada empresa suya), o el Admin (todas): debajo va la empresa (su rol en el contrato, razón social y RUC), como el proveedor; sin firma subida, el espacio en
     blanco para firmar. La empresa comparece «debidamente representada». El contrato del link del proveedor va sin la imagen de la
     firma (cualquiera con el link podría copiarla).
+  - **El contrato no puede ser el comprobante:** al subirlo, si es el mismo archivo que la factura o el recibo de la orden (mismo MD5
+    y tamaño en el almacenamiento), se rechaza («Ese archivo es el comprobante … de la orden, no el contrato»). Lo revisa la app y la
+    base (`fn_contrato_no_comprobante`, migración `prod1_contrato_no_comprobante`; así no se lo salta una app abierta desde antes de
+    un despliegue), y al enviar a Tesorería solo cuenta un contrato que no sea un comprobante de la orden (`os_contrato_valido`).
   - **Servicios sin contrato** (migración `prod1_servicio_sin_contrato`): hay servicios que no dan para un contrato (un alquiler de
     winche por horas). Logística marca el servicio (`items.sin_contrato`) en Ítems › Servicios (columna «Sin contrato») o al crear la
     OS (bloque «Contrato», por servicio; queda en el catálogo). Una OS cuyos servicios son **todos** sin contrato va a Tesorería sin el

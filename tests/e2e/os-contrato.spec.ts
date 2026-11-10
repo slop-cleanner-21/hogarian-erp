@@ -103,61 +103,108 @@ test.describe("@prod1 @logistica facturar: guía y retención", () => {
     }
   });
 
-  test("OS facturada: al subir el contrato firmado va sola a Tesorería", async ({ abrir }, info) => {
-    test.skip(info.project.name !== "m390", "escribe en la base");
-    const fila = sql(
-      `select o.obra_id, o.numero from ordenes_compra o
-        where o.tipo = 'OS' and o.estado = 'FACTURADA' and not o.es_retencion
-          and not exists (select 1 from adjuntos a where a.tipo = 'CONTRATO' and a.obra_id = o.obra_id and a.numero_oc = o.numero)
-        order by o.obra_id desc, o.numero limit 1`,
-    )[0];
-    test.skip(!fila, "no hay OS facturada sin contrato firmado");
-    const [obra, numero] = fila;
-    try {
-      const page = await abrir("logistica", `/logistica/ordenes/${obra}/${numero}?tipo=OS`);
-      // Otro archivo que el comprobante (las demos usan esta misma imagen como factura): el contrato no puede ser la factura.
-      const contrato = Buffer.concat([fs.readFileSync(path.resolve("tests/e2e/archivos/ariant.png")), Buffer.from("contrato")]);
-      await page.locator('#contrato input[type="file"]').setInputFiles({ name: "contrato-firmado.png", mimeType: "image/png", buffer: contrato });
-      await expect.poll(() => sql1(`select estado from ordenes_compra where obra_id = ${obra} and numero = '${numero}'`), { timeout: 15_000 }).toBe("EN_TESORERIA");
-    } finally {
-      sql(`delete from adjuntos where tipo = 'CONTRATO' and obra_id = ${obra} and numero_oc = '${numero}';
-           update ordenes_compra set estado = 'FACTURADA' where obra_id = ${obra} and numero = '${numero}';
-           delete from notificaciones where href like '%/${obra}/${numero}' and created_at > now() - interval '10 minutes';`);
-    }
+  // Las dos suben un contrato a la misma OS facturada: una tras otra.
+  test.describe("contrato firmado de una OS facturada", () => {
+    test.describe.configure({ mode: "serial" });
+
+    test("OS facturada: al subir el contrato firmado va sola a Tesorería", async ({ abrir }, info) => {
+      test.skip(info.project.name !== "m390", "escribe en la base");
+      const fila = sql(
+        `select o.obra_id, o.numero from ordenes_compra o
+          where o.tipo = 'OS' and o.estado = 'FACTURADA' and not o.es_retencion
+            and not exists (select 1 from adjuntos a where a.tipo = 'CONTRATO' and a.obra_id = o.obra_id and a.numero_oc = o.numero)
+          order by o.obra_id desc, o.numero limit 1`,
+      )[0];
+      test.skip(!fila, "no hay OS facturada sin contrato firmado");
+      const [obra, numero] = fila;
+      try {
+        const page = await abrir("logistica", `/logistica/ordenes/${obra}/${numero}?tipo=OS`);
+        // Otro archivo que el comprobante (las demos usan esta misma imagen como factura): el contrato no puede ser la factura.
+        const contrato = Buffer.concat([fs.readFileSync(path.resolve("tests/e2e/archivos/ariant.png")), Buffer.from("contrato")]);
+        await page.locator('#contrato input[type="file"]').setInputFiles({ name: "contrato-firmado.png", mimeType: "image/png", buffer: contrato });
+        await expect.poll(() => sql1(`select estado from ordenes_compra where obra_id = ${obra} and numero = '${numero}'`), { timeout: 15_000 }).toBe("EN_TESORERIA");
+      } finally {
+        sql(`delete from adjuntos where tipo = 'CONTRATO' and obra_id = ${obra} and numero_oc = '${numero}';
+             update ordenes_compra set estado = 'FACTURADA' where obra_id = ${obra} and numero = '${numero}';
+             delete from notificaciones where href like '%/${obra}/${numero}' and created_at > now() - interval '10 minutes';`);
+      }
+    });
+
+    test("el contrato firmado no puede ser el comprobante de la orden: avisa y la orden no se mueve", async ({ abrir }, info) => {
+      test.skip(info.project.name !== "m390", "escribe en la base");
+      const fila = sql(
+        `select o.obra_id, o.numero, min(i.comprobante_id) from ordenes_compra o join oc_items i on i.obra_id = o.obra_id and i.numero_oc = o.numero
+          where o.tipo = 'OS' and o.estado = 'FACTURADA' and not o.es_retencion and i.comprobante_id is not null
+            and not exists (select 1 from adjuntos a where a.tipo = 'CONTRATO' and a.obra_id = o.obra_id and a.numero_oc = o.numero)
+          group by 1, 2 order by o.obra_id desc, o.numero limit 1`,
+      )[0];
+      test.skip(!fila, "no hay OS facturada sin contrato firmado");
+      const [obra, numero, comp] = fila;
+      const env = Object.fromEntries(
+        fs.readFileSync(".env.local", "utf8").split(/\r?\n/).filter((l) => /^[A-Z_]+=/.test(l)).map((l) => [l.slice(0, l.indexOf("=")), l.slice(l.indexOf("=") + 1).replace(/^["']|["']$/g, "")]),
+      );
+      const sb = "http://127.0.0.1:55321";
+      const auth = { apikey: env.SUPABASE_SECRET_KEY, Authorization: `Bearer ${env.SUPABASE_SECRET_KEY}` };
+      const archivo = path.resolve("tests/e2e/archivos/ariant.png");
+      const ruta = `e2e/contrato-igual-${Date.now()}.png`;
+      const antes = sql1(`select coalesce(archivo_path, '') from comprobantes where id = ${comp}`);
+      // El comprobante de la orden pasa a ser ese mismo archivo.
+      const r = await fetch(`${sb}/storage/v1/object/comprobantes/${ruta}`, { method: "POST", headers: { ...auth, "Content-Type": "image/png" }, body: fs.readFileSync(archivo) });
+      expect(r.ok).toBe(true);
+      try {
+        sql(`select set_config('app.skip_audit', 'on', false) is null; update comprobantes set archivo_path = '${ruta}' where id = ${comp}`);
+        const page = await abrir("logistica", `/logistica/ordenes/${obra}/${numero}?tipo=OS`);
+        await page.locator('#contrato input[type="file"]').setInputFiles(archivo);
+        await expect(page.getByText(/^Ese archivo es el comprobante .* de la orden, no el contrato/)).toBeVisible({ timeout: 15_000 });
+        expect(sql1(`select count(*) from adjuntos where tipo = 'CONTRATO' and obra_id = ${obra} and numero_oc = '${numero}'`)).toBe("0");
+        expect(sql1(`select estado from ordenes_compra where obra_id = ${obra} and numero = '${numero}'`)).toBe("FACTURADA");
+      } finally {
+        sql(`select set_config('app.skip_audit', 'on', false) is null; update comprobantes set archivo_path = ${antes ? `'${antes}'` : "null"} where id = ${comp}`);
+        await fetch(`${sb}/storage/v1/object/comprobantes`, { method: "DELETE", headers: { ...auth, "Content-Type": "application/json" }, body: JSON.stringify({ prefixes: [ruta] }) });
+      }
+    });
   });
 
-  test("el contrato firmado no puede ser el comprobante de la orden: avisa y la orden no se mueve", async ({ abrir }, info) => {
-    test.skip(info.project.name !== "m390", "escribe en la base");
+  test("la base: el contrato no puede ser el archivo del comprobante (al subirlo ni, al revés, al enviar a Tesorería)", async () => {
     const fila = sql(
       `select o.obra_id, o.numero, min(i.comprobante_id) from ordenes_compra o join oc_items i on i.obra_id = o.obra_id and i.numero_oc = o.numero
-        where o.tipo = 'OS' and o.estado = 'FACTURADA' and not o.es_retencion and i.comprobante_id is not null
-          and not exists (select 1 from adjuntos a where a.tipo = 'CONTRATO' and a.obra_id = o.obra_id and a.numero_oc = o.numero)
+        where o.tipo = 'OS' and o.estado = 'FACTURADA' and not o.historico and not o.es_retencion and i.comprobante_id is not null
+          and os_lleva_contrato(o.obra_id, o.numero)
         group by 1, 2 order by o.obra_id desc, o.numero limit 1`,
     )[0];
-    test.skip(!fila, "no hay OS facturada sin contrato firmado");
+    test.skip(!fila, "no hay OS facturada");
     const [obra, numero, comp] = fila;
-    const env = Object.fromEntries(
-      fs.readFileSync(".env.local", "utf8").split(/\r?\n/).filter((l) => /^[A-Z_]+=/.test(l)).map((l) => [l.slice(0, l.indexOf("=")), l.slice(l.indexOf("=") + 1).replace(/^["']|["']$/g, "")]),
-    );
-    const sb = "http://127.0.0.1:55321";
-    const auth = { apikey: env.SUPABASE_SECRET_KEY, Authorization: `Bearer ${env.SUPABASE_SECRET_KEY}` };
-    const archivo = path.resolve("tests/e2e/archivos/ariant.png");
-    const ruta = `e2e/contrato-igual-${Date.now()}.png`;
-    const antes = sql1(`select coalesce(archivo_path, '') from comprobantes where id = ${comp}`);
-    // El comprobante de la orden pasa a ser ese mismo archivo.
-    const r = await fetch(`${sb}/storage/v1/object/comprobantes/${ruta}`, { method: "POST", headers: { ...auth, "Content-Type": "image/png" }, body: fs.readFileSync(archivo) });
-    expect(r.ok).toBe(true);
-    try {
-      sql(`select set_config('app.skip_audit', 'on', false) is null; update comprobantes set archivo_path = '${ruta}' where id = ${comp}`);
-      const page = await abrir("logistica", `/logistica/ordenes/${obra}/${numero}?tipo=OS`);
-      await page.locator('#contrato input[type="file"]').setInputFiles(archivo);
-      await expect(page.getByText(/^Ese archivo es el comprobante .* de la orden, no el contrato/)).toBeVisible({ timeout: 15_000 });
-      expect(sql1(`select count(*) from adjuntos where tipo = 'CONTRATO' and obra_id = ${obra} and numero_oc = '${numero}'`)).toBe("0");
-      expect(sql1(`select estado from ordenes_compra where obra_id = ${obra} and numero = '${numero}'`)).toBe("FACTURADA");
-    } finally {
-      sql(`select set_config('app.skip_audit', 'on', false) is null; update comprobantes set archivo_path = ${antes ? `'${antes}'` : "null"} where id = ${comp}`);
-      await fetch(`${sb}/storage/v1/object/comprobantes`, { method: "DELETE", headers: { ...auth, "Content-Type": "application/json" }, body: JSON.stringify({ prefixes: [ruta] }) });
-    }
+    const uid = uidDe("LOGISTICA");
+    // Archivos simulados en el almacenamiento (todo se deshace): el comprobante y el «contrato» con el mismo MD5 y tamaño.
+    const objeto = (bucket: string, nombre: string, etag: string) =>
+      `insert into storage.objects (bucket_id, name, metadata) values ('${bucket}', '${nombre}', '{"eTag": "\\"${etag}\\"", "size": 2217}'::jsonb);`;
+    const probar = (antes: string, q: string) => {
+      const filas = sqlScript(`begin;
+        delete from adjuntos where tipo = 'CONTRATO' and obra_id = ${obra} and numero_oc = '${numero}';
+        ${objeto("comprobantes", `e2e/comp-${comp}.pdf`, "aaa")}
+        update comprobantes set archivo_path = 'e2e/comp-${comp}.pdf' where id = ${comp};
+        ${objeto("documentos", `${obra}/${numero}/CONTRATO/igual.pdf`, "aaa")}
+        ${objeto("documentos", `${obra}/${numero}/CONTRATO/firmado.pdf`, "bbb")}
+        ${antes}
+        select set_config('request.jwt.claims', '{"sub":"${uid}","role":"authenticated"}', true) is null;
+        set local role authenticated;
+        do $$ begin
+          ${q};
+          perform set_config('t.r', 'ok', true);
+        exception when others then
+          perform set_config('t.r', 'error: ' || sqlerrm, true);
+        end $$;
+        select 'r', current_setting('t.r');
+        rollback;`);
+      return filas.find((f) => f[0] === "r")?.[1];
+    };
+    const adjunto = (nombre: string) =>
+      `insert into adjuntos (obra_id, numero_oc, tipo, path, nombre) values (${obra}, '${numero}', 'CONTRATO', '${obra}/${numero}/CONTRATO/${nombre}', '${nombre}')`;
+    expect(probar("", adjunto("igual.pdf")), "el mismo archivo que el comprobante").toMatch(/es el comprobante .* de la orden, no el contrato/);
+    expect(probar("", adjunto("firmado.pdf")), "otro archivo").toBe("ok");
+    // Al revés: el contrato ya estaba (sin pasar por la revisión) y el comprobante resultó ser ese mismo archivo.
+    const yaEstaba = `alter table adjuntos disable trigger adjuntos_contrato_no_comprobante; ${adjunto("igual.pdf")}; alter table adjuntos enable trigger adjuntos_contrato_no_comprobante;`;
+    expect(probar(yaEstaba, `perform enviar_a_tesoreria(${obra}, '${numero}')`)).toMatch(/Falta el contrato firmado/);
   });
 
   test("RHE: 8 % del proveedor sobre S/ 1,500, nada con suspensión vigente, y aviso si cambia el contrato", async ({ abrir }, info) => {
