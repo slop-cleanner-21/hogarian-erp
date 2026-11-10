@@ -63,3 +63,6 @@ tests/e2e/.auth/
 
 # Auditorías manuales (scripts y resultados con datos reales de la base): solo locales, nunca al repo.
 tests/audit/
+
+# Permisos locales de Claude Code (no van al repo)
+.claude/settings.local.json
