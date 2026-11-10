@@ -51,8 +51,13 @@ begin
 end $do$;
 SQL
 
-for demo in db:demo-entregas db:simular db:demo-archivos db:demo-fotos db:demo-requerimientos db:demo-tesoreria; do
+# DEMOS="db:demo-tesoreria" corre solo esas (p. ej. tras copiar los datos de producción con scripts/prod-a-local.sh).
+for demo in ${DEMOS:-db:demo-entregas db:simular db:demo-archivos db:demo-fotos db:demo-requerimientos db:demo-tesoreria}; do
   echo "== $demo"
-  npm run --silent "$demo" || exit 1
+  if ! npm run --silent "$demo"; then
+    # Los requerimientos son del MVP (prod 1 no los tiene): si sus partidas no están (otros datos), se sigue.
+    [ "$demo" = db:demo-requerimientos ] && { echo "   (sin la demo de requerimientos: es del MVP)"; continue; }
+    exit 1
+  fi
 done
 echo "== listo"
