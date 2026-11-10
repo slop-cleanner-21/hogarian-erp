@@ -1516,6 +1516,7 @@ export type Database = {
           id: number;
           numero: number | null;
           rubro: Database["public"]["Enums"]["rubro"];
+          sin_contrato: boolean;
           tipo_material: string | null;
           tolerancia_pct: number;
           unidad: string | null;
@@ -1527,6 +1528,7 @@ export type Database = {
           id?: number;
           numero?: number | null;
           rubro: Database["public"]["Enums"]["rubro"];
+          sin_contrato?: boolean;
           tipo_material?: string | null;
           tolerancia_pct?: number;
           unidad?: string | null;
@@ -1537,6 +1539,7 @@ export type Database = {
           id?: number;
           numero?: number | null;
           rubro?: Database["public"]["Enums"]["rubro"];
+          sin_contrato?: boolean;
           tipo_material?: string | null;
           tolerancia_pct?: number;
           unidad?: string | null;

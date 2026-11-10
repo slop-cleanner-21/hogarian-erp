@@ -232,11 +232,31 @@ export default async function OrdenesPage({ searchParams }: PageProps<"/logistic
     ]);
     const conGuia = new Set((guias ?? []).map((g) => `${g.obra_id}-${g.numero_oc}`));
     const conContrato = new Set((contratos ?? []).map((c) => `${c.obra_id}-${c.numero_oc}`));
+    // OS cuyos servicios no llevan contrato (todos marcados «sin contrato»): no esperan el firmado.
+    const sinFirmar = (ocs ?? []).filter((o) => o.tipo === "OS" && !o.historico && !conContrato.has(`${o.obra_id}-${o.numero}`));
+    const noLleva = new Set<string>();
+    if (sinFirmar.length) {
+      const [{ data: lineas }, { data: sinContrato }] = await Promise.all([
+        supabase
+          .from("v_oc_items")
+          .select("obra_id, numero_oc, item_id")
+          .in("obra_id", [...new Set(sinFirmar.map((o) => o.obra_id))])
+          .in("numero_oc", [...new Set(sinFirmar.map((o) => o.numero))]),
+        supabase.from("items").select("id").eq("sin_contrato", true),
+      ]);
+      const sin = new Set((sinContrato ?? []).map((i) => i.id));
+      const lleva = new Map<string, boolean>();
+      for (const l of lineas ?? []) {
+        const k = `${l.obra_id}-${l.numero_oc}`;
+        lleva.set(k, (lleva.get(k) ?? false) || !sin.has(l.item_id!));
+      }
+      for (const [k, v] of lleva) if (!v) noLleva.add(k);
+    }
     for (const o of ocs ?? []) {
       const k = `${o.obra_id}-${o.numero}`;
       // Las históricas (Excel) no esperan contrato ni guía.
       if (o.historico) continue;
-      if (o.tipo === "OS" && !conContrato.has(k)) falta.set(k, "Firmar contrato");
+      if (o.tipo === "OS" && !conContrato.has(k) && !noLleva.has(k)) falta.set(k, "Firmar contrato");
       else if (o.tipo === "OC" && o.requiere_guia && !conGuia.has(k)) falta.set(k, "Subir guía");
     }
   }

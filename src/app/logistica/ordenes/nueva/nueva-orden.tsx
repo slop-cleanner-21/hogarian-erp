@@ -68,6 +68,7 @@ export function NuevaOrden({
   proveedores: proveedoresIniciales,
   partidas,
   historial,
+  sinContrato = [],
   tiposMaterial,
   requeridos,
   atender,
@@ -86,6 +87,8 @@ export function NuevaOrden({
   proveedores: ProveedorOpt[];
   partidas: VPartida[];
   historial: Venta[];
+  /** OS: ítems (servicios) marcados «sin contrato». */
+  sinContrato?: number[];
   tiposMaterial: string[];
   /** Lo que Operaciones requirió y aún no se compra, por partida (solo indicación). */
   requeridos: Record<number, number>;
@@ -137,6 +140,8 @@ export function NuevaOrden({
   };
   const [requiereGuia, setRequiereGuia] = useState(false);
   const [garantia, setGarantia] = useState<Garantia>(GARANTIA_DEFECTO);
+  // OS: «sin contrato» por servicio (la marca es del ítem; lo cambiado aquí se guarda en el catálogo al emitir).
+  const [contratoCambios, setContratoCambios] = useState<Map<number, boolean>>(new Map());
 
   // Lo avanzado queda en el dispositivo: al salir y volver a Nueva (o cerrar la app), sigue como estaba.
   const clave = claveBorrador(usuario, tipo, borrador?.id);
@@ -246,6 +251,9 @@ export function NuevaOrden({
           cantidad: Number(sel.get(p.id)),
           ...(tipo === "OS" ? { ret_garantia_pct: Number(garantia[categoriaGarantia(p)]) } : {}),
         })),
+        sinContrato: servicios
+          .filter(([id]) => sinContratoDe(id) !== sinContratoSet.has(id))
+          .map(([id]) => ({ item_id: id, sin_contrato: sinContratoDe(id) })),
         ...(borrador ? { borradorId: borrador.id } : {}),
       });
       if (!res.ok) {
@@ -272,6 +280,13 @@ export function NuevaOrden({
       router.replace(`/logistica?tipo=${tipo}&tab=bor`);
     });
 
+  const sinContratoSet = new Set(sinContrato);
+  const sinContratoDe = (id: number) => contratoCambios.get(id) ?? sinContratoSet.has(id);
+  const servicios =
+    tipo === "OS"
+      ? [...new Map(seleccionadas.filter((p) => p.item_id != null).map((p) => [p.item_id!, p.descripcion ?? ""])).entries()]
+      : [];
+  const llevaContrato = servicios.length === 0 || servicios.some(([id]) => !sinContratoDe(id));
   const categorias = [...new Set(seleccionadas.map(categoriaGarantia))].sort((a, b) => ORDEN_GARANTIA.indexOf(a) - ORDEN_GARANTIA.indexOf(b));
   const garantiaInvalida = tipo === "OS" && categorias.some((c) => !pctValido(garantia[c]));
   const retenido =
@@ -426,6 +441,27 @@ export function NuevaOrden({
             </section>
           )}
 
+          {servicios.length > 0 && (
+            <section aria-label="Contrato" className="flex flex-col gap-2 rounded-panel bg-surface p-4">
+              <h2 className="font-semibold">Contrato</h2>
+              {servicios.map(([id, descripcion]) => (
+                <label key={id} className="flex min-h-11 cursor-pointer items-center justify-between gap-3">
+                  <span className="min-w-0 leading-snug">{descripcion}</span>
+                  <span className="flex shrink-0 items-center gap-2 text-sm text-ink-2">
+                    Sin contrato
+                    <input
+                      type="checkbox"
+                      aria-label={`${descripcion}: sin contrato`}
+                      checked={sinContratoDe(id)}
+                      onChange={(e) => setContratoCambios((m) => new Map(m).set(id, e.target.checked))}
+                      className="h-6 w-6 accent-primary"
+                    />
+                  </span>
+                </label>
+              ))}
+            </section>
+          )}
+
           <ul className="overflow-hidden rounded-panel bg-surface">
             <li role="row" className="flex items-end gap-2 border-b border-line py-2 pl-4 pr-1 text-[13px] font-medium leading-tight text-ink-2">
               <span role="columnheader" className="flex flex-1 flex-col">
@@ -521,6 +557,8 @@ export function NuevaOrden({
                 <dd className="num">
                   {fechaInicio && fecha(fechaInicio)} – {fecha(hoyISO())}
                 </dd>
+                <dt className="text-ink-3">Contrato</dt>
+                <dd>{llevaContrato ? "Sí" : "No"}</dd>
                 {retenido > 0.005 && (
                   <>
                     <dt className="text-ink-3">Garantía</dt>
