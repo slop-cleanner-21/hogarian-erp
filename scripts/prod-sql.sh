@@ -17,5 +17,12 @@ if [ $# -ge 1 ]; then
   [ -f "$1" ] || { echo "No existe $1" >&2; exit 1; }
   exec <"$1"
 fi
-docker exec -i -e PGPASSWORD="$PGPASSWORD" -e PGCLIENTENCODING=UTF8 supabase_db_erp-prod1 \
-  psql "$CONN" -v ON_ERROR_STOP=1 --single-transaction -X -At -F ' | '
+# Con el Supabase local encendido, su contenedor; apagado, un contenedor temporal con la misma imagen (solo psql).
+if docker ps --format '{{.Names}}' | grep -qx supabase_db_erp-prod1; then
+  PSQL=(docker exec -i -e PGPASSWORD="$PGPASSWORD" -e PGCLIENTENCODING=UTF8 supabase_db_erp-prod1 psql)
+else
+  IMG="$(docker images --format '{{.Repository}}:{{.Tag}}' | grep -m1 'supabase/postgres:')"
+  [ -n "$IMG" ] || { echo "No hay imagen de Postgres: levanta el Supabase local (npx supabase start)" >&2; exit 1; }
+  PSQL=(docker run --rm -i -e PGPASSWORD="$PGPASSWORD" -e PGCLIENTENCODING=UTF8 --entrypoint psql "$IMG")
+fi
+"${PSQL[@]}" "$CONN" -v ON_ERROR_STOP=1 --single-transaction -X -At -F ' | '
