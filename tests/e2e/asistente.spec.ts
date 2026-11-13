@@ -207,6 +207,34 @@ test.describe("@tesoreria @asistente", () => {
     expect(lado).toBeLessThanOrEqual(1568);
   });
 
+  test("dictado (simulado): se nota que está escuchando, el texto llega al campo y se detiene", async ({ abrir }) => {
+    const page = await abrir("tesoreria", "/tesoreria");
+    await page.evaluate(() => {
+      class R {
+        onresult: ((e: unknown) => void) | null = null;
+        onend: (() => void) | null = null;
+        start() {
+          setTimeout(() => this.onresult?.({ results: [{ 0: { transcript: "las OS pagadas" } }] }), 100);
+        }
+        stop() {
+          this.onend?.();
+        }
+      }
+      Object.defineProperty(window, "SpeechRecognition", { value: R, configurable: true });
+      Object.defineProperty(window, "webkitSpeechRecognition", { value: R, configurable: true });
+    });
+    await page.getByRole("button", { name: "Hogariano", exact: true }).click();
+    const panel = page.getByRole("region", { name: "Hogariano" });
+    await panel.getByRole("button", { name: "Hablar" }).click();
+    await expect(panel.getByRole("button", { name: "Dejar de escuchar" })).toHaveAttribute("aria-pressed", "true");
+    await expect(panel.getByRole("status").filter({ hasText: "Escuchando" })).toBeVisible();
+    await expect(panel.getByRole("textbox", { name: "Mensaje" })).toHaveValue("las OS pagadas");
+    await panel.getByRole("button", { name: "Dejar de escuchar" }).click();
+    await expect(panel.getByRole("button", { name: "Hablar" })).toBeVisible();
+    await expect(panel.getByRole("status").filter({ hasText: "Escuchando" })).toHaveCount(0);
+    await expect(panel.getByRole("textbox", { name: "Mensaje" })).toHaveValue("las OS pagadas");
+  });
+
   test("las herramientas leen con la sesión de quien pregunta: el Jefe de Operaciones no ve montos", async () => {
     const h = await herramientas("jefe");
     try {

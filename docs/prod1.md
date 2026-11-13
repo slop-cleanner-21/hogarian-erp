@@ -164,7 +164,11 @@ Contabilidad, Residente y RRHH **no entran**. Sus roles siguen en la base
   coral (`IconoHogariano`) en la barra superior de
   Tesorería (Pagos y Presupuesto). Abre un **panel abajo que no tapa la app** (como Gemini en Android; `PanelAsistente`, en el layout
   de Tesorería): compacto, con la última respuesta y el campo, y se agranda a media pantalla para ver la conversación (solo, si la
-  respuesta es larga). Sigue abierto al navegar; al filtrar, queda compacto para que se vea el resultado. Se le escribe, se le dicta (el dictado del navegador: Chrome y Edge; Chrome manda el audio a
+  respuesta es larga). Sigue abierto al navegar; al filtrar, queda compacto para que se vea el resultado (la respuesta lleva el ícono de filtro).
+  Su color es el coral del destello (`--hogariano`), solo para sus estados: el destello gira mientras piensa y late mientras escucha;
+  grabando, el micrófono pasa a un botón coral de detener con un anillo que late, y arriba del campo van las barras y el tiempo.
+  Las palabras largas (RUC, N°) se cortan dentro de la burbuja y el campo crece hasta un tope. Las animaciones (`.hog-*`,
+  `globals.css`) se apagan con «reducir movimiento». Se le escribe, se le dicta (el dictado del navegador: Chrome y Edge; Chrome manda el audio a
   Google para transcribirlo, no pasa por nuestro servidor; pide HTTPS o localhost, y `Permissions-Policy` permite el micrófono a
   la propia app) o se le manda una foto (factura, voucher, captura; se achica en el teléfono a 1568 px). Entiende
   pedidos como «quiero ver las OC de Adolfo King en la etapa L1A» y abre la pantalla con esos filtros, o responde cuánto y qué.
