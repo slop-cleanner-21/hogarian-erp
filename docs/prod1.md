@@ -160,6 +160,23 @@ Contabilidad, Residente y RRHH **no entran**. Sus roles siguen en la base
   factura con su archivo, PDF de la orden, contrato, guía de remisión, pagos con voucher, rechazos y entregas.
   Para eso Gerencia lee guías, pagos, rechazos, facturas y vouchers (antes solo Logística, Contabilidad y
   Tesorería). El Jefe de Operaciones no entra a la consulta.
+- **Asistente (prototipo, rama `mcp-prototype`; fase 1: Tesorería, solo lectura y filtros):** botón ✦ en la barra superior de
+  Tesorería (Pagos y Presupuesto). Se le escribe, se le dicta (el dictado del navegador: Chrome y Edge; el audio lo procesa el
+  navegador, no llega al servidor) o se le manda una foto (factura, voucher, captura; se achica en el teléfono a 1568 px). Entiende
+  pedidos como «quiero ver las OC de Adolfo King en la etapa L1A» y abre la pantalla con esos filtros, o responde cuánto y qué.
+  - Es Claude (API de Anthropic, `claude-opus-5-5`, esfuerzo bajo) con las herramientas de un **servidor MCP** propio
+    (`src/lib/asistente/mcp.ts`): buscar empresas, obras, proveedores y etapas; consultar la lista de Pagos con sus mismos filtros
+    y el detalle de una orden; y armar el filtro de Pagos o del Presupuesto. Se conecta en el mismo proceso (`InMemoryTransport`):
+    el conector MCP de la API necesitaría una URL pública y no llevaría la sesión. Un servidor MCP externo (p. ej. para Claude
+    Desktop) es otra fase, con su propia autenticación.
+  - Las herramientas leen con la **sesión de quien pregunta** (la base le da solo lo que ve en pantalla) y solo hacen `select`: nada
+    de RPC ni escrituras. No devuelven cuentas bancarias ni enlaces del proveedor. Los enlaces de filtro los arma el servidor desde
+    ids validados (`src/lib/asistente/urls.ts`); el modelo nunca escribe una URL, y la pantalla solo navega a `/tesoreria…`.
+  - Ruta `POST /asistente` (`requireSesion(["TESORERIA"])`, el Admin también): hasta 2,000 caracteres, 3 fotos y 20 turnos de
+    historial; 10 preguntas por minuto por persona (en la memoria de cada instancia). La conversación queda en la pestaña
+    (`sessionStorage`). Lo que se pregunta, los datos que leen las herramientas y las fotos van a la API de Claude.
+  - Clave: `ANTHROPIC_API_KEY` en `.env.local` (y en Vercel al subirlo); sin ella la ruta responde «El asistente no está
+    configurado». Pruebas: `tests/e2e/asistente.spec.ts`, sin llamar a la API.
 - **Sugerencias:** un botón en el encabezado de todas las pantallas (va en `TopBar`, porque varias no llevan menú de usuario), para
   todos los roles: error, mejora o preferencia de diseño, con hasta 5 capturas (también se pegan en la computadora) y, solas, la
   pantalla y el link desde donde se escribe. Al Admin le llega un aviso y las ve en Admin › Sugerencias, con un enlace a esa
