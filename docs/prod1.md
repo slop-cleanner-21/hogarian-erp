@@ -160,9 +160,13 @@ Contabilidad, Residente y RRHH **no entran**. Sus roles siguen en la base
   factura con su archivo, PDF de la orden, contrato, guía de remisión, pagos con voucher, rechazos y entregas.
   Para eso Gerencia lee guías, pagos, rechazos, facturas y vouchers (antes solo Logística, Contabilidad y
   Tesorería). El Jefe de Operaciones no entra a la consulta.
-- **Asistente (prototipo, rama `mcp-prototype`; fase 1: Tesorería, solo lectura y filtros):** botón ✦ en la barra superior de
-  Tesorería (Pagos y Presupuesto). Se le escribe, se le dicta (el dictado del navegador: Chrome y Edge; el audio lo procesa el
-  navegador, no llega al servidor) o se le manda una foto (factura, voucher, captura; se achica en el teléfono a 1568 px). Entiende
+- **Hogariano, el asistente (prototipo, rama `mcp-prototype`; fase 1: Tesorería, solo lectura y filtros):** botón con un destello
+  coral (`IconoHogariano`) en la barra superior de
+  Tesorería (Pagos y Presupuesto). Abre un **panel abajo que no tapa la app** (como Gemini en Android; `PanelAsistente`, en el layout
+  de Tesorería): compacto, con la última respuesta y el campo, y se agranda a media pantalla para ver la conversación (solo, si la
+  respuesta es larga). Sigue abierto al navegar; al filtrar, queda compacto para que se vea el resultado. Se le escribe, se le dicta (el dictado del navegador: Chrome y Edge; Chrome manda el audio a
+  Google para transcribirlo, no pasa por nuestro servidor; pide HTTPS o localhost, y `Permissions-Policy` permite el micrófono a
+  la propia app) o se le manda una foto (factura, voucher, captura; se achica en el teléfono a 1568 px). Entiende
   pedidos como «quiero ver las OC de Adolfo King en la etapa L1A» y abre la pantalla con esos filtros, o responde cuánto y qué.
   - Es Claude (API de Anthropic, `claude-opus-5-5`, esfuerzo bajo) con las herramientas de un **servidor MCP** propio
     (`src/lib/asistente/mcp.ts`): buscar empresas, obras, proveedores y etapas; consultar la lista de Pagos con sus mismos filtros

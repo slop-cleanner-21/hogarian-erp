@@ -1,6 +1,7 @@
 import Anthropic from "@anthropic-ai/sdk";
 import { z } from "zod";
 import { preguntar } from "@/lib/asistente/agente";
+import { MAX_TURNOS } from "@/lib/asistente/urls";
 import { createClient, requireSesion } from "@/lib/supabase/server";
 
 // Pregunta al asistente (fase 1: Tesorería, solo lectura y filtros). Las herramientas leen con la sesión de quien
@@ -9,10 +10,10 @@ const Pedido = z.object({
   texto: z.string().trim().max(2000),
   historial: z
     .array(z.object({ rol: z.enum(["usuario", "asistente"]), texto: z.string().max(4000) }))
-    .max(20)
+    .max(MAX_TURNOS)
     .default([]),
   imagenes: z
-    .array(z.object({ media_type: z.enum(["image/jpeg", "image/png", "image/webp"]), data: z.string().max(1_500_000).regex(/^[A-Za-z0-9+/=]+$/) }))
+    .array(z.object({ media_type: z.enum(["image/jpeg", "image/png", "image/webp"]), data: z.string().max(1_300_000).regex(/^[A-Za-z0-9+/=]+$/) }))
     .max(3)
     .default([]),
   pantalla: z.string().max(300).default("/tesoreria"),

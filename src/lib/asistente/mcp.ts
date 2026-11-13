@@ -8,7 +8,7 @@ import { desdeFecha, RANGOS_MONTO } from "@/lib/filtros";
 import { todas } from "@/lib/paginar";
 import { normalizarItem } from "@/lib/parecidos";
 import type { createClient } from "@/lib/supabase/server";
-import { FiltrosPagos, FiltrosPresupuesto, urlPagos, urlPresupuesto } from "./urls";
+import { FECHA, FiltrosPagos, FiltrosPresupuesto, urlPagos, urlPresupuesto } from "./urls";
 
 type Db = Awaited<ReturnType<typeof createClient>>;
 
@@ -24,6 +24,8 @@ export function coincide(nombre: string, texto: string): boolean {
 }
 
 const ETAPAS = z.array(z.string().trim().min(1).max(20)).max(30);
+/** N° de orden: solo letras, dígitos y guion (va dentro de un filtro de PostgREST). */
+const NUMERO = z.string().trim().regex(/^[\w-]{1,20}$/, "N° de orden inválido");
 const LIMITE = z.number().int().min(1).max(50).default(20);
 
 export function crearServidorMcp(db: Db): McpServer {
@@ -99,7 +101,7 @@ export function crearServidorMcp(db: Db): McpServer {
         estado: z.enum(["pendiente", "pagado", "rechazos"]).default("pendiente"),
         proveedor_id: z.number().int().positive().optional(),
         etapas: ETAPAS.optional(),
-        fecha: z.string().max(30).optional(),
+        fecha: FECHA.optional(),
         monto: z.enum(["bajo", "medio", "alto"]).optional(),
         limite: LIMITE,
       },
@@ -107,10 +109,19 @@ export function crearServidorMcp(db: Db): McpServer {
     async (f) => {
       const desde = desdeFecha(f.fecha ?? null);
       if (f.estado === "rechazos") {
+        // Los rechazos no traen el id del proveedor: se filtran por su RUC, como la pantalla.
+        let ruc: string | null = null;
+        if (f.proveedor_id) {
+          const { data: prov, error } = await db.from("proveedores").select("ruc_o_cod").eq("id", f.proveedor_id).maybeSingle();
+          if (error) return fallo(error.message);
+          if (!prov) return fallo("Ese proveedor no existe");
+          ruc = prov.ruc_o_cod;
+        }
         const filas = await todas((a, b) => {
           let q = db.from("v_rechazos").select("doc, obra_id, numero, obra, proveedor, ruc, motivo, created_at").eq("doc", f.doc);
           if (f.empresa_id) q = q.eq("empresa_id", f.empresa_id);
           if (f.obra_id) q = q.eq("obra_id", f.obra_id);
+          if (ruc) q = q.eq("ruc", ruc);
           if (desde) q = q.gte("created_at", desde[0]).lt("created_at", desde[1]);
           return q.order("created_at", { ascending: false }).order("id").range(a, b);
         });
@@ -145,7 +156,7 @@ export function crearServidorMcp(db: Db): McpServer {
     "detalle_orden",
     {
       description: "Una OC u OS: sus ítems (cantidad, P.U., parcial, etapa), su comprobante (con detracción y retención) y sus pagos.",
-      inputSchema: { obra_id: z.number().int().positive(), numero: z.string().trim().min(1).max(20) },
+      inputSchema: { obra_id: z.number().int().positive(), numero: NUMERO },
     },
     async ({ obra_id, numero }) => {
       const [cab, lineas] = await Promise.all([
@@ -163,17 +174,21 @@ export function crearServidorMcp(db: Db): McpServer {
           .order("id"),
       ]);
       if (cab.error) return fallo(cab.error.message);
+      if (lineas.error) return fallo(lineas.error.message);
       if (!cab.data) return fallo(`No hay una orden ${numero} en esa obra`);
       const compIds = [...new Set((lineas.data ?? []).map((l) => l.comprobante_id).filter((c): c is number => c != null))];
       const [comps, apl] = await Promise.all([
         compIds.length
           ? db.from("comprobantes").select("id, tipo, serie, numero, fecha_emision, total, detraccion, retencion, anulado_at").in("id", compIds)
-          : Promise.resolve({ data: [] }),
+          : Promise.resolve({ data: [], error: null }),
         db
           .from("pago_aplicaciones")
           .select("monto, pagos(fecha, banco, numero_operacion)")
           .or(`and(obra_id.eq.${obra_id},numero_oc.eq.${numero})${compIds.length ? `,comprobante_id.in.(${compIds.join(",")})` : ""}`),
       ]);
+      // Un error no se lee como «no tiene comprobantes» o «no tiene pagos».
+      if (comps.error) return fallo(comps.error.message);
+      if (apl.error) return fallo(apl.error.message);
       return json({
         orden: { numero, ...cab.data },
         items: (lineas.data ?? []).map((l) => ({ descripcion: l.descripcion, unidad: l.unidad, cantidad: l.cantidad, pu: l.pu_efectivo, parcial: l.parcial, etapa: l.etapa, requerimiento: l.requerimiento })),
@@ -201,7 +216,7 @@ export function crearServidorMcp(db: Db): McpServer {
         estado: z.enum(["pendiente", "pagado", "rechazos"]).default("pendiente"),
         proveedor_id: z.number().int().positive().optional(),
         etapas: ETAPAS.optional(),
-        fecha: z.string().max(30).optional(),
+        fecha: FECHA.optional(),
         monto: z.enum(["bajo", "medio", "alto"]).optional(),
         orden: FiltrosPagos.shape.orden,
       },

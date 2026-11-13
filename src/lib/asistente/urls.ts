@@ -4,7 +4,8 @@
 import { z } from "zod";
 import { RANGO_RE } from "@/lib/filtros";
 
-const FECHA = z.union([z.enum(["7d", "30d", "mes", "mesant"]), z.string().regex(RANGO_RE, "Rango AAAA-MM-DD_AAAA-MM-DD")]);
+/** Fecha de la lista: 7d, 30d, mes, mesant o un rango AAAA-MM-DD_AAAA-MM-DD. */
+export const FECHA = z.union([z.enum(["7d", "30d", "mes", "mesant"]), z.string().regex(RANGO_RE, "Rango AAAA-MM-DD_AAAA-MM-DD")]);
 const ETAPA = z.string().trim().min(1).max(20);
 
 export const FiltrosPagos = z.object({
@@ -62,4 +63,24 @@ export function urlPresupuesto(f: FiltrosPresupuesto): string {
   if (p.pago) q.set("pago", p.pago);
   if (p.busqueda) q.set("q", p.busqueda);
   return `/tesoreria/consultas?${q}`;
+}
+
+// Lo que comparten la hoja (cliente) y la ruta.
+export const MAX_TURNOS = 20;
+
+/** Los últimos turnos, empezando por una pregunta (la API no acepta empezar con una respuesta). */
+export function historialDe(turnos: { rol: "usuario" | "asistente"; texto: string }[]) {
+  const ultimos = turnos.slice(-MAX_TURNOS);
+  const desde = ultimos.findIndex((t) => t.rol === "usuario");
+  return desde < 0 ? [] : ultimos.slice(desde).map(({ rol, texto }) => ({ rol, texto }));
+}
+
+/** Solo se navega a Pagos o al Presupuesto de Tesorería (el enlace lo arma el servidor; igual se revisa). */
+export function destinoValido(url: string): boolean {
+  try {
+    const u = new URL(url, "https://app.local");
+    return u.origin === "https://app.local" && (u.pathname === "/tesoreria" || u.pathname === "/tesoreria/consultas") && !u.hash;
+  } catch {
+    return false;
+  }
 }

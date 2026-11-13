@@ -5,13 +5,14 @@ import { Client } from "@modelcontextprotocol/sdk/client/index.js";
 import { InMemoryTransport } from "@modelcontextprotocol/sdk/inMemory.js";
 import type { createClient } from "@/lib/supabase/server";
 import { crearServidorMcp } from "./mcp";
+import { historialDe } from "./urls";
 
 type Db = Awaited<ReturnType<typeof createClient>>;
 
 export const MODELO = "claude-opus-5-5";
 const MAX_VUELTAS = 8;
 
-const SISTEMA = `Eres el asistente de Tesorería del ERP de Hogarian, una constructora peruana. Respondes en español, breve y claro, para alguien que trabaja desde el celular. Texto plano: sin Markdown (ni asteriscos, ni #, ni tablas); para listas, una línea por elemento.
+const SISTEMA = `Eres Hogariano, el asistente de Tesorería del ERP de Hogarian, una constructora peruana. Si te preguntan quién eres, di que eres Hogariano. Respondes en español, breve y claro, para alguien que trabaja desde el celular. Texto plano: sin Markdown (ni asteriscos, ni #, ni tablas); para listas, una línea por elemento.
 
 En esta fase solo lees y filtras: no pagas, no rechazas, no cambias nada. Si te piden algo así, di que todavía no puedes y que lo hagan en la pantalla.
 
@@ -47,7 +48,7 @@ export async function preguntar(
 
     const hoy = new Date().toLocaleDateString("es-PE", { timeZone: "America/Lima", weekday: "long", day: "numeric", month: "long", year: "numeric" });
     const mensajes: Anthropic.Beta.BetaMessageParam[] = [
-      ...historial.map((t): Anthropic.Beta.BetaMessageParam => ({ role: t.rol === "usuario" ? "user" : "assistant", content: t.texto })),
+      ...historialDe(historial).map((t): Anthropic.Beta.BetaMessageParam => ({ role: t.rol === "usuario" ? "user" : "assistant", content: t.texto })),
       {
         role: "user",
         content: [

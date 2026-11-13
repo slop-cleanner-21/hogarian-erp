@@ -103,7 +103,7 @@ test.describe("@prod1 @logistica facturar: guía y retención", () => {
     }
   });
 
-  // Las dos suben un contrato a la misma OS facturada: una tras otra.
+  // Usan la misma OS facturada (suben un contrato o la envían): una tras otra.
   test.describe("contrato firmado de una OS facturada", () => {
     test.describe.configure({ mode: "serial" });
 
@@ -163,48 +163,48 @@ test.describe("@prod1 @logistica facturar: guía y retención", () => {
         await fetch(`${sb}/storage/v1/object/comprobantes`, { method: "DELETE", headers: { ...auth, "Content-Type": "application/json" }, body: JSON.stringify({ prefixes: [ruta] }) });
       }
     });
-  });
 
-  test("la base: el contrato no puede ser el archivo del comprobante (al subirlo ni, al revés, al enviar a Tesorería)", async () => {
-    const fila = sql(
-      `select o.obra_id, o.numero, min(i.comprobante_id) from ordenes_compra o join oc_items i on i.obra_id = o.obra_id and i.numero_oc = o.numero
-        where o.tipo = 'OS' and o.estado = 'FACTURADA' and not o.historico and not o.es_retencion and i.comprobante_id is not null
-          and os_lleva_contrato(o.obra_id, o.numero)
-        group by 1, 2 order by o.obra_id desc, o.numero limit 1`,
-    )[0];
-    test.skip(!fila, "no hay OS facturada");
-    const [obra, numero, comp] = fila;
-    const uid = uidDe("LOGISTICA");
-    // Archivos simulados en el almacenamiento (todo se deshace): el comprobante y el «contrato» con el mismo MD5 y tamaño.
-    const objeto = (bucket: string, nombre: string, etag: string) =>
-      `insert into storage.objects (bucket_id, name, metadata) values ('${bucket}', '${nombre}', '{"eTag": "\\"${etag}\\"", "size": 2217}'::jsonb);`;
-    const probar = (antes: string, q: string) => {
-      const filas = sqlScript(`begin;
-        delete from adjuntos where tipo = 'CONTRATO' and obra_id = ${obra} and numero_oc = '${numero}';
-        ${objeto("comprobantes", `e2e/comp-${comp}.pdf`, "aaa")}
-        update comprobantes set archivo_path = 'e2e/comp-${comp}.pdf' where id = ${comp};
-        ${objeto("documentos", `${obra}/${numero}/CONTRATO/igual.pdf`, "aaa")}
-        ${objeto("documentos", `${obra}/${numero}/CONTRATO/firmado.pdf`, "bbb")}
-        ${antes}
-        select set_config('request.jwt.claims', '{"sub":"${uid}","role":"authenticated"}', true) is null;
-        set local role authenticated;
-        do $$ begin
-          ${q};
-          perform set_config('t.r', 'ok', true);
-        exception when others then
-          perform set_config('t.r', 'error: ' || sqlerrm, true);
-        end $$;
-        select 'r', current_setting('t.r');
-        rollback;`);
-      return filas.find((f) => f[0] === "r")?.[1];
-    };
-    const adjunto = (nombre: string) =>
-      `insert into adjuntos (obra_id, numero_oc, tipo, path, nombre) values (${obra}, '${numero}', 'CONTRATO', '${obra}/${numero}/CONTRATO/${nombre}', '${nombre}')`;
-    expect(probar("", adjunto("igual.pdf")), "el mismo archivo que el comprobante").toMatch(/es el comprobante .* de la orden, no el contrato/);
-    expect(probar("", adjunto("firmado.pdf")), "otro archivo").toBe("ok");
-    // Al revés: el contrato ya estaba (sin pasar por la revisión) y el comprobante resultó ser ese mismo archivo.
-    const yaEstaba = `alter table adjuntos disable trigger adjuntos_contrato_no_comprobante; ${adjunto("igual.pdf")}; alter table adjuntos enable trigger adjuntos_contrato_no_comprobante;`;
-    expect(probar(yaEstaba, `perform enviar_a_tesoreria(${obra}, '${numero}')`)).toMatch(/Falta el contrato firmado/);
+    test("la base: el contrato no puede ser el archivo del comprobante (al subirlo ni, al revés, al enviar a Tesorería)", async () => {
+      const fila = sql(
+        `select o.obra_id, o.numero, min(i.comprobante_id) from ordenes_compra o join oc_items i on i.obra_id = o.obra_id and i.numero_oc = o.numero
+          where o.tipo = 'OS' and o.estado = 'FACTURADA' and not o.historico and not o.es_retencion and i.comprobante_id is not null
+            and os_lleva_contrato(o.obra_id, o.numero)
+          group by 1, 2 order by o.obra_id desc, o.numero limit 1`,
+      )[0];
+      test.skip(!fila, "no hay OS facturada");
+      const [obra, numero, comp] = fila;
+      const uid = uidDe("LOGISTICA");
+      // Archivos simulados en el almacenamiento (todo se deshace): el comprobante y el «contrato» con el mismo MD5 y tamaño.
+      const objeto = (bucket: string, nombre: string, etag: string) =>
+        `insert into storage.objects (bucket_id, name, metadata) values ('${bucket}', '${nombre}', '{"eTag": "\\"${etag}\\"", "size": 2217}'::jsonb);`;
+      const probar = (antes: string, q: string) => {
+        const filas = sqlScript(`begin;
+          delete from adjuntos where tipo = 'CONTRATO' and obra_id = ${obra} and numero_oc = '${numero}';
+          ${objeto("comprobantes", `e2e/comp-${comp}.pdf`, "aaa")}
+          update comprobantes set archivo_path = 'e2e/comp-${comp}.pdf' where id = ${comp};
+          ${objeto("documentos", `${obra}/${numero}/CONTRATO/igual.pdf`, "aaa")}
+          ${objeto("documentos", `${obra}/${numero}/CONTRATO/firmado.pdf`, "bbb")}
+          ${antes}
+          select set_config('request.jwt.claims', '{"sub":"${uid}","role":"authenticated"}', true) is null;
+          set local role authenticated;
+          do $$ begin
+            ${q};
+            perform set_config('t.r', 'ok', true);
+          exception when others then
+            perform set_config('t.r', 'error: ' || sqlerrm, true);
+          end $$;
+          select 'r', current_setting('t.r');
+          rollback;`);
+        return filas.find((f) => f[0] === "r")?.[1];
+      };
+      const adjunto = (nombre: string) =>
+        `insert into adjuntos (obra_id, numero_oc, tipo, path, nombre) values (${obra}, '${numero}', 'CONTRATO', '${obra}/${numero}/CONTRATO/${nombre}', '${nombre}')`;
+      expect(probar("", adjunto("igual.pdf")), "el mismo archivo que el comprobante").toMatch(/es el comprobante .* de la orden, no el contrato/);
+      expect(probar("", adjunto("firmado.pdf")), "otro archivo").toBe("ok");
+      // Al revés: el contrato ya estaba (sin pasar por la revisión) y el comprobante resultó ser ese mismo archivo.
+      const yaEstaba = `alter table adjuntos disable trigger adjuntos_contrato_no_comprobante; ${adjunto("igual.pdf")}; alter table adjuntos enable trigger adjuntos_contrato_no_comprobante;`;
+      expect(probar(yaEstaba, `perform enviar_a_tesoreria(${obra}, '${numero}')`)).toMatch(/Falta el contrato firmado/);
+    });
   });
 
   test("RHE: 8 % del proveedor sobre S/ 1,500, nada con suspensión vigente, y aviso si cambia el contrato", async ({ abrir }, info) => {
