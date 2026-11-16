@@ -1,5 +1,6 @@
 import type { Metadata } from "next";
 import Link from "next/link";
+import { IconoHogariano } from "@/components/asistente";
 import { ImagenFirmada } from "@/components/imagen-firmada";
 import { TopBar, UserMenu } from "@/components/shell";
 import { EnlaceArchivo } from "@/components/visor";
@@ -22,7 +23,7 @@ export default async function SugerenciasPage() {
   const db = createAdminClient();
   const { data: sugerencias, error } = await db
     .from("sugerencias")
-    .select("id, user_id, rol, tipo, texto, pantalla, ruta, capturas, created_at")
+    .select("id, user_id, rol, tipo, texto, pantalla, ruta, capturas, created_at, origen")
     .order("created_at", { ascending: false })
     .order("id", { ascending: false })
     .limit(200);
@@ -54,9 +55,17 @@ export default async function SugerenciasPage() {
                       {ROL_LABEL[s.rol as Rol] ?? s.rol} · {cuando.format(new Date(s.created_at))}
                     </p>
                   </div>
-                  <span className={`shrink-0 rounded-full px-2 text-[13px] font-semibold leading-6 ${TONO[s.tipo] ?? ""}`}>
-                    {TIPOS_SUGERENCIA.find((t) => t.valor === s.tipo)?.label ?? s.tipo}
-                  </span>
+                  <div className="flex shrink-0 flex-col items-end gap-1">
+                    <span className={`rounded-full px-2 text-[13px] font-semibold leading-6 ${TONO[s.tipo] ?? ""}`}>
+                      {TIPOS_SUGERENCIA.find((t) => t.valor === s.tipo)?.label ?? s.tipo}
+                    </span>
+                    {s.origen === "HOGARIANO" && (
+                      <span className="flex items-center gap-1 rounded-full bg-hogariano/12 px-2 text-[13px] font-semibold leading-6 text-hogariano">
+                        <IconoHogariano size={14} />
+                        Con Hogariano
+                      </span>
+                    )}
+                  </div>
                 </div>
                 <p className="whitespace-pre-wrap break-words leading-snug">{s.texto}</p>
                 {s.capturas.length > 0 && (

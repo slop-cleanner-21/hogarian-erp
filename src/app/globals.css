@@ -253,9 +253,20 @@ html[data-bloqueo] body > :not([data-bloqueo-pantalla]) {
 .hog-entra {
   animation: subir 160ms ease-out;
 }
+/* Pensando: el destello rota despacio y sus rayos se recogen hacia el centro y vuelven, en ola alrededor del círculo
+   (cada rayo es su propio trazo con pathLength 1; el desfase lo da --i). */
 .hog-pensando {
-  animation: hog-girar 2.4s linear infinite;
+  animation: hog-girar 6s linear infinite;
   transform-origin: center;
+}
+.hog-pensando .hog-rayo {
+  stroke-dasharray: 1 1;
+  animation: hog-rayo 1.2s cubic-bezier(0.45, 0, 0.55, 1) infinite;
+  animation-delay: calc(var(--i) * -0.1s);
+}
+@keyframes hog-rayo {
+  0%, 100% { stroke-dashoffset: 0; opacity: 1; }
+  50% { stroke-dashoffset: 0.7; opacity: 0.55; }
 }
 .hog-escuchando {
   animation: hog-latir 1.1s ease-in-out infinite;
@@ -263,6 +274,9 @@ html[data-bloqueo] body > :not([data-bloqueo-pantalla]) {
 }
 @keyframes hog-girar {
   to { transform: rotate(360deg); }
+}
+@keyframes hog-pulso {
+  50% { opacity: 0.45; }
 }
 @keyframes hog-latir {
   50% { transform: scale(0.82); }
@@ -279,6 +293,18 @@ html[data-bloqueo] body > :not([data-bloqueo-pantalla]) {
 @keyframes hog-anillo {
   from { transform: scale(0.85); opacity: 0.9; }
   to { transform: scale(1.35); opacity: 0; }
+}
+/* Respuesta compacta que no cabe: se desvanece abajo (tocarla la agranda). */
+.hog-corte {
+  -webkit-mask-image: linear-gradient(to bottom, black 70%, transparent);
+  mask-image: linear-gradient(to bottom, black 70%, transparent);
+}
+/* Aviso breve cuando el panel se oculta para mostrar lo que hizo. */
+.hog-aviso {
+  animation: subir 160ms ease-out, hog-irse 300ms ease-in 3.7s forwards;
+}
+@keyframes hog-irse {
+  to { opacity: 0; transform: translateY(6px); }
 }
 /* Barras de sonido mientras escucha (decorativas: el dictado del navegador no da el nivel). */
 .hog-barras > i {
@@ -300,6 +326,9 @@ html[data-bloqueo] body > :not([data-bloqueo-pantalla]) {
 }
 @media (prefers-reduced-motion: reduce) {
   .panel-hogariano, .hog-entra, .hog-pensando, .hog-escuchando, .hog-barras > i { animation: none; transition: none; }
+  /* Sin girar ni recoger rayos: solo un pulso suave, para que se siga notando que piensa. */
+  .hog-pensando .hog-rayo { animation: hog-pulso 1.6s ease-in-out infinite; animation-delay: 0s; stroke-dashoffset: 0; }
+  .hog-aviso { animation: hog-irse 1ms linear 4s forwards; }
   .hog-anillo::before { animation: none; opacity: 0.6; transform: none; }
   .hog-barras > i { transform: scaleY(0.6); }
 }

@@ -25,6 +25,7 @@ import { usePathname, useRouter, useSearchParams } from "next/navigation";
 import { useEffect, useState, useTransition, type ReactNode } from "react";
 import { cn } from "@/lib/format";
 import { exportarExcel } from "@/app/excel/actions";
+import { useAbrirHoja } from "@/lib/asistente/hojas";
 import { BotonAsistente } from "./asistente";
 import { BotonSugerencia } from "./sugerencia";
 import { cambiarRol } from "@/app/rol/actions";
@@ -203,6 +204,7 @@ export function TopBar({
 
 export function UserMenu({ id, nombre, rol }: { id: string; nombre: string; rol: Rol }) {
   const [open, setOpen] = useState(false);
+  useAbrirHoja("menu", () => setOpen(true));
   const [contrasena, setContrasena] = useState(false);
   const [firma, setFirma] = useState(false);
   const [huella, setHuella] = useState(false);

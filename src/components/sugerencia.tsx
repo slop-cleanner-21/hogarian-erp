@@ -3,6 +3,7 @@
 import { Lightbulb, Paperclip, X } from "lucide-react";
 import { useEffect, useRef, useState, useTransition, type ClipboardEvent } from "react";
 import { enviarSugerencia } from "@/app/sugerencias/actions";
+import { useAbrirHoja } from "@/lib/asistente/hojas";
 import { createClient } from "@/lib/supabase/client";
 import { cn } from "@/lib/format";
 import { TIPOS_SUGERENCIA, type TipoSugerencia } from "@/lib/sugerencias";
@@ -20,6 +21,7 @@ type Captura = { archivo: File; url: string };
 /** Botón del encabezado: errores, mejoras y preferencias de diseño, con capturas. Lleva la pantalla y el link desde donde se escribe. */
 export function BotonSugerencia() {
   const [abierta, setAbierta] = useState(false);
+  useAbrirHoja("sugerencia", () => setAbierta(true));
   return (
     <>
       <button

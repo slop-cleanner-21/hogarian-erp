@@ -65,15 +65,41 @@ export function urlPresupuesto(f: FiltrosPresupuesto): string {
   return `/tesoreria/consultas?${q}`;
 }
 
-// Lo que comparten la hoja (cliente) y la ruta.
+// Lo que comparten el panel (cliente) y la ruta.
 export const MAX_TURNOS = 20;
+/** Lo más largo de un turno que vuelve como historial (una respuesta con tablas puede ser larga; más, se recorta). */
+export const MAX_TEXTO_TURNO = 8000;
 
-/** Los últimos turnos, empezando por una pregunta (la API no acepta empezar con una respuesta). */
+/** Los últimos turnos, empezando por una pregunta (la API no acepta empezar con una respuesta), cada uno hasta el tope. */
 export function historialDe(turnos: { rol: "usuario" | "asistente"; texto: string }[]) {
   const ultimos = turnos.slice(-MAX_TURNOS);
   const desde = ultimos.findIndex((t) => t.rol === "usuario");
-  return desde < 0 ? [] : ultimos.slice(desde).map(({ rol, texto }) => ({ rol, texto }));
+  return desde < 0 ? [] : ultimos.slice(desde).map(({ rol, texto }) => ({ rol, texto: texto.slice(0, MAX_TEXTO_TURNO) }));
 }
+
+/** El pago de una orden en Tesorería (lo arma el servidor: el modelo solo copia el enlace). */
+export const enlaceOrden = (obraId: number, numero: string) => `/tesoreria/pago/${obraId}/${encodeURIComponent(numero)}`;
+
+/** ¿Un enlace de la respuesta se puede abrir? Pagos, el Presupuesto o el pago de una orden; nada fuera de la app. */
+export function enlaceValido(url: string): boolean {
+  try {
+    const u = new URL(url, "https://app.local");
+    if (u.origin !== "https://app.local" || u.hash) return false;
+    return u.pathname === "/tesoreria" || u.pathname === "/tesoreria/consultas" || /^\/tesoreria\/pago\/\d+\/[^/]+$/.test(u.pathname);
+  } catch {
+    return false;
+  }
+}
+
+/** Lo que el asistente puede abrir en la app (cada uno es una hoja o una pantalla). */
+export const QUE_ABRIR = ["menu", "avisos", "diseno", "filtros", "sugerencia", "ajustes_hogariano", "chats"] as const;
+/** Lo que el asistente hace en la pantalla. Las herramientas la devuelven; el panel la valida y la ejecuta. */
+export const Accion = z.discriminatedUnion("tipo", [
+  z.object({ tipo: z.literal("navegar"), url: z.string().max(600).refine(enlaceValido) }),
+  z.object({ tipo: z.literal("tema"), valor: z.enum(["claro", "oscuro", "sistema"]) }),
+  z.object({ tipo: z.literal("abrir"), que: z.enum(QUE_ABRIR) }),
+]);
+export type Accion = z.infer<typeof Accion>;
 
 /** Solo se navega a Pagos o al Presupuesto de Tesorería (el enlace lo arma el servidor; igual se revisa). */
 export function destinoValido(url: string): boolean {

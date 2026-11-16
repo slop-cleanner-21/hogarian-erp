@@ -2825,6 +2825,7 @@ export type Database = {
           capturas: string[];
           created_at: string;
           id: number;
+          origen: string;
           pantalla: string | null;
           rol: string;
           ruta: string | null;
@@ -2837,6 +2838,7 @@ export type Database = {
           capturas?: string[];
           created_at?: string;
           id?: never;
+          origen?: string;
           pantalla?: string | null;
           rol: string;
           ruta?: string | null;
@@ -2848,6 +2850,7 @@ export type Database = {
           capturas?: string[];
           created_at?: string;
           id?: never;
+          origen?: string;
           pantalla?: string | null;
           rol?: string;
           ruta?: string | null;
@@ -4356,6 +4359,7 @@ export type Database = {
       enviar_sugerencia: {
         Args: {
           p_capturas: string[];
+          p_origen?: string;
           p_pantalla: string;
           p_ruta: string;
           p_texto: string;

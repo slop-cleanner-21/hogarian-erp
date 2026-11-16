@@ -9,6 +9,7 @@ import { Button } from "@/components/ui/button";
 import { inputClass } from "@/components/ui/field";
 import { SearchSelect, type Option } from "@/components/ui/search-select";
 import { Sheet } from "@/components/ui/sheet";
+import { useAbrirHoja } from "@/lib/asistente/hojas";
 import { FECHAS, RANGO_RE, TODOS } from "@/lib/filtros";
 import { cn, matches } from "@/lib/format";
 
@@ -46,6 +47,7 @@ export function FiltrosHoja({
   const path = usePathname();
   const params = useSearchParams();
   const [abierta, setAbierta] = useState(false);
+  useAbrirHoja("filtros", () => setAbierta(true));
 
   const actuales = Object.fromEntries(secciones.map((s) => [s.param, (local ? local.valores[s.param] : params.get(s.param)) ?? defDe(s)]));
   const activos = secciones.reduce(

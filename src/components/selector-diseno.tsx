@@ -22,6 +22,7 @@ import {
 import { useRouter } from "next/navigation";
 import { useState, useTransition, type ReactNode } from "react";
 import { Sheet } from "@/components/ui/sheet";
+import { useAbrirHoja } from "@/lib/asistente/hojas";
 import { DISENOS_ITEMS, disenosDe, guardarDiseno, type PantallaDiseno } from "@/lib/diseno";
 import { cn } from "@/lib/format";
 
@@ -380,6 +381,7 @@ export function SelectorDiseno({
   const router = useRouter();
   const opciones: readonly { value: string; label: string }[] = tipo === "items" ? DISENOS_ITEMS : disenosDe(pantalla);
   const [hoja, setHoja] = useState(false);
+  useAbrirHoja("diseno", () => setHoja(true));
   const [elegido, setElegido] = useState({ diseno: actual, fijo });
   const [cargando, startTransition] = useTransition();
   const Icono = ICONOS[tipo][elegido.diseno] ?? LayoutList;

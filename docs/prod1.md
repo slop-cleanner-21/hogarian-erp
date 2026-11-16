@@ -160,40 +160,60 @@ Contabilidad, Residente y RRHH **no entran**. Sus roles siguen en la base
   factura con su archivo, PDF de la orden, contrato, guía de remisión, pagos con voucher, rechazos y entregas.
   Para eso Gerencia lee guías, pagos, rechazos, facturas y vouchers (antes solo Logística, Contabilidad y
   Tesorería). El Jefe de Operaciones no entra a la consulta.
-- **Hogariano, el asistente (prototipo, rama `mcp-prototype`; fase 1: Tesorería, solo lectura y filtros):** botón con un destello
-  coral (`IconoHogariano`) en la barra superior de
-  Tesorería (Pagos y Presupuesto). Abre un **panel abajo que no tapa la app** (como Gemini en Android; `PanelAsistente`, en el layout
-  de Tesorería): compacto, con la última respuesta y el campo, y se agranda a media pantalla para ver la conversación (solo, si la
-  respuesta es larga). Sigue abierto al navegar; al filtrar, queda compacto para que se vea el resultado (la respuesta lleva el ícono de filtro).
-  Su color es el coral del destello (`--hogariano`), solo para sus estados: el destello gira mientras piensa y late mientras escucha;
-  grabando, el micrófono pasa a un botón coral de detener con un anillo que late, y arriba del campo van las barras y el tiempo.
-  Las palabras largas (RUC, N°) se cortan dentro de la burbuja y el campo crece hasta un tope. Las animaciones (`.hog-*`,
-  `globals.css`) se apagan con «reducir movimiento». Se le escribe, se le dicta (el dictado del navegador: Chrome y Edge; Chrome manda el audio a
-  Google para transcribirlo, no pasa por nuestro servidor; pide HTTPS o localhost, y `Permissions-Policy` permite el micrófono a
-  la propia app) o se le manda una foto (factura, voucher, captura; se achica en el teléfono a 1568 px). Entiende
-  pedidos como «quiero ver las OC de Adolfo King en la etapa L1A» y abre la pantalla con esos filtros, o responde cuánto y qué.
+- **Hogariano, el asistente (prototipo, rama `mcp-prototype`; Tesorería: lee, filtra, maneja la interfaz y envía sugerencias):**
+  botón con un destello coral (`IconoHogariano`) en la barra superior de Tesorería (Pagos y Presupuesto). Abre un **panel abajo
+  que no tapa la app** (como Gemini en Android; `PanelAsistente`, en el layout de Tesorería): compacto, con la última respuesta y
+  el campo. **Se agranda solo** cuando la respuesta no cabe: se mide lo pintado (si desborda el panel chico) o trae tablas o
+  subtítulos (`pideEspacio`); una corta queda chica. Sigue abierto al navegar.
+  - **Respuestas con formato** (Markdown: subtítulos, negritas, listas, tablas; `asistente-markdown.tsx`, `react-markdown` +
+    `remark-gfm`): sin HTML crudo ni imágenes (una foto con instrucciones podría pedir una imagen con datos en su URL). Las tablas
+    van al ancho del panel, con los montos sin partir. **Enlaces** a las órdenes que nombra: los arma el servidor (`enlace` en cada
+    fila, `enlaceOrden`) y el modelo solo los copia; el panel abre solo los que pasan `enlaceValido` (Pagos, Presupuesto o el pago
+    de una orden). Cualquier otro queda como texto.
+  - **Maneja la interfaz**: filtra Pagos o el Presupuesto, abre el pago de una orden, cambia el tema (claro, oscuro, sistema) y
+    abre el menú del usuario, los avisos, el diseño de la lista, los filtros o el formulario de sugerencia (evento `ABRIR_HOJA`,
+    `lib/asistente/hojas.ts`; cada hoja lo escucha). Las herramientas devuelven una `accion` (`Accion`, en `urls.ts`) que el
+    panel valida otra vez y ejecuta; **al hacerlo se oculta** y deja un aviso breve con lo que hizo (tocarlo lo vuelve a abrir).
+    Sus propios ajustes y la lista de chats los muestra en el panel.
+  - **Chats**: varios, en el dispositivo y por usuario (`localStorage`, `lib/asistente/chats.ts`; hasta 30 chats, sin fotos). Desde
+    la cabecera: nuevo chat, la lista (abrir o borrar) y **Ajustes**: si el botón abre **el último chat o uno nuevo**. Si se ocultó
+    solo por una acción, al volver sigue el mismo chat (para seguir afinando el pedido). Lo conversado (montos, proveedores) queda
+    en el teléfono de quien pregunta.
+  - **Sugerencias por chat**: si el usuario quiere reportar un error o pedir una mejora, Hogariano arma el texto, se lo muestra y la
+    envía solo cuando confirma (`crear_sugerencia`, una por pregunta, nunca por lo que diga una foto). Va por `enviar_sugerencia`
+    con `origen` HOGARIANO (migración `prod1_sugerencia_hogariano`) y la pantalla desde la que se escribe; el Admin la ve marcada
+    «Con Hogariano» y el aviso lo dice. Para adjuntar capturas, abre el formulario de siempre.
+  - Su color es el coral del destello (`--hogariano`), solo para sus estados: mientras piensa, sus rayos se recogen y se estiran en
+    ola y el destello rota despacio (`.hog-pensando .hog-rayo`); late mientras escucha; grabando, el micrófono pasa a un botón coral
+    de detener con un anillo que late, y arriba del campo van las barras y el tiempo. Las animaciones (`.hog-*`, `globals.css`)
+    se apagan con «reducir movimiento» (pensando queda en un pulso suave).
+  - Se le escribe, se le dicta (el dictado del navegador: Chrome y Edge; Chrome manda el audio a Google para transcribirlo, no pasa
+    por nuestro servidor; pide HTTPS o localhost, y `Permissions-Policy` permite el micrófono a la propia app) o se le manda una
+    foto (factura, voucher, captura; se achica en el teléfono a 1568 px).
   - Es Claude (API de Anthropic, `claude-opus-5-5`, esfuerzo bajo) con las herramientas de un **servidor MCP** propio
     (`src/lib/asistente/mcp.ts`): buscar empresas, obras, proveedores y etapas; consultar la lista de Pagos con sus mismos filtros
     (sumas de todo, las primeras filas en el `orden` pedido y cuántas no vinieron: «las más grandes» salen de `monto.desc`, nunca de una
     lista parcial por fecha) y el detalle de una orden; resúmenes sumados en el servidor (el modelo no suma filas a mano):
     Pagos **por grupo** (proveedor, obra, empresa, etapa —repartida como la pantalla— o mes), **compras de un ítem** (cantidad,
     P.U. mínimo, máximo, promedio y último, por proveedor; sin anuladas ni cotizando) y el **presupuesto de una obra** por etapa,
-    rubro o partida (presupuestado, comprado, pagado, por pagar y excedido; lo pagado, como el Presupuesto: `acumularPagoPartida`); y armar el filtro de Pagos o del Presupuesto. Se conecta en el mismo proceso (`InMemoryTransport`):
-    el conector MCP de la API necesitaría una URL pública y no llevaría la sesión. Un servidor MCP externo (p. ej. para Claude
-    Desktop) es otra fase, con su propia autenticación.
-  - Las herramientas leen con la **sesión de quien pregunta** (la base le da solo lo que ve en pantalla) y solo hacen `select`: nada
-    de RPC ni escrituras. No devuelven cuentas bancarias ni enlaces del proveedor. Los enlaces de filtro los arma el servidor desde
-    ids validados (`src/lib/asistente/urls.ts`); el modelo nunca escribe una URL, y la pantalla solo navega a `/tesoreria…`.
+    rubro o partida (presupuestado, comprado, pagado, por pagar y excedido; lo pagado, como el Presupuesto: `acumularPagoPartida`);
+    y las de la interfaz y la sugerencia. Se conecta en el mismo proceso (`InMemoryTransport`): el conector MCP de la API
+    necesitaría una URL pública y no llevaría la sesión. Un servidor MCP externo (p. ej. para Claude Desktop) es otra fase, con su
+    propia autenticación.
+  - Las herramientas leen con la **sesión de quien pregunta** (la base le da solo lo que ve en pantalla) con `select`; la única
+    escritura es la sugerencia. No devuelven cuentas bancarias ni enlaces del proveedor. Los enlaces los arma el servidor desde
+    ids validados (`src/lib/asistente/urls.ts`); el modelo nunca escribe una URL.
   - Ruta `POST /asistente` (`requireSesion(["TESORERIA"])`, el Admin también): hasta 2,000 caracteres, 3 fotos y 20 turnos de
-    historial; 10 preguntas por minuto por persona (en la memoria de cada instancia). La conversación queda en la pestaña
-    (`sessionStorage`). Lo que se pregunta, los datos que leen las herramientas y las fotos van a la API de Claude.
+    historial (cada uno hasta 8,000 caracteres; lo más largo se recorta); 10 preguntas por minuto por persona (en la memoria de
+    cada instancia). Responde `{ texto, acciones }`. Lo que se pregunta, los datos que leen las herramientas y las fotos van a la
+    API de Claude.
   - Clave: `ANTHROPIC_API_KEY` en `.env.local` (y en Vercel al subirlo); sin ella la ruta responde «El asistente no está
-    configurado». Pruebas: `tests/e2e/asistente.spec.ts`, sin llamar a la API.
+    configurado». Pruebas: `tests/e2e/asistente.spec.ts`, sin llamar a la API (respuestas simuladas para el panel).
 - **Sugerencias:** un botón en el encabezado de todas las pantallas (va en `TopBar`, porque varias no llevan menú de usuario), para
   todos los roles: error, mejora o preferencia de diseño, con hasta 5 capturas (también se pegan en la computadora) y, solas, la
   pantalla y el link desde donde se escribe. Al Admin le llega un aviso y las ve en Admin › Sugerencias, con un enlace a esa
   pantalla. Tabla `sugerencias` y bucket `sugerencias`: solo las lee el servidor; cada uno sube a su carpeta y se escribe por
-  `enviar_sugerencia`, que solo acepta archivos propios.
+  `enviar_sugerencia`, que solo acepta archivos propios. También se envían por chat con Hogariano (`origen` HOGARIANO, ver arriba).
 - **Usuarios (solo el Admin):** crea cuentas (nombres y apellidos, correo, rol de prod 1, DNI y celular), cambia nombres,
   apellidos, correo, rol, DNI y celular, restablece la contraseña (genera otra temporal),
   desactiva y reactiva. Lo hace el servidor con la clave secreta (`src/lib/supabase/admin.ts`); el registro

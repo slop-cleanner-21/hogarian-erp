@@ -3,7 +3,8 @@ import { Client } from "@modelcontextprotocol/sdk/client/index.js";
 import { InMemoryTransport } from "@modelcontextprotocol/sdk/inMemory.js";
 import { createClient } from "@supabase/supabase-js";
 import { coincide, crearServidorMcp } from "@/lib/asistente/mcp";
-import { destinoValido, historialDe, urlPagos, urlPresupuesto } from "@/lib/asistente/urls";
+import { podar, pideEspacio, tituloDe } from "@/lib/asistente/chats";
+import { Accion, destinoValido, enlaceOrden, enlaceValido, historialDe, MAX_TEXTO_TURNO, urlPagos, urlPresupuesto } from "@/lib/asistente/urls";
 import { expect, test } from "./fixtures";
 import { ROLES, sesionApi, sql, sql1 } from "./lib";
 
@@ -16,12 +17,12 @@ const env = Object.fromEntries(
 const SB = "http://127.0.0.1:55321";
 
 /** Las herramientas del asistente, conectadas en memoria y leyendo con la sesión del rol. */
-async function herramientas(rol: keyof typeof ROLES) {
+async function herramientas(rol: keyof typeof ROLES, pantalla = "/tesoreria/consultas?obra=1") {
   const s = await sesionApi(SB, env.NEXT_PUBLIC_SUPABASE_ANON_KEY, env.SUPABASE_SECRET_KEY, ROLES[rol]);
   const db = createClient(SB, env.NEXT_PUBLIC_SUPABASE_ANON_KEY, { global: { headers: { Authorization: `Bearer ${s.access_token}` } }, auth: { persistSession: false } });
   const [a, b] = InMemoryTransport.createLinkedPair();
   // eslint-disable-next-line @typescript-eslint/no-explicit-any -- el cliente de la API y el del servidor son el mismo supabase-js
-  const servidor = crearServidorMcp(db as any);
+  const servidor = crearServidorMcp(db as any, { pantalla });
   const cliente = new Client({ name: "prueba", version: "0" });
   await Promise.all([servidor.connect(b), cliente.connect(a)]);
   const llamar = async (name: string, args: Record<string, unknown> = {}) => {
@@ -66,6 +67,35 @@ test.describe("@tesoreria @asistente", () => {
     expect(historialDe([{ rol: "asistente", texto: "hola" }])).toEqual([]);
   });
 
+  test("enlaces de la respuesta: solo pantallas de Tesorería; acciones validadas; el historial recorta lo muy largo", () => {
+    expect(enlaceValido(enlaceOrden(12, "100016"))).toBe(true);
+    expect(enlaceValido("/tesoreria?empresa=1&area=log&doc=OC")).toBe(true);
+    for (const malo of ["https://otro.sitio/tesoreria", "//otro.sitio/x", "/admin/usuarios", "/tesoreria/pago/x/1", "/tesoreria/pago/1/2/3", "javascript:alert(1)", "/tesoreria#x"])
+      expect(enlaceValido(malo), malo).toBe(false);
+    // La navegación automática sigue solo a Pagos o al Presupuesto; el pago de una orden va por abrir_orden (Accion).
+    expect(destinoValido(enlaceOrden(1, "2"))).toBe(false);
+    expect(Accion.safeParse({ tipo: "navegar", url: enlaceOrden(1, "2") }).success).toBe(true);
+    expect(Accion.safeParse({ tipo: "navegar", url: "https://otro.sitio" }).success).toBe(false);
+    expect(Accion.safeParse({ tipo: "abrir", que: "admin" }).success).toBe(false);
+    expect(Accion.safeParse({ tipo: "tema", valor: "oscuro" }).success).toBe(true);
+    const largo = historialDe([{ rol: "usuario", texto: "x".repeat(MAX_TEXTO_TURNO + 500) }]);
+    expect(largo[0].texto.length).toBe(MAX_TEXTO_TURNO);
+    // Chats: título de la primera pregunta, sin vacíos, del más reciente al más antiguo.
+    expect(tituloDe([{ rol: "usuario", texto: "  cuánto\n le debo  " }])).toBe("cuánto le debo");
+    const g = podar({
+      actual: "b",
+      chats: [
+        { id: "a", titulo: "", creado: 1, actualizado: 1, turnos: [] },
+        { id: "b", titulo: "", creado: 2, actualizado: 2, turnos: [] },
+        { id: "c", titulo: "x", creado: 3, actualizado: 3, turnos: [{ rol: "usuario", texto: "x" }] },
+      ],
+    });
+    expect(g.chats.map((c) => c.id)).toEqual(["c", "b"]);
+    expect(pideEspacio("| a | b |\n|---|---|\n| 1 | 2 |")).toBe(true);
+    expect(pideEspacio("### Resumen\nhola")).toBe(true);
+    expect(pideEspacio("Tienes S/ 1,200.00 por pagar.")).toBe(false);
+  });
+
   test("buscar por nombre: sin tildes ni mayúsculas, palabras en cualquier orden y abreviadas", () => {
     expect(coincide("CONSTRUCCIÓN SAN MARTÍN", "san martin")).toBe(true);
     expect(coincide("CONSTRUCCIÓN SAN MARTÍN", "martín const")).toBe(true);
@@ -99,22 +129,24 @@ test.describe("@tesoreria @asistente", () => {
 
       // La empresa sale de la obra; con otra empresa, no.
       const nav = (await h.llamar("aplicar_filtros_pagos", { obra_id: Number(obra), etapas: etapas.slice(0, 1) })).json();
-      expect(nav.navegar).toBe(urlPagos({ empresa_id: Number(empresa), obra_id: Number(obra), etapas: etapas.slice(0, 1) }));
+      expect(nav.accion).toEqual({ tipo: "navegar", url: urlPagos({ empresa_id: Number(empresa), obra_id: Number(obra), etapas: etapas.slice(0, 1) }) });
       const otra = sql1(`select id from empresas where id <> ${empresa} order by id limit 1`);
       if (otra) expect((await h.llamar("aplicar_filtros_pagos", { obra_id: Number(obra), empresa_id: Number(otra) })).error).toBe(true);
       expect((await h.llamar("aplicar_filtros_pagos", { obra_id: 999999999 })).error).toBe(true);
       // Solo la empresa, o todas (el id va como número; «todas» es otro campo, para que el modelo no lo mande como texto).
-      expect((await h.llamar("aplicar_filtros_pagos", { empresa_id: Number(empresa) })).json().navegar).toBe(urlPagos({ empresa_id: Number(empresa) }));
-      expect((await h.llamar("aplicar_filtros_pagos", { todas_las_empresas: true, doc: "OS" })).json().navegar).toBe(urlPagos({ empresa_id: "todas", doc: "OS" }));
+      expect((await h.llamar("aplicar_filtros_pagos", { empresa_id: Number(empresa) })).json().accion.url).toBe(urlPagos({ empresa_id: Number(empresa) }));
+      expect((await h.llamar("aplicar_filtros_pagos", { todas_las_empresas: true, doc: "OS" })).json().accion.url).toBe(urlPagos({ empresa_id: "todas", doc: "OS" }));
       expect((await h.llamar("aplicar_filtros_pagos", { empresa_id: Number(empresa), fecha: "la semana pasada" })).error).toBe(true);
 
       const pres = (await h.llamar("aplicar_filtros_presupuesto", { obra_id: Number(obra), rubro: "SUBCONTRATO" })).json();
-      expect(pres.navegar).toBe(urlPresupuesto({ obra_id: Number(obra), empresa_id: Number(empresa), rubro: "SUBCONTRATO" }));
+      expect(pres.accion.url).toBe(urlPresupuesto({ obra_id: Number(obra), empresa_id: Number(empresa), rubro: "SUBCONTRATO" }));
 
       // El detalle de una orden: ítems, comprobantes y pagos, sin cuentas.
       const numero = sql1(`select numero from v_por_pagar where estado = 'PENDIENTE' and doc = 'OC' and obra_id = ${obra} order by numero limit 1`);
       const det = (await h.llamar("detalle_orden", { obra_id: Number(obra), numero })).json();
       expect(det.orden.numero).toBe(numero);
+      expect(det.orden.enlace).toBe(enlaceOrden(Number(obra), numero));
+      expect(r.filas.every((f: { enlace: string }) => enlaceValido(f.enlace))).toBe(true);
       expect(det.items.length).toBeGreaterThan(0);
       expect(JSON.stringify(det)).not.toMatch(/cuenta_bancaria|token/);
       // Un N° con caracteres de filtro no pasa.
@@ -160,22 +192,29 @@ test.describe("@tesoreria @asistente", () => {
     }
   });
 
-  test("la hoja (con la respuesta simulada): navega con espacios en el filtro, guarda la conversación y achica las fotos", async ({ abrir }) => {
+  test("el panel (con la respuesta simulada): al filtrar se oculta con un aviso, sigue el chat al volver y achica las fotos", async ({ abrir }) => {
     const page = await abrir("tesoreria", "/tesoreria");
     const destino = urlPresupuesto({ obra_id: Number(sql1("select min(obra_id) from partidas")), rubro: "MANO OBRA", etapas: ["ACB 1"] });
     const pedidos: { texto: string; historial: { rol: string }[]; imagenes: { data: string }[] }[] = [];
     await page.route("**/asistente", async (ruta) => {
       pedidos.push(ruta.request().postDataJSON());
-      await ruta.fulfill({ json: pedidos.length === 1 ? { texto: "Abrí el presupuesto.", navegar: destino } : { texto: "Listo.", navegar: null } });
+      await ruta.fulfill({
+        json: pedidos.length === 1 ? { texto: "Abrí el presupuesto.", acciones: [{ tipo: "navegar", url: destino }] } : { texto: "Listo.", acciones: [] },
+      });
     });
     await page.getByRole("button", { name: "Hogariano", exact: true }).click();
     const hoja = page.getByRole("region", { name: "Hogariano" });
     await hoja.getByRole("textbox", { name: "Mensaje" }).fill("mano de obra de la etapa ACB 1");
     await hoja.getByRole("button", { name: "Enviar" }).click();
     await page.waitForURL((u) => u.pathname === "/tesoreria/consultas" && u.searchParams.get("rubro") === "MANO OBRA" && u.searchParams.get("etapa") === "ACB 1");
+    // Manejó la interfaz: el panel se oculta para que se vea, y un aviso breve dice qué hizo.
+    await expect(hoja).toHaveCount(0);
+    await expect(page.getByRole("status").filter({ hasText: "Abrí el presupuesto." })).toBeVisible();
 
-    // El panel sigue abierto al navegar, con la respuesta; la siguiente pregunta lleva el historial, empezando por la pregunta.
+    // Al volver a abrirlo sigue el mismo chat; la siguiente pregunta lleva el historial, empezando por la pregunta.
+    await page.getByRole("button", { name: "Hogariano", exact: true }).click();
     await expect(hoja.getByText("Abrí el presupuesto.")).toBeVisible();
+    await expect(hoja.getByText("Filtró la pantalla")).toBeVisible();
     // Una foto de teléfono grande (4000 x 3000, con ruido: lo peor para el JPEG) se achica antes de mandarla.
     const png = await page.evaluate(async () => {
       const c = document.createElement("canvas");
@@ -205,6 +244,114 @@ test.describe("@tesoreria @asistente", () => {
       return Math.max(b.width, b.height);
     }, pedidos[1].imagenes[0].data);
     expect(lado).toBeLessThanOrEqual(1568);
+  });
+
+  test("el panel: corto queda chico; tabla o largo se agranda solo; enlaces solo a Tesorería; chats y ajustes", async ({ abrir }) => {
+    const page = await abrir("tesoreria", "/tesoreria");
+    const orden = sql(`select obra_id, numero from v_por_pagar where estado = 'PENDIENTE' and doc = 'OC' order by obra_id, numero limit 1`)[0];
+    const enlace = enlaceOrden(Number(orden[0]), orden[1]);
+    const respuestas = [
+      { texto: "Tienes **S/ 1,200.00** por pagar.", acciones: [] },
+      {
+        texto: `### Por pagar\n\n| Orden | Saldo |\n|---|---:|\n| [OC ${orden[1]}](${enlace}) | S/ 10.00 |\n\n[otro sitio](https://otro.sitio/robar)`,
+        acciones: [],
+      },
+      { texto: Array.from({ length: 14 }, (_, i) => `Línea ${i + 1} de una respuesta larga sin tablas.`).join("\n\n"), acciones: [] },
+    ];
+    let n = 0;
+    await page.route("**/asistente", (ruta) => ruta.fulfill({ json: respuestas[Math.min(n++, respuestas.length - 1)] }));
+    await page.getByRole("button", { name: "Hogariano", exact: true }).click();
+    const hoja = page.getByRole("region", { name: "Hogariano" });
+    const preguntar = async (t: string) => {
+      await hoja.getByRole("textbox", { name: "Mensaje" }).fill(t);
+      await hoja.getByRole("button", { name: "Enviar" }).click();
+    };
+
+    // Corta: cabe en el panel chico, con su formato (negrita).
+    await preguntar("cuánto debo");
+    await expect(hoja.locator("strong", { hasText: "S/ 1,200.00" })).toBeVisible();
+    await page.waitForTimeout(400);
+    await expect(hoja.getByRole("button", { name: "Agrandar" })).toBeVisible();
+
+    // Con tabla y subtítulo: se agranda solo; el enlace a la orden abre su pago (y el panel se oculta); el de afuera es texto.
+    await preguntar("las de este mes");
+    await expect(hoja.getByRole("button", { name: "Achicar" })).toBeVisible();
+    await expect(hoja.getByRole("table")).toBeVisible();
+    await expect(hoja.getByRole("link", { name: "otro sitio" })).toHaveCount(0);
+    await expect(hoja.getByText("otro sitio")).toBeVisible();
+
+    // Larga sin tablas: se mide y, como no cabe, se agranda sola.
+    await hoja.getByRole("button", { name: "Achicar" }).click();
+    await preguntar("explícame");
+    await expect(hoja.getByText("Línea 14 de una respuesta larga sin tablas.")).toBeAttached();
+    await expect(hoja.getByRole("button", { name: "Achicar" })).toBeVisible();
+
+    await hoja.getByRole("link", { name: `OC ${orden[1]}` }).click();
+    await page.waitForURL((u) => u.pathname === enlace);
+    await expect(hoja).toHaveCount(0);
+
+    // Chats: uno nuevo, la lista con los dos, volver al primero y borrar.
+    await page.getByRole("button", { name: "Hogariano", exact: true }).click();
+    await hoja.getByRole("button", { name: "Nuevo chat" }).click();
+    await expect(hoja.getByText("Línea 14 de una respuesta larga sin tablas.")).toHaveCount(0);
+    await preguntar("otra cosa");
+    await hoja.getByRole("button", { name: "Chats", exact: true }).click();
+    const lista = hoja.getByRole("list", { name: "Chats" });
+    await expect(lista.getByRole("listitem")).toHaveCount(2);
+    await lista.getByRole("button", { name: /^cuánto debo/ }).click();
+    await expect(hoja.getByText("Tienes")).toBeVisible();
+
+    // Ajuste «Chat nuevo»: al cerrarlo y abrirlo con el botón empieza vacío; el anterior sigue en la lista.
+    await hoja.getByRole("button", { name: "Ajustes de Hogariano" }).click();
+    await hoja.getByRole("radio", { name: "Chat nuevo" }).click();
+    await expect(hoja.getByRole("radio", { name: "Chat nuevo" })).toHaveAttribute("aria-checked", "true");
+    await hoja.getByRole("button", { name: "Cerrar Hogariano" }).click();
+    await page.getByRole("button", { name: "Hogariano", exact: true }).click();
+    await expect(hoja.getByText("Tienes")).toHaveCount(0);
+    await hoja.getByRole("button", { name: "Chats", exact: true }).click();
+    await expect(lista.getByRole("listitem")).toHaveCount(2);
+    await lista.getByRole("button", { name: /^Borrar «otra cosa»/ }).click();
+    await expect(lista.getByRole("listitem")).toHaveCount(1);
+
+    // Los chats quedan al recargar (en el dispositivo).
+    // (El panel vuelve como estaba: abierto.)
+    await page.reload();
+    await expect(hoja).toBeVisible();
+    await hoja.getByRole("button", { name: "Chats", exact: true }).click();
+    await expect(lista.getByRole("listitem")).toHaveCount(1);
+  });
+
+  test("el panel maneja la interfaz: tema oscuro y el menú del usuario, ocultándose", async ({ abrir }) => {
+    const page = await abrir("tesoreria", "/tesoreria");
+    const respuestas = [
+      { texto: "Listo: modo oscuro.", acciones: [{ tipo: "tema", valor: "oscuro" }] },
+      { texto: "Abrí tu menú.", acciones: [{ tipo: "abrir", que: "menu" }] },
+      { texto: "Tus ajustes.", acciones: [{ tipo: "abrir", que: "ajustes_hogariano" }] },
+    ];
+    let n = 0;
+    await page.route("**/asistente", (ruta) => ruta.fulfill({ json: respuestas[n++] }));
+    const hoja = page.getByRole("region", { name: "Hogariano" });
+    const preguntar = async (t: string) => {
+      await page.getByRole("button", { name: "Hogariano", exact: true }).click();
+      await hoja.getByRole("textbox", { name: "Mensaje" }).fill(t);
+      await hoja.getByRole("button", { name: "Enviar" }).click();
+    };
+    try {
+      await preguntar("ponlo oscuro");
+      await expect(page.locator("html")).toHaveAttribute("data-theme", "dark");
+      await expect(hoja).toHaveCount(0);
+
+      await preguntar("abre mi menú");
+      await expect(hoja).toHaveCount(0);
+      await expect(page.getByRole("radiogroup", { name: "Tema" })).toBeVisible();
+      await page.keyboard.press("Escape");
+
+      // Sus propios ajustes no lo ocultan: los muestra en el panel.
+      await preguntar("tus ajustes");
+      await expect(hoja.getByRole("radio", { name: "Último chat" })).toBeVisible();
+    } finally {
+      await page.evaluate(() => localStorage.removeItem("erp-theme")).catch(() => {});
+    }
   });
 
   test("dictado (simulado): se nota que está escuchando, el texto llega al campo y se detiene", async ({ abrir }) => {
@@ -329,6 +476,48 @@ test.describe("@tesoreria @asistente", () => {
       expect(x.grupos[0]).toHaveProperty("cantidades");
     } finally {
       await h.cerrar();
+    }
+  });
+
+  test("herramientas de la interfaz: abrir una orden, el tema y las hojas devuelven una acción válida; no inventan", async () => {
+    const orden = sql(`select obra_id, numero from v_por_pagar where doc = 'OC' order by obra_id, numero limit 1`)[0];
+    const h = await herramientas("tesoreria");
+    try {
+      const o = (await h.llamar("abrir_orden", { obra_id: Number(orden[0]), numero: orden[1] })).json();
+      expect(o.accion).toEqual({ tipo: "navegar", url: enlaceOrden(Number(orden[0]), orden[1]) });
+      expect((await h.llamar("abrir_orden", { obra_id: Number(orden[0]), numero: "999999999" })).error).toBe(true);
+      expect((await h.llamar("cambiar_tema", { tema: "oscuro" })).json().accion).toEqual({ tipo: "tema", valor: "oscuro" });
+      expect((await h.llamar("abrir_en_la_app", { que: "menu" })).json().accion).toEqual({ tipo: "abrir", que: "menu" });
+      expect((await h.llamar("abrir_en_la_app", { que: "admin" })).error).toBe(true);
+    } finally {
+      await h.cerrar();
+    }
+  });
+
+  test("crear una sugerencia por chat: le llega al Admin marcada «con Hogariano», una por pregunta", async ({}, info) => {
+    test.skip(info.project.name !== "m390", "escribe en la base");
+    const marca = `E2E-HOG-${Date.now()}`;
+    const limpiar = () => {
+      sql(`delete from notificaciones where tipo = 'SUGERENCIA' and cuerpo like '%${marca}%'`);
+      sql(`delete from audit_log where tabla = 'sugerencias' and detalle::text like '%${marca}%'`);
+      sql(`delete from sugerencias where texto like '%${marca}%'`);
+    };
+    const h = await herramientas("tesoreria");
+    try {
+      const r = (await h.llamar("crear_sugerencia", { tipo: "MEJORA", texto: `Poder ordenar Pagos por proveedor ${marca}` })).json();
+      expect(r.enviada).toBe(true);
+      const [origen, pantalla, ruta, rol] = sql(`select origen, pantalla, ruta, rol from sugerencias where texto like '%${marca}%'`)[0];
+      expect(origen).toBe("HOGARIANO");
+      expect(pantalla).toBe("Tesorería › Presupuesto");
+      expect(ruta).toBe("/tesoreria/consultas?obra=1");
+      expect(rol).toBe("TESORERIA");
+      expect(sql1(`select titulo from notificaciones where tipo = 'SUGERENCIA' and cuerpo like '%${marca}%' limit 1`)).toMatch(/con Hogariano/);
+      // Una por pregunta.
+      expect((await h.llamar("crear_sugerencia", { tipo: "ERROR", texto: `otra más ${marca}` })).error).toBe(true);
+      expect(sql1(`select count(*) from sugerencias where texto like '%${marca}%'`)).toBe("1");
+    } finally {
+      await h.cerrar();
+      limpiar();
     }
   });
 

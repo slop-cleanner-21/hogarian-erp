@@ -1,7 +1,9 @@
-// Servidor MCP del asistente de Tesorería (fase 1: solo lectura y filtros). Cada pedido arma uno nuevo con el cliente de
-// Supabase de quien pregunta: las herramientas leen con su sesión, así que la base (RLS) le da solo lo que él ve en
-// pantalla. Nada escribe: solo `select` (ni RPC, que algunas registran o recalculan). Las herramientas de filtro no
-// navegan: devuelven el enlace, que arma el servidor desde ids validados (src/lib/asistente/urls.ts).
+// Servidor MCP del asistente de Tesorería. Cada pedido arma uno nuevo con el cliente de Supabase de quien pregunta: las
+// herramientas leen con su sesión, así que la base (RLS) le da solo lo que él ve en pantalla. Leen con `select` (ni RPC, que
+// algunas registran o recalculan); la única escritura es crear una sugerencia (`enviar_sugerencia`, como el formulario del
+// encabezado, con origen HOGARIANO), una por pregunta. Las herramientas de la interfaz (filtros, ir a una orden, tema, abrir
+// una hoja) no tocan nada: devuelven una `accion` que el panel valida y ejecuta; los enlaces los arma el servidor desde ids
+// validados (src/lib/asistente/urls.ts), nunca el modelo.
 import { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 import { z } from "zod";
 import { acumularPagoPartida, ESTADOS_PAGO } from "@/lib/filtro-pago";
@@ -9,13 +11,16 @@ import { desdeFecha, RANGOS_MONTO } from "@/lib/filtros";
 import { todas } from "@/lib/paginar";
 import { normalizarItem } from "@/lib/parecidos";
 import type { createClient } from "@/lib/supabase/server";
-import { FECHA, FiltrosPagos, FiltrosPresupuesto, urlPagos, urlPresupuesto } from "./urls";
+import { type Accion, enlaceOrden, FECHA, FiltrosPagos, FiltrosPresupuesto, QUE_ABRIR, urlPagos, urlPresupuesto } from "./urls";
 
 type Db = Awaited<ReturnType<typeof createClient>>;
 
 /** Resultado de una herramienta: JSON en texto (lo que lee el modelo). */
 const json = (data: unknown) => ({ content: [{ type: "text" as const, text: JSON.stringify(data) }] });
 const fallo = (mensaje: string) => ({ content: [{ type: "text" as const, text: mensaje }], isError: true });
+/** Una acción para la pantalla (la recoge el agente y la ejecuta el panel). */
+const accion = (a: Accion, extra: Record<string, unknown> = {}) => json({ accion: a, ...extra });
+const ESTADOS_TESORERIA = new Set<string>(ESTADOS_PAGO);
 
 /** ¿Todas las palabras buscadas están en el nombre (como palabra o comienzo de palabra)? Sin tildes ni mayúsculas. */
 export function coincide(nombre: string, texto: string): boolean {
@@ -66,8 +71,10 @@ function leerDocumentos(db: Db, f: FiltrosDocs) {
   });
 }
 
-export function crearServidorMcp(db: Db): McpServer {
-  const server = new McpServer({ name: "hogarian-tesoreria", version: "0.1.0" });
+/** `pantalla`: la ruta desde la que se pregunta (la sugerencia la lleva, como el formulario). */
+export function crearServidorMcp(db: Db, ctx: { pantalla?: string } = {}): McpServer {
+  const server = new McpServer({ name: "hogarian-tesoreria", version: "0.2.0" });
+  let sugerencias = 0;
 
   server.registerTool(
     "listar_empresas",
@@ -133,7 +140,7 @@ export function crearServidorMcp(db: Db): McpServer {
         "Lee las OC u OS de la lista de Pagos con los mismos filtros que la pantalla y devuelve cuántas son, sus sumas (de todas) y " +
         "solo las primeras filas según `orden` (sin_mostrar = las que no vinieron). Para «las más grandes» usa orden monto.desc; " +
         "para «las más antiguas», fecha.asc: no saques un ranking de filas en otro orden. estado: pendiente (por pagar), pagado o " +
-        "rechazos. Montos en soles (por pagar: saldo; pagado: lo pagado).",
+        "rechazos. Montos en soles (por pagar: saldo; pagado: lo pagado). Cada fila trae su `enlace` (el pago de la orden).",
       inputSchema: {
         empresa_id: z.number().int().positive().optional(),
         obra_id: z.number().int().positive().optional(),
@@ -171,7 +178,10 @@ export function crearServidorMcp(db: Db): McpServer {
       const pagado = f.estado === "pagado";
       const columnaMonto = pagado ? "pagado" : "saldo";
       // eslint-disable-next-line @typescript-eslint/no-unused-vars -- el id del proveedor no le sirve al modelo
-      const filas = (await leerDocumentos(db, { ...f, estado: f.estado })).map(({ proveedor_id, ...r }) => r);
+      const filas = (await leerDocumentos(db, { ...f, estado: f.estado })).map(({ proveedor_id, ...r }) => ({
+        ...r,
+        enlace: r.obra_id != null && r.numero ? enlaceOrden(r.obra_id, r.numero) : null,
+      }));
       const suma = (k: "total" | "pagado" | "saldo") => r2(filas.reduce((s, r) => s + Number(r[k] ?? 0), 0));
       if (f.orden) {
         // Sobre todas las filas (ya están en memoria), con desempate por obra y N°: el ranking no depende de cuáles vinieron.
@@ -236,7 +246,7 @@ export function crearServidorMcp(db: Db): McpServer {
       if (comps.error) return fallo(comps.error.message);
       if (apl.error) return fallo(apl.error.message);
       return json({
-        orden: { numero, ...cab.data },
+        orden: { numero, ...cab.data, enlace: enlaceOrden(obra_id, numero) },
         items: (lineas.data ?? []).map((l) => ({ descripcion: l.descripcion, unidad: l.unidad, cantidad: l.cantidad, pu: l.pu_efectivo, parcial: l.parcial, etapa: l.etapa, requerimiento: l.requerimiento })),
         comprobantes: (comps.data ?? [])
           .filter((c) => !c.anulado_at)
@@ -392,7 +402,10 @@ export function crearServidorMcp(db: Db): McpServer {
       const obraDe = (id: number | null) => (id == null ? null : (nombreObra.get(id) ?? null));
       const provDe = (id: number | null) => (id == null ? "Sin proveedor" : (nombreProv.get(id) ?? "Sin proveedor"));
 
-      type Ultimo = { fecha: string | null; pu: number; proveedor: string; orden: string; obra: string | null };
+      // Solo las que están en Tesorería o pagadas tienen pantalla de pago.
+      const enlaceDe = (l: { obra_id: number | null; numero_oc: string | null; estado: string | null }) =>
+        l.obra_id != null && l.numero_oc && ESTADOS_TESORERIA.has(l.estado ?? "") ? enlaceOrden(l.obra_id, l.numero_oc) : null;
+      type Ultimo = { fecha: string | null; pu: number; proveedor: string; orden: string; obra: string | null; enlace: string | null };
       const porItem = new Map<string, { item: string; unidad: string; cantidad: number; monto: number; min: number; max: number; ultimo: Ultimo | null }>();
       const porProv = new Map<string, { proveedor: string; monto: number; lineas: number }>();
       for (const l of lineas) {
@@ -405,7 +418,7 @@ export function crearServidorMcp(db: Db): McpServer {
         x.monto += Number(l.parcial ?? 0);
         x.min = Math.min(x.min, pu);
         x.max = Math.max(x.max, pu);
-        x.ultimo ??= { fecha: l.fecha, pu, proveedor: prov, orden: `${l.tipo} ${l.numero_oc}`, obra: obraDe(l.obra_id) };
+        x.ultimo ??= { fecha: l.fecha, pu, proveedor: prov, orden: `${l.tipo} ${l.numero_oc}`, obra: obraDe(l.obra_id), enlace: enlaceDe(l) };
         porItem.set(k, x);
         const y = porProv.get(prov) ?? { proveedor: prov, monto: 0, lineas: 0 };
         y.monto += Number(l.parcial ?? 0);
@@ -441,6 +454,7 @@ export function crearServidorMcp(db: Db): McpServer {
           pu: l.pu_efectivo,
           parcial: l.parcial,
           estado: l.estado,
+          enlace: enlaceDe(l),
         })),
         lineas_sin_mostrar: Math.max(0, lineas.length - f.limite),
       });
@@ -567,7 +581,7 @@ export function crearServidorMcp(db: Db): McpServer {
       }
       const p = FiltrosPagos.safeParse({ ...f, empresa_id: empresa ?? "todas" });
       if (!p.success) return fallo(p.error.issues[0].message);
-      return json({ navegar: urlPagos(p.data) });
+      return accion({ tipo: "navegar", url: urlPagos(p.data) });
     },
   );
 
@@ -590,7 +604,72 @@ export function crearServidorMcp(db: Db): McpServer {
       if (!obra) return fallo("Esa obra no existe");
       const p = FiltrosPresupuesto.safeParse({ ...f, empresa_id: obra.empresa_id });
       if (!p.success) return fallo(p.error.issues[0].message);
-      return json({ navegar: urlPresupuesto(p.data) });
+      return accion({ tipo: "navegar", url: urlPresupuesto(p.data) });
+    },
+  );
+
+  server.registerTool(
+    "abrir_orden",
+    {
+      description: "Lleva a la pantalla de pago de una OC u OS (la que está en Tesorería o ya pagada). El panel se oculta.",
+      inputSchema: { obra_id: z.number().int().positive(), numero: NUMERO },
+    },
+    async ({ obra_id, numero }) => {
+      const { data, error } = await db.from("v_por_pagar").select("doc").eq("obra_id", obra_id).eq("numero", numero).maybeSingle();
+      if (error) return fallo(error.message);
+      if (!data) return fallo(`La orden ${numero} no está en Tesorería`);
+      return accion({ tipo: "navegar", url: enlaceOrden(obra_id, numero) });
+    },
+  );
+
+  server.registerTool(
+    "cambiar_tema",
+    {
+      description: "Pone la app en modo claro, oscuro o el del sistema (el del teléfono). El panel se oculta para que se vea.",
+      inputSchema: { tema: z.enum(["claro", "oscuro", "sistema"]) },
+    },
+    async ({ tema }) => accion({ tipo: "tema", valor: tema }),
+  );
+
+  server.registerTool(
+    "abrir_en_la_app",
+    {
+      description:
+        "Abre algo de la app: menu (el menú del usuario: tema, cambiar contraseña, huella, exportar Excel, cerrar sesión), avisos " +
+        "(la pantalla de avisos), diseno (cómo se ve la lista de Pagos), filtros (la hoja de filtros de la pantalla), sugerencia " +
+        "(el formulario para escribirla a mano, con capturas), ajustes_hogariano (los tuyos: si el botón abre el último chat o uno " +
+        "nuevo), chats (la lista de chats). Salvo ajustes_hogariano y chats, el panel se oculta.",
+      inputSchema: { que: z.enum(QUE_ABRIR) },
+    },
+    async ({ que }) => accion({ tipo: "abrir", que }),
+  );
+
+  server.registerTool(
+    "crear_sugerencia",
+    {
+      description:
+        "Envía una sugerencia al Admin (le llega un aviso y la ve en Admin › Sugerencias, marcada «Con Hogariano»), con la pantalla " +
+        "desde la que se escribe. tipo: ERROR (algo falla), MEJORA (algo que falta o se podría hacer mejor) o DISENO (cómo se ve). " +
+        "texto: lo que el usuario quiere decir, claro y completo, en sus términos. Solo cuando el usuario lo pide y después de que " +
+        "confirme el texto. Una por pregunta.",
+      inputSchema: { tipo: z.enum(["ERROR", "MEJORA", "DISENO"]), texto: z.string().trim().min(10).max(2000) },
+    },
+    async ({ tipo, texto }) => {
+      if (sugerencias > 0) return fallo("Ya enviaste una sugerencia en esta pregunta");
+      sugerencias++;
+      const ruta = ctx.pantalla?.startsWith("/") && !ctx.pantalla.startsWith("//") ? ctx.pantalla : "/tesoreria";
+      const p = ruta.split("?")[0];
+      const pantalla = p.startsWith("/tesoreria/consultas") ? "Tesorería › Presupuesto" : p.startsWith("/tesoreria/pago") ? "Tesorería › Pago" : "Tesorería › Pagos";
+      const { data, error } = await db.rpc("enviar_sugerencia", {
+        p_tipo: tipo,
+        p_texto: texto,
+        p_pantalla: pantalla,
+        p_ruta: ruta,
+        p_capturas: [],
+        p_origen: "HOGARIANO",
+      });
+      if (error) return fallo(error.message);
+      return json({ enviada: true, id: data });
     },
   );
 

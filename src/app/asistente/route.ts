@@ -1,15 +1,15 @@
 import Anthropic from "@anthropic-ai/sdk";
 import { z } from "zod";
 import { preguntar } from "@/lib/asistente/agente";
-import { MAX_TURNOS } from "@/lib/asistente/urls";
+import { MAX_TEXTO_TURNO, MAX_TURNOS } from "@/lib/asistente/urls";
 import { createClient, requireSesion } from "@/lib/supabase/server";
 
-// Pregunta al asistente (fase 1: Tesorería, solo lectura y filtros). Las herramientas leen con la sesión de quien
+// Pregunta a Hogariano (Tesorería: lee, filtra, maneja la interfaz y envía sugerencias). Las herramientas leen con la sesión de quien
 // pregunta; la clave de la API de Claude solo vive en el servidor (ANTHROPIC_API_KEY).
 const Pedido = z.object({
   texto: z.string().trim().max(2000),
   historial: z
-    .array(z.object({ rol: z.enum(["usuario", "asistente"]), texto: z.string().max(4000) }))
+    .array(z.object({ rol: z.enum(["usuario", "asistente"]), texto: z.string().max(MAX_TEXTO_TURNO) }))
     .max(MAX_TURNOS)
     .default([]),
   imagenes: z
