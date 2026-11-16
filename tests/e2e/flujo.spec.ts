@@ -552,11 +552,21 @@ test.describe("@flujo flujo completo por las pantallas", () => {
       await expect(page.getByRole("textbox", { name: "Monto", exact: true })).toHaveValue(sol(NETO_SERVICIO - RETENCION));
       await elegir(page, page.locator("main"), "Banco", "BCP");
       await page.getByRole("textbox", { name: "N° de operación", exact: true }).fill(`OS${sufijo}`);
-      await page.locator('main input[type="file"]').setInputFiles(ARCHIVO);
+      // El voucher en varias imágenes: se eligen dos, se agrega una tercera y se quita, y van las dos.
+      const imagen = (n: string) => ({ name: n, mimeType: "image/png", buffer: Buffer.concat([fs.readFileSync(ARCHIVO), Buffer.from(n)]) });
+      await page.getByLabel("Archivos del voucher").setInputFiles([imagen("voucher-1.png"), imagen("voucher-2.png")]);
+      await expect(page.getByRole("button", { name: "Agregar otra imagen" })).toBeVisible();
+      await page.getByLabel("Archivos del voucher").setInputFiles(imagen("sobra.png"));
+      await expect(page.getByRole("list", { name: "Vouchers elegidos" }).getByRole("listitem")).toHaveCount(3);
+      await page.getByRole("button", { name: "Quitar voucher 3" }).click();
+      await expect(page.getByRole("img", { name: /^Voucher \d$/ })).toHaveCount(2);
       await page.getByRole("button", { name: "Aprobar pago" }).click();
       await page.getByRole("dialog", { name: "¿Aprobar pago?" }).getByRole("button", { name: "Sí" }).click();
       await expect.poll(() => estado(obraId, os), { timeout: 15_000 }).toBe("PAGADA");
       expect(sql1(`select monto from pagos where numero_operacion = 'OS${sufijo}'`)).toBe((NETO_SERVICIO - RETENCION).toFixed(2));
+      expect(
+        sql(`select a.nombre from adjuntos a join pagos p on p.id = a.pago_id where p.numero_operacion = 'OS${sufijo}' and a.tipo = 'VOUCHER' order by a.id`).map(([n]) => n),
+      ).toEqual(["voucher-1.png", "voucher-2.png"]);
       expect(
         sql1(`select c.retencion from comprobantes c where c.id = (select comprobante_id from oc_items where obra_id = ${obraId} and numero_oc = '${os}' limit 1)`),
       ).toBe(RETENCION.toFixed(2));

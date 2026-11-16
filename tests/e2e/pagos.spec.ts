@@ -344,4 +344,31 @@ test.describe("@pagos @tesoreria prod 1: sin pagos parciales", () => {
     }
     expect(error).toContain("no se aceptan pagos parciales");
   });
+
+  test("varios archivos del pago: se registran todos con el pago; fuera de su carpeta, repetidos o de más, no", async () => {
+    const uid = uidDe("TESORERIA");
+    const carpeta = `pagos/e2e-varios-${Date.now()}`;
+    const pagar = (extra: string) => `begin;
+      insert into storage.objects (bucket_id, name) values ('documentos', '${carpeta}/1.png'), ('documentos', '${carpeta}/2.jpg'), ('documentos', '${carpeta}/3.pdf'), ('documentos', 'pagos/otra/4.png');
+      select set_config('request.jwt.claims', '{"sub":"${uid}","role":"authenticated"}', true);
+      set local role authenticated;
+      select set_config('e2e.pago', pagar_documento(${obraId}, '${numero}', null, current_date, 'BCP', 'E2E-VARIOS', ${saldo}, '${carpeta}/1.png', 'voucher.png', '${extra}'::jsonb)::text, true);
+      select a.nombre || ':' || coalesce(a.mime, '') from adjuntos a where a.pago_id = current_setting('e2e.pago')::bigint order by a.id;
+      rollback;`;
+    const error = (extra: string) => {
+      try {
+        sqlScript(pagar(extra));
+        return "";
+      } catch (e) {
+        return String((e as { stderr?: string }).stderr ?? e);
+      }
+    };
+    const filas = sqlScript(pagar(`[{"path":"${carpeta}/2.jpg","nombre":"segunda.jpg"},{"path":"${carpeta}/3.pdf","nombre":"constancia.pdf"}]`)).flat();
+    expect(filas.filter((f) => /^[^{].*:/.test(f))).toEqual(["voucher.png:image/png", "segunda.jpg:image/jpeg", "constancia.pdf:application/pdf"]);
+    expect(error(`[{"path":"pagos/otra/4.png","nombre":"ajeno.png"}]`)).toContain("Archivo del pago no válido");
+    expect(error(`[{"path":"${carpeta}/no-existe.png","nombre":"x.png"}]`)).toContain("Archivo del pago no válido");
+    expect(error(`[{"path":"${carpeta}/2.jpg","nombre":"a"},{"path":"${carpeta}/2.jpg","nombre":"b"}]`)).toContain("repetido");
+    expect(error(`[{"path":"${carpeta}/1.png","nombre":"el mismo"}]`)).toContain("ya está registrado");
+    expect(error(JSON.stringify(Array.from({ length: 10 }, (_, i) => ({ path: `${carpeta}/${i}.png`, nombre: "x" }))))).toContain("Hasta 10");
+  });
 });

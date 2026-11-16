@@ -149,6 +149,10 @@ Contabilidad, Residente y RRHH **no entran**. Sus roles siguen en la base
   `pagar_documento` rechaza un pago parcial. Una orden vieja con pago parcial se paga por lo que le falta.
   El total de la orden muestra la detracción y la retención (Logística y Tesorería), para que lo pagado
   menor que el total no parezca un error.
+  **Voucher en uno o más archivos** (migración `prod1_vouchers_varios`): Tesorería sube una o varias imágenes o PDF (el voucher
+  en varias fotos, o voucher y constancia), hasta 10, y quita las que no van antes de aprobar. `pagar_documento` registra el
+  primero y los demás (`p_vouchers_extra`) en la misma transacción que el pago: todos de la carpeta del pago de esa orden, ya
+  subidos y sin repetir; si el pago falla, la pantalla borra los subidos.
 - **Adicionales:** Gerencia los agrega directo en la obra (bloque «Adicionales», con el presupuesto ya
   publicado), sin la solicitud de Operaciones del MVP (RPC `agregar_adicional`). Un adicional es un grupo de
   partidas con el siguiente N° de la obra («ADIC n»); puede repetir el ítem y la etapa de una regular. Logística

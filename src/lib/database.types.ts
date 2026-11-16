@@ -4609,6 +4609,7 @@ export type Database = {
           p_orden_pago_id: number;
           p_voucher_nombre: string;
           p_voucher_path: string;
+          p_vouchers_extra?: Json;
         };
         Returns: number;
       };

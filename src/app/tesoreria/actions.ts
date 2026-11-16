@@ -25,10 +25,12 @@ const Pago = z
     monto: z.number().positive("Ingresa el monto"),
     voucherPath: z.string().min(1, "Sube el voucher"),
     voucherNombre: z.string().min(1),
+    /** Los demás archivos del pago (más fotos del voucher, la constancia): hasta 10 en total. */
+    vouchersExtra: z.array(z.object({ path: z.string().min(1).max(300), nombre: z.string().min(1).max(200) })).max(9, "Hasta 10 archivos").default([]),
   })
   .refine((p) => (p.ordenPagoId != null) !== (p.obraId != null && p.numero != null), "Documento inválido");
 
-/** "Aprobar pago": registra el pago con su voucher en un solo paso. */
+/** "Aprobar pago": registra el pago con sus vouchers (uno o más) en un solo paso. */
 export async function pagarDocumento(input: z.input<typeof Pago>): Promise<Result<number>> {
   const supabase = await db();
   const p = Pago.safeParse(input);
@@ -44,6 +46,7 @@ export async function pagarDocumento(input: z.input<typeof Pago>): Promise<Resul
     p_monto: d.monto,
     p_voucher_path: d.voucherPath,
     p_voucher_nombre: d.voucherNombre,
+    p_vouchers_extra: d.vouchersExtra,
   });
   if (error) return { ok: false, error: error.message };
   revalidatePath("/tesoreria");

@@ -1,7 +1,7 @@
 "use client";
 
 import { MarcaAdicional } from "@/components/marca-adicional";
-import { Camera, Check, ChevronDown, ExternalLink, FileText } from "lucide-react";
+import { Camera, ChevronDown, ExternalLink, FileText, X } from "lucide-react";
 import { CORRECCION_LABEL, HistorialRechazos, type Correccion, type RechazoVer } from "@/components/historial-rechazos";
 import { Plegable } from "@/components/plegable";
 import { OrdenesPartida } from "@/components/presupuesto-obra";
@@ -30,6 +30,8 @@ import { SelectorDiseno } from "@/components/selector-diseno";
 import type { DisenoItems, PantallaDiseno } from "@/lib/diseno";
 import { Faltan } from "@/components/ui/faltan";
 
+/** Archivos de un pago (voucher en varias fotos, constancia…): los mismos que acepta pagar_documento. */
+const MAX_VOUCHERS = 10;
 const BANCOS = ["BBVA", "BCP", "INTERBANK", "SCOTIABANK", "BANCO DE LA NACION", "EFECTIVO"];
 
 export type LineaPago = {
@@ -153,14 +155,10 @@ export function DetallePago({
   const [fechaPago, setFechaPago] = useState(hoyISO());
   const [banco, setBanco] = useState<string | null>(bancoDefault?.trim() || null);
   const [operacion, setOperacion] = useState("");
-  const [voucher, setVoucher] = useState<File | null>(null);
-  const vistaVoucher = useMemo(
-    () => (voucher?.type.startsWith("image/") ? URL.createObjectURL(voucher) : null),
-    [voucher],
-  );
-  useEffect(() => () => {
-    if (vistaVoucher) URL.revokeObjectURL(vistaVoucher);
-  }, [vistaVoucher]);
+  // Uno o más archivos del pago (el voucher en varias fotos, o voucher y constancia), hasta 10.
+  const [vouchers, setVouchers] = useState<File[]>([]);
+  const vistas = useMemo(() => vouchers.map((v) => (v.type.startsWith("image/") ? URL.createObjectURL(v) : null)), [vouchers]);
+  useEffect(() => () => vistas.forEach((u) => u && URL.revokeObjectURL(u)), [vistas]);
   const [confirmar, setConfirmar] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [pending, startTransition] = useTransition();
@@ -189,7 +187,7 @@ export function DetallePago({
       router.push("/tesoreria");
     });
 
-  const listo = Number(monto) > 0 && Number(monto) <= saldo + 0.005 && !!banco && operacion.trim() !== "" && voucher != null;
+  const listo = Number(monto) > 0 && Number(monto) <= saldo + 0.005 && !!banco && operacion.trim() !== "" && vouchers.length > 0;
 
   const abrirPdf = () =>
     startTransition(async () => {
@@ -201,29 +199,31 @@ export function DetallePago({
   const aprobar = () =>
     startTransition(async () => {
       setError(null);
-      let path: string | null = null;
+      const subidos: { path: string; nombre: string }[] = [];
       try {
-        const [subido] = await subirArchivos(carpetaVoucher, [voucher!]);
-        path = subido.path;
+        // De a uno: si uno falla, se sabe cuáles ya subieron (para quitarlos).
+        for (const v of vouchers) subidos.push(...(await subirArchivos(carpetaVoucher, [v])));
+        const [primero, ...resto] = subidos;
         const res = await pagarDocumento({
           ...destino,
           fecha: fechaPago,
           banco: banco ?? "",
           numeroOperacion: operacion,
           monto: Number(monto),
-          voucherPath: subido.path,
-          voucherNombre: subido.nombre,
+          voucherPath: primero.path,
+          voucherNombre: primero.nombre,
+          vouchersExtra: resto.map(({ path, nombre }) => ({ path, nombre })),
         });
         if (!res.ok) throw new Error(res.error);
         setConfirmar(false);
-        setVoucher(null);
+        setVouchers([]);
         setOperacion("");
         router.refresh();
       } catch (e) {
         setConfirmar(false);
         setError(e instanceof Error ? e.message : "No se pudo registrar el pago");
-        // El voucher subido queda huérfano si el pago falla: se elimina.
-        if (path) await createClient().storage.from("documentos").remove([path]);
+        // Los archivos subidos quedan huérfanos si el pago falla: se eliminan.
+        if (subidos.length) await createClient().storage.from("documentos").remove(subidos.map((s) => s.path));
       }
     });
 
@@ -512,25 +512,56 @@ export function DetallePago({
               />
             </Field>
             <div className="flex flex-col gap-1.5">
-              <span className="text-[15px] font-medium text-ink-2">Voucher</span>
+              <span className="text-[15px] font-medium text-ink-2">{vouchers.length > 1 ? `Voucher (${vouchers.length})` : "Voucher"}</span>
               <input
                 ref={fileRef}
                 type="file"
                 hidden
+                multiple
                 accept="image/*,application/pdf"
-                onChange={(e) => setVoucher(e.target.files?.[0] ?? null)}
+                aria-label="Archivos del voucher"
+                onChange={(e) => {
+                  const nuevos = [...(e.target.files ?? [])];
+                  e.target.value = "";
+                  setVouchers((vs) => [...vs, ...nuevos].slice(0, MAX_VOUCHERS));
+                }}
               />
-              <button
-                type="button"
-                onClick={() => fileRef.current?.click()}
-                className={cn(inputClass, "flex items-center gap-2 text-left", voucher ? "text-ink" : "text-ink-3")}
-              >
-                {voucher ? <Check size={18} className="shrink-0 text-ok" /> : <Camera size={18} className="shrink-0" />}
-                <span className="truncate">{voucher ? voucher.name : "Subir voucher"}</span>
-              </button>
-              {vistaVoucher && (
-                // eslint-disable-next-line @next/next/no-img-element -- vista previa local (blob)
-                <img src={vistaVoucher} alt="Voucher elegido" className="max-h-72 w-full rounded-field border border-line object-contain" />
+              {vouchers.length > 0 && (
+                <ul aria-label="Vouchers elegidos" className="grid grid-cols-2 gap-2">
+                  {vouchers.map((v, i) => (
+                    <li key={`${v.name}-${v.size}-${i}`} className="relative overflow-hidden rounded-field border border-line bg-surface">
+                      {vistas[i] ? (
+                        // eslint-disable-next-line @next/next/no-img-element -- vista previa local (blob)
+                        <img src={vistas[i]!} alt={`Voucher ${i + 1}`} className="h-36 w-full object-contain" />
+                      ) : (
+                        <span className="flex h-36 flex-col items-center justify-center gap-1 px-2 text-center text-[14px] text-ink-2">
+                          <FileText size={26} className="text-ink-3" />
+                          <span className="line-clamp-2 [overflow-wrap:anywhere]">{v.name}</span>
+                        </span>
+                      )}
+                      <button
+                        type="button"
+                        aria-label={`Quitar voucher ${i + 1}`}
+                        onClick={() => setVouchers((vs) => vs.filter((_, j) => j !== i))}
+                        className="absolute right-0 top-0 flex h-11 w-11 items-start justify-end p-1"
+                      >
+                        <span className="flex h-6 w-6 items-center justify-center rounded-full bg-ink text-bg">
+                          <X size={14} />
+                        </span>
+                      </button>
+                    </li>
+                  ))}
+                </ul>
+              )}
+              {vouchers.length < MAX_VOUCHERS && (
+                <button
+                  type="button"
+                  onClick={() => fileRef.current?.click()}
+                  className={cn(inputClass, "flex items-center gap-2 text-left text-ink-3")}
+                >
+                  <Camera size={18} className="shrink-0" />
+                  <span className="truncate">{vouchers.length ? "Agregar otra imagen" : "Subir voucher"}</span>
+                </button>
               )}
             </div>
             {error && <p role="alert" className="text-danger">{error}</p>}
@@ -546,7 +577,7 @@ export function DetallePago({
 
       {pendiente && (
         <ActionBar
-          arriba={!bloqueo && <Faltan items={[!banco && "banco", operacion.trim() === "" && "N° de operación", voucher == null && "voucher"]} />}
+          arriba={!bloqueo && <Faltan items={[!banco && "banco", operacion.trim() === "" && "N° de operación", vouchers.length === 0 && "voucher"]} />}
         >
           <Button variant="secondary" disabled={pending} onClick={() => setRechazar(true)}>
             Rechazar
