@@ -14,9 +14,8 @@ export async function POST(req: Request) {
   if (!accesoActivo()) return new Response(null, { status: 404 });
   const clave = String((await req.formData().catch(() => null))?.get("clave") ?? "");
   const esperada = process.env.DEMO_ACCESO ?? "";
-  const destino = (ruta: string) => new URL(ruta, req.url);
-  if (!esperada || !igual(clave, esperada)) return Response.redirect(destino("/acceso?error=1"), 303);
-  const res = Response.redirect(destino("/login"), 303);
+  // Redirecciones relativas: detrás de un proxy (túnel), req.url trae el host interno (localhost:3100).
+  if (!esperada || !igual(clave, esperada)) return new Response(null, { status: 303, headers: { Location: "/acceso?error=1" } });
   const cookie = [
     `${COOKIE_ACCESO}=${await firmaAcceso()}`,
     "Path=/",
@@ -25,6 +24,5 @@ export async function POST(req: Request) {
     `Max-Age=${60 * 60 * 24 * 7}`,
     ...(process.env.NODE_ENV === "production" ? ["Secure"] : []),
   ].join("; ");
-  // Response.redirect deja los headers inmutables: se arma una respuesta nueva con la cookie.
-  return new Response(null, { status: 303, headers: { Location: res.headers.get("Location")!, "Set-Cookie": cookie } });
+  return new Response(null, { status: 303, headers: { Location: "/login", "Set-Cookie": cookie } });
 }
