@@ -256,6 +256,82 @@ test.describe("@tesoreria @asistente", () => {
     }
   });
 
+  test("resumen por grupo: por proveedor y por etapa, sumado en el servidor, cuadra con la base", async () => {
+    const pend = `from v_por_pagar where estado = 'PENDIENTE' and doc in ('OC', 'OS')`;
+    const saldo = Number(sql1(`select coalesce(sum(saldo), 0) ${pend}`));
+    test.skip(saldo === 0, "nada por pagar");
+    const [provTop, saldoTop] = sql(`select proveedor, sum(saldo) s ${pend} group by proveedor order by s desc, proveedor limit 1`)[0];
+    const h = await herramientas("tesoreria");
+    try {
+      const p = (await h.llamar("resumen_por_grupo", { por: "proveedor", limite: 3 })).json();
+      expect(p.saldo).toBeCloseTo(saldo, 2);
+      expect(p.ordenes).toBe(Number(sql1(`select count(*) ${pend}`)));
+      expect(p.grupos[0].grupo.startsWith(provTop)).toBe(true);
+      expect(p.grupos[0].saldo).toBeCloseTo(Number(saldoTop), 2);
+      // Lo mostrado más el resto es todo.
+      const mostrado = p.grupos.reduce((s: number, g: { saldo: number }) => s + g.saldo, 0);
+      expect(mostrado + (p.resto?.saldo ?? 0)).toBeCloseTo(saldo, 1);
+
+      // Por etapa: una orden reparte su saldo entre sus etapas, así que las etapas suman lo mismo.
+      const e = (await h.llamar("resumen_por_grupo", { por: "etapa", limite: 50 })).json();
+      const porEtapa = e.grupos.reduce((s: number, g: { saldo: number }) => s + g.saldo, 0) + (e.resto?.saldo ?? 0);
+      expect(porEtapa).toBeCloseTo(saldo, 0);
+    } finally {
+      await h.cerrar();
+    }
+  });
+
+  test("compras de un ítem: cantidad, monto y último P.U. como en la base (sin anuladas ni cotizando)", async () => {
+    const fila = sql(
+      `select i.id, i.descripcion, count(*) n from v_oc_items_calc l join items i on i.id = l.item_id
+       where l.estado not in ('ANULADA', 'EMITIDA') and not coalesce(l.es_retencion, false) and i.descripcion ~ '^[A-Z ]+$'
+       group by i.id, i.descripcion order by n desc limit 1`,
+    )[0];
+    test.skip(!fila, "sin compras");
+    const [id, descripcion] = fila;
+    const base = `from v_oc_items_calc where item_id = ${id} and estado not in ('ANULADA', 'EMITIDA') and not coalesce(es_retencion, false)`;
+    const [cantidad, monto] = sql(`select sum(cantidad), sum(parcial) ${base}`)[0];
+    const h = await herramientas("tesoreria");
+    try {
+      const r = (await h.llamar("compras_de_item", { texto: descripcion, limite: 5 })).json();
+      const it = r.por_item.find((x: { item: string }) => x.item === descripcion);
+      expect(it, `${descripcion} en ${JSON.stringify(r.por_item.map((x: { item: string }) => x.item))}`).toBeTruthy();
+      expect(it.cantidad).toBeCloseTo(Number(cantidad), 2);
+      expect(it.monto).toBeCloseTo(Number(monto), 2);
+      expect(it.pu_min).toBeLessThanOrEqual(it.pu_max);
+      expect(r.ultimas_lineas.length).toBeLessThanOrEqual(5);
+      expect(JSON.stringify(r)).not.toMatch(/cuenta_bancaria|token/);
+      // Un texto que no es ningún ítem se dice, no se responde con ceros.
+      expect((await h.llamar("compras_de_item", { texto: "zzqx inexistente" })).error).toBe(true);
+    } finally {
+      await h.cerrar();
+    }
+  });
+
+  test("resumen del presupuesto de una obra: presupuestado y pagado cuadran con la base", async () => {
+    const obra = sql1(`select obra_id from v_avance_partida group by obra_id order by count(*) desc limit 1`);
+    test.skip(!obra, "sin presupuestos");
+    const presupuestado = Number(sql1(`select sum(parcial) from v_avance_partida where obra_id = ${obra}`));
+    const pagado = Number(
+      sql1(
+        `select coalesce(sum(l.parcial), 0) from v_oc_items_calc l join v_avance_partida p on p.partida_id = l.partida_id
+         where l.obra_id = ${obra} and l.estado in ('PAGADA', 'EN_ENTREGA', 'RECIBIDA')`,
+      ),
+    );
+    const h = await herramientas("tesoreria");
+    try {
+      const r = (await h.llamar("resumen_presupuesto", { obra_id: Number(obra), por: "rubro" })).json();
+      expect(r.presupuestado).toBeCloseTo(presupuestado, 1);
+      expect(r.pagado).toBeCloseTo(pagado, 1);
+      const x = (await h.llamar("resumen_presupuesto", { obra_id: Number(obra), por: "partida", orden: "excedido", limite: 3 })).json();
+      expect(x.grupos.length).toBeLessThanOrEqual(3);
+      for (let i = 1; i < x.grupos.length; i++) expect(x.grupos[i - 1].excedido).toBeGreaterThanOrEqual(x.grupos[i].excedido);
+      expect(x.grupos[0]).toHaveProperty("cantidades");
+    } finally {
+      await h.cerrar();
+    }
+  });
+
   test("las herramientas leen con la sesión de quien pregunta: el Jefe de Operaciones no ve montos", async () => {
     const h = await herramientas("jefe");
     try {

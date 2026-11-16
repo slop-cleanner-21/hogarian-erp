@@ -175,7 +175,10 @@ Contabilidad, Residente y RRHH **no entran**. Sus roles siguen en la base
   - Es Claude (API de Anthropic, `claude-opus-5-5`, esfuerzo bajo) con las herramientas de un **servidor MCP** propio
     (`src/lib/asistente/mcp.ts`): buscar empresas, obras, proveedores y etapas; consultar la lista de Pagos con sus mismos filtros
     (sumas de todo, las primeras filas en el `orden` pedido y cuántas no vinieron: «las más grandes» salen de `monto.desc`, nunca de una
-    lista parcial por fecha) y el detalle de una orden; y armar el filtro de Pagos o del Presupuesto. Se conecta en el mismo proceso (`InMemoryTransport`):
+    lista parcial por fecha) y el detalle de una orden; resúmenes sumados en el servidor (el modelo no suma filas a mano):
+    Pagos **por grupo** (proveedor, obra, empresa, etapa —repartida como la pantalla— o mes), **compras de un ítem** (cantidad,
+    P.U. mínimo, máximo, promedio y último, por proveedor; sin anuladas ni cotizando) y el **presupuesto de una obra** por etapa,
+    rubro o partida (presupuestado, comprado, pagado, por pagar y excedido; lo pagado, como el Presupuesto: `acumularPagoPartida`); y armar el filtro de Pagos o del Presupuesto. Se conecta en el mismo proceso (`InMemoryTransport`):
     el conector MCP de la API necesitaría una URL pública y no llevaría la sesión. Un servidor MCP externo (p. ej. para Claude
     Desktop) es otra fase, con su propia autenticación.
   - Las herramientas leen con la **sesión de quien pregunta** (la base le da solo lo que ve en pantalla) y solo hacen `select`: nada

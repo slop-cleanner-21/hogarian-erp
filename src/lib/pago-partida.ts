@@ -1,9 +1,7 @@
 import "server-only";
 import { todas } from "@/lib/paginar";
 import { createClient } from "@/lib/supabase/server";
-import type { PagoPartida } from "@/lib/filtro-pago";
-
-const PAGADAS = new Set(["PAGADA", "EN_ENTREGA", "RECIBIDA"]);
+import { acumularPagoPartida, ESTADOS_PAGO, type PagoPartida } from "@/lib/filtro-pago";
 
 export async function pagoPorPartida(obraId: number): Promise<Map<number, PagoPartida>> {
   const supabase = await createClient();
@@ -12,18 +10,8 @@ export async function pagoPorPartida(obraId: number): Promise<Map<number, PagoPa
       .from("v_oc_items_calc")
       .select("partida_id, cantidad, parcial, estado, es_retencion")
       .eq("obra_id", obraId)
-      .in("estado", ["PAGADA", "EN_ENTREGA", "RECIBIDA", "EN_TESORERIA"])
+      .in("estado", ESTADOS_PAGO)
       .range(a, b),
   );
-  const m = new Map<number, PagoPartida>();
-  for (const f of filas) {
-    const p = m.get(f.partida_id!) ?? { pagado: 0, montoPagado: 0, porPagar: 0 };
-    if (PAGADAS.has(f.estado ?? "")) {
-      // La OS de retenciones devuelve dinero: su cantidad no es lo ejecutado.
-      if (!f.es_retencion) p.pagado += Number(f.cantidad ?? 0);
-      p.montoPagado += Number(f.parcial ?? 0);
-    } else p.porPagar += Number(f.parcial ?? 0);
-    m.set(f.partida_id!, p);
-  }
-  return m;
+  return acumularPagoPartida(filas);
 }
