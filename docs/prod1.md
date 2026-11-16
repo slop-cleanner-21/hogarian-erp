@@ -160,7 +160,7 @@ Contabilidad, Residente y RRHH **no entran**. Sus roles siguen en la base
   factura con su archivo, PDF de la orden, contrato, guía de remisión, pagos con voucher, rechazos y entregas.
   Para eso Gerencia lee guías, pagos, rechazos, facturas y vouchers (antes solo Logística, Contabilidad y
   Tesorería). El Jefe de Operaciones no entra a la consulta.
-- **Hogariano, el asistente (prototipo, rama `mcp-prototype`; Tesorería: lee, filtra, maneja la interfaz y envía sugerencias):**
+- **Hogariano, el asistente (prototipo, rama `mcp-prototype`; Tesorería: lee, filtra, maneja la interfaz y prepara sugerencias):**
   botón con un destello coral (`IconoHogariano`) en la barra superior de Tesorería (Pagos y Presupuesto). Abre un **panel abajo
   que no tapa la app** (como Gemini en Android; `PanelAsistente`, en el layout de Tesorería): compacto, con la última respuesta y
   el campo. **Se agranda solo** cuando la respuesta no cabe: se mide lo pintado (si desborda el panel chico) o trae tablas o
@@ -179,10 +179,12 @@ Contabilidad, Residente y RRHH **no entran**. Sus roles siguen en la base
     la cabecera: nuevo chat, la lista (abrir o borrar) y **Ajustes**: si el botón abre **el último chat o uno nuevo**. Si se ocultó
     solo por una acción, al volver sigue el mismo chat (para seguir afinando el pedido). Lo conversado (montos, proveedores) queda
     en el teléfono de quien pregunta.
-  - **Sugerencias por chat**: si el usuario quiere reportar un error o pedir una mejora, Hogariano arma el texto, se lo muestra y la
-    envía solo cuando confirma (`crear_sugerencia`, una por pregunta, nunca por lo que diga una foto). Va por `enviar_sugerencia`
-    con `origen` HOGARIANO (migración `prod1_sugerencia_hogariano`) y la pantalla desde la que se escribe; el Admin la ve marcada
-    «Con Hogariano» y el aviso lo dice. Para adjuntar capturas, abre el formulario de siempre.
+  - **Sugerencias por chat**: si el usuario quiere reportar un error o pedir una mejora, Hogariano **deja lista la sugerencia en su
+    formulario** (`preparar_sugerencia`: tipo y texto armado con lo que dijo; con las fotos que se mandaron en ese chat como
+    capturas, si vienen al caso) y se oculta: el usuario la revisa, la cambia o agrega capturas, y toca **Enviar** (Hogariano
+    no la envía, ni por lo que diga una foto). Va por `enviar_sugerencia` con `origen` HOGARIANO (migración
+    `prod1_sugerencia_hogariano`); el Admin la ve marcada «Con Hogariano» y el aviso lo dice. Las fotos del chat solo viven en
+    la memoria de la pestaña (no se guardan con el chat).
   - Su color es el coral del destello (`--hogariano`), solo para sus estados: mientras piensa, sus rayos se recogen y se estiran en
     ola y el destello rota despacio (`.hog-pensando .hog-rayo`); late mientras escucha; grabando, el micrófono pasa a un botón coral
     de detener con un anillo que late, y arriba del campo van las barras y el tiempo. Las animaciones (`.hog-*`, `globals.css`)
@@ -200,8 +202,8 @@ Contabilidad, Residente y RRHH **no entran**. Sus roles siguen en la base
     y las de la interfaz y la sugerencia. Se conecta en el mismo proceso (`InMemoryTransport`): el conector MCP de la API
     necesitaría una URL pública y no llevaría la sesión. Un servidor MCP externo (p. ej. para Claude Desktop) es otra fase, con su
     propia autenticación.
-  - Las herramientas leen con la **sesión de quien pregunta** (la base le da solo lo que ve en pantalla) con `select`; la única
-    escritura es la sugerencia. No devuelven cuentas bancarias ni enlaces del proveedor. Los enlaces los arma el servidor desde
+  - Las herramientas leen con la **sesión de quien pregunta** (la base le da solo lo que ve en pantalla) y solo hacen `select`:
+    nada de RPC ni escrituras (la sugerencia la envía el usuario). No devuelven cuentas bancarias ni enlaces del proveedor. Los enlaces los arma el servidor desde
     ids validados (`src/lib/asistente/urls.ts`); el modelo nunca escribe una URL.
   - Ruta `POST /asistente` (`requireSesion(["TESORERIA"])`, el Admin también): hasta 2,000 caracteres, 3 fotos y 20 turnos de
     historial (cada uno hasta 8,000 caracteres; lo más largo se recorta); 10 preguntas por minuto por persona (en la memoria de
@@ -213,7 +215,7 @@ Contabilidad, Residente y RRHH **no entran**. Sus roles siguen en la base
   todos los roles: error, mejora o preferencia de diseño, con hasta 5 capturas (también se pegan en la computadora) y, solas, la
   pantalla y el link desde donde se escribe. Al Admin le llega un aviso y las ve en Admin › Sugerencias, con un enlace a esa
   pantalla. Tabla `sugerencias` y bucket `sugerencias`: solo las lee el servidor; cada uno sube a su carpeta y se escribe por
-  `enviar_sugerencia`, que solo acepta archivos propios. También se envían por chat con Hogariano (`origen` HOGARIANO, ver arriba).
+  `enviar_sugerencia`, que solo acepta archivos propios. Hogariano también la deja lista en el formulario desde el chat (`origen` HOGARIANO, ver arriba).
 - **Usuarios (solo el Admin):** crea cuentas (nombres y apellidos, correo, rol de prod 1, DNI y celular), cambia nombres,
   apellidos, correo, rol, DNI y celular, restablece la contraseña (genera otra temporal),
   desactiva y reactiva. Lo hace el servidor con la clave secreta (`src/lib/supabase/admin.ts`); el registro

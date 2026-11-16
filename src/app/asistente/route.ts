@@ -4,7 +4,7 @@ import { preguntar } from "@/lib/asistente/agente";
 import { MAX_TEXTO_TURNO, MAX_TURNOS } from "@/lib/asistente/urls";
 import { createClient, requireSesion } from "@/lib/supabase/server";
 
-// Pregunta a Hogariano (Tesorería: lee, filtra, maneja la interfaz y envía sugerencias). Las herramientas leen con la sesión de quien
+// Pregunta a Hogariano (Tesorería: lee, filtra, maneja la interfaz y prepara sugerencias). Las herramientas leen con la sesión de quien
 // pregunta; la clave de la API de Claude solo vive en el servidor (ANTHROPIC_API_KEY).
 const Pedido = z.object({
   texto: z.string().trim().max(2000),

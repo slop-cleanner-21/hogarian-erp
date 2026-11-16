@@ -98,6 +98,13 @@ export const Accion = z.discriminatedUnion("tipo", [
   z.object({ tipo: z.literal("navegar"), url: z.string().max(600).refine(enlaceValido) }),
   z.object({ tipo: z.literal("tema"), valor: z.enum(["claro", "oscuro", "sistema"]) }),
   z.object({ tipo: z.literal("abrir"), que: z.enum(QUE_ABRIR) }),
+  /** El formulario de sugerencia lleno (con las fotos del chat como capturas, si `con_fotos`): la envía el usuario. */
+  z.object({
+    tipo: z.literal("sugerencia"),
+    categoria: z.enum(["ERROR", "MEJORA", "DISENO"]),
+    texto: z.string().trim().min(3).max(2000),
+    con_fotos: z.boolean().default(false),
+  }),
 ]);
 export type Accion = z.infer<typeof Accion>;
 

@@ -9,6 +9,8 @@ const Sugerencia = z.object({
   pantalla: z.string().max(200),
   ruta: z.string().max(500),
   capturas: z.array(z.string().max(200)).max(5, "Hasta 5 capturas"),
+  /** HOGARIANO: la dejó lista el asistente (la envió el usuario desde el formulario). */
+  origen: z.enum(["APP", "HOGARIANO"]).default("APP"),
 });
 
 /** Le llega al Admin (Admin › Sugerencias), con la pantalla y las capturas. Devuelve el error, si lo hay. */
@@ -23,6 +25,7 @@ export async function enviarSugerencia(input: z.input<typeof Sugerencia>): Promi
     p_pantalla: p.data.pantalla,
     p_ruta: p.data.ruta,
     p_capturas: p.data.capturas,
+    p_origen: p.data.origen,
   });
   return error ? error.message : null;
 }

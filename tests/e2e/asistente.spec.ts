@@ -1,4 +1,5 @@
 import fs from "node:fs";
+import path from "node:path";
 import { Client } from "@modelcontextprotocol/sdk/client/index.js";
 import { InMemoryTransport } from "@modelcontextprotocol/sdk/inMemory.js";
 import { createClient } from "@supabase/supabase-js";
@@ -17,12 +18,12 @@ const env = Object.fromEntries(
 const SB = "http://127.0.0.1:55321";
 
 /** Las herramientas del asistente, conectadas en memoria y leyendo con la sesión del rol. */
-async function herramientas(rol: keyof typeof ROLES, pantalla = "/tesoreria/consultas?obra=1") {
+async function herramientas(rol: keyof typeof ROLES) {
   const s = await sesionApi(SB, env.NEXT_PUBLIC_SUPABASE_ANON_KEY, env.SUPABASE_SECRET_KEY, ROLES[rol]);
   const db = createClient(SB, env.NEXT_PUBLIC_SUPABASE_ANON_KEY, { global: { headers: { Authorization: `Bearer ${s.access_token}` } }, auth: { persistSession: false } });
   const [a, b] = InMemoryTransport.createLinkedPair();
   // eslint-disable-next-line @typescript-eslint/no-explicit-any -- el cliente de la API y el del servidor son el mismo supabase-js
-  const servidor = crearServidorMcp(db as any, { pantalla });
+  const servidor = crearServidorMcp(db as any);
   const cliente = new Client({ name: "prueba", version: "0" });
   await Promise.all([servidor.connect(b), cliente.connect(a)]);
   const llamar = async (name: string, args: Record<string, unknown> = {}) => {
@@ -505,30 +506,63 @@ test.describe("@tesoreria @asistente", () => {
     }
   });
 
-  test("crear una sugerencia por chat: le llega al Admin marcada «con Hogariano», una por pregunta", async ({}, info) => {
+  test("preparar una sugerencia: devuelve el formulario lleno como acción; no escribe nada", async () => {
+    const antes = sql1("select count(*) from sugerencias");
+    const h = await herramientas("tesoreria");
+    try {
+      const r = (await h.llamar("preparar_sugerencia", { tipo: "MEJORA", texto: "Poder ordenar Pagos por proveedor", con_fotos: true })).json();
+      expect(r.accion).toEqual({ tipo: "sugerencia", categoria: "MEJORA", texto: "Poder ordenar Pagos por proveedor", con_fotos: true });
+      expect((await h.llamar("preparar_sugerencia", { tipo: "OTRA", texto: "algo que no es un tipo" })).error).toBe(true);
+    } finally {
+      await h.cerrar();
+    }
+    expect(sql1("select count(*) from sugerencias")).toBe(antes);
+  });
+
+  test("sugerencia por chat: con la foto del chat, abre el formulario lleno y al enviarla queda «con Hogariano»", async ({ abrir }, info) => {
     test.skip(info.project.name !== "m390", "escribe en la base");
     const marca = `E2E-HOG-${Date.now()}`;
-    const limpiar = () => {
+    const page = await abrir("tesoreria", "/tesoreria");
+    await page.route("**/asistente", (ruta) =>
+      ruta.fulfill({
+        json: {
+          texto: "La dejé lista: revísala y envíala.",
+          acciones: [{ tipo: "sugerencia", categoria: "ERROR", texto: `El total de Pagos no cuadra ${marca}`, con_fotos: true }],
+        },
+      }),
+    );
+    await page.getByRole("button", { name: "Hogariano", exact: true }).click();
+    const hoja = page.getByRole("region", { name: "Hogariano" });
+    await hoja.locator('input[type="file"]').setInputFiles(path.resolve("tests/e2e/archivos/ariant.png"));
+    await expect(hoja.getByRole("img", { name: "Foto 1" })).toBeVisible();
+    await hoja.getByRole("textbox", { name: "Mensaje" }).fill("crea una sugerencia: el total no cuadra, mira la captura");
+    await hoja.getByRole("button", { name: "Enviar" }).click();
+
+    // El panel se oculta y queda el formulario lleno: tipo, texto y la foto como captura; el usuario solo envía.
+    await expect(hoja).toHaveCount(0);
+    const form = page.getByRole("dialog", { name: "Sugerencia" });
+    await expect(form.getByText("Con Hogariano")).toBeVisible();
+    await expect(form.getByRole("radio", { name: "Error" })).toHaveAttribute("aria-checked", "true");
+    await expect(form.getByRole("textbox")).toHaveValue(`El total de Pagos no cuadra ${marca}`);
+    await expect(form.getByRole("img", { name: "Captura 1" })).toBeVisible();
+    try {
+      await form.getByRole("button", { name: "Enviar" }).click();
+      await expect(form.getByRole("status")).toHaveText(/Ya le llegó/);
+      const [origen, n] = sql(`select origen, cardinality(capturas) from sugerencias where texto like '%${marca}%'`)[0];
+      expect(origen).toBe("HOGARIANO");
+      expect(n).toBe("1");
+      expect(sql1(`select titulo from notificaciones where tipo = 'SUGERENCIA' and cuerpo like '%${marca}%' limit 1`)).toMatch(/con Hogariano/);
+    } finally {
+      const capturas = sql(`select unnest(capturas) from sugerencias where texto like '%${marca}%'`).map(([c]) => c);
+      if (capturas.length)
+        await fetch(`${SB}/storage/v1/object/sugerencias`, {
+          method: "DELETE",
+          headers: { apikey: env.SUPABASE_SECRET_KEY, Authorization: `Bearer ${env.SUPABASE_SECRET_KEY}`, "Content-Type": "application/json" },
+          body: JSON.stringify({ prefixes: capturas }),
+        });
       sql(`delete from notificaciones where tipo = 'SUGERENCIA' and cuerpo like '%${marca}%'`);
       sql(`delete from audit_log where tabla = 'sugerencias' and detalle::text like '%${marca}%'`);
       sql(`delete from sugerencias where texto like '%${marca}%'`);
-    };
-    const h = await herramientas("tesoreria");
-    try {
-      const r = (await h.llamar("crear_sugerencia", { tipo: "MEJORA", texto: `Poder ordenar Pagos por proveedor ${marca}` })).json();
-      expect(r.enviada).toBe(true);
-      const [origen, pantalla, ruta, rol] = sql(`select origen, pantalla, ruta, rol from sugerencias where texto like '%${marca}%'`)[0];
-      expect(origen).toBe("HOGARIANO");
-      expect(pantalla).toBe("Tesorería › Presupuesto");
-      expect(ruta).toBe("/tesoreria/consultas?obra=1");
-      expect(rol).toBe("TESORERIA");
-      expect(sql1(`select titulo from notificaciones where tipo = 'SUGERENCIA' and cuerpo like '%${marca}%' limit 1`)).toMatch(/con Hogariano/);
-      // Una por pregunta.
-      expect((await h.llamar("crear_sugerencia", { tipo: "ERROR", texto: `otra más ${marca}` })).error).toBe(true);
-      expect(sql1(`select count(*) from sugerencias where texto like '%${marca}%'`)).toBe("1");
-    } finally {
-      await h.cerrar();
-      limpiar();
     }
   });
 

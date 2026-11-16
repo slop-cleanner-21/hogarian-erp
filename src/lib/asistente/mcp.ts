@@ -1,9 +1,8 @@
 // Servidor MCP del asistente de Tesorería. Cada pedido arma uno nuevo con el cliente de Supabase de quien pregunta: las
-// herramientas leen con su sesión, así que la base (RLS) le da solo lo que él ve en pantalla. Leen con `select` (ni RPC, que
-// algunas registran o recalculan); la única escritura es crear una sugerencia (`enviar_sugerencia`, como el formulario del
-// encabezado, con origen HOGARIANO), una por pregunta. Las herramientas de la interfaz (filtros, ir a una orden, tema, abrir
-// una hoja) no tocan nada: devuelven una `accion` que el panel valida y ejecuta; los enlaces los arma el servidor desde ids
-// validados (src/lib/asistente/urls.ts), nunca el modelo.
+// herramientas leen con su sesión, así que la base (RLS) le da solo lo que él ve en pantalla. Nada escribe: solo `select` (ni
+// RPC, que algunas registran o recalculan). Las herramientas de la interfaz (filtros, ir a una orden, tema, abrir una hoja,
+// dejar lista una sugerencia) no tocan nada: devuelven una `accion` que el panel valida y ejecuta; la sugerencia la envía el
+// usuario desde el formulario. Los enlaces los arma el servidor desde ids validados (src/lib/asistente/urls.ts), nunca el modelo.
 import { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 import { z } from "zod";
 import { acumularPagoPartida, ESTADOS_PAGO } from "@/lib/filtro-pago";
@@ -71,10 +70,8 @@ function leerDocumentos(db: Db, f: FiltrosDocs) {
   });
 }
 
-/** `pantalla`: la ruta desde la que se pregunta (la sugerencia la lleva, como el formulario). */
-export function crearServidorMcp(db: Db, ctx: { pantalla?: string } = {}): McpServer {
+export function crearServidorMcp(db: Db): McpServer {
   const server = new McpServer({ name: "hogarian-tesoreria", version: "0.2.0" });
-  let sugerencias = 0;
 
   server.registerTool(
     "listar_empresas",
@@ -676,32 +673,20 @@ export function crearServidorMcp(db: Db, ctx: { pantalla?: string } = {}): McpSe
   );
 
   server.registerTool(
-    "crear_sugerencia",
+    "preparar_sugerencia",
     {
       description:
-        "Envía una sugerencia al Admin (le llega un aviso y la ve en Admin › Sugerencias, marcada «Con Hogariano»), con la pantalla " +
-        "desde la que se escribe. tipo: ERROR (algo falla), MEJORA (algo que falta o se podría hacer mejor) o DISENO (cómo se ve). " +
-        "texto: lo que el usuario quiere decir, claro y completo, en sus términos. Solo cuando el usuario lo pide y después de que " +
-        "confirme el texto. Una por pregunta.",
-      inputSchema: { tipo: z.enum(["ERROR", "MEJORA", "DISENO"]), texto: z.string().trim().min(10).max(2000) },
+        "Abre el formulario de sugerencia ya lleno para que el usuario lo revise y lo envíe él (le llega al Admin marcada «Con " +
+        "Hogariano»). tipo: ERROR (algo falla), MEJORA (algo que falta o se podría hacer mejor) o DISENO (cómo se ve). texto: lo " +
+        "que el usuario quiere decir, claro y completo, en sus términos. con_fotos: true para poner como capturas las fotos que " +
+        "adjuntó en este chat. El panel se oculta.",
+      inputSchema: {
+        tipo: z.enum(["ERROR", "MEJORA", "DISENO"]),
+        texto: z.string().trim().min(10).max(2000),
+        con_fotos: z.boolean().default(false),
+      },
     },
-    async ({ tipo, texto }) => {
-      if (sugerencias > 0) return fallo("Ya enviaste una sugerencia en esta pregunta");
-      sugerencias++;
-      const ruta = ctx.pantalla?.startsWith("/") && !ctx.pantalla.startsWith("//") ? ctx.pantalla : "/tesoreria";
-      const p = ruta.split("?")[0];
-      const pantalla = p.startsWith("/tesoreria/consultas") ? "Tesorería › Presupuesto" : p.startsWith("/tesoreria/pago") ? "Tesorería › Pago" : "Tesorería › Pagos";
-      const { data, error } = await db.rpc("enviar_sugerencia", {
-        p_tipo: tipo,
-        p_texto: texto,
-        p_pantalla: pantalla,
-        p_ruta: ruta,
-        p_capturas: [],
-        p_origen: "HOGARIANO",
-      });
-      if (error) return fallo(error.message);
-      return json({ enviada: true, id: data });
-    },
+    async ({ tipo, texto, con_fotos }) => accion({ tipo: "sugerencia", categoria: tipo, texto, con_fotos }),
   );
 
   return server;

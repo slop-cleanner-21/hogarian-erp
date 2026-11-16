@@ -4,6 +4,7 @@ import { Lightbulb, Paperclip, X } from "lucide-react";
 import { useEffect, useRef, useState, useTransition, type ClipboardEvent } from "react";
 import { enviarSugerencia } from "@/app/sugerencias/actions";
 import { useAbrirHoja } from "@/lib/asistente/hojas";
+import { IconoHogariano } from "./asistente";
 import { createClient } from "@/lib/supabase/client";
 import { cn } from "@/lib/format";
 import { TIPOS_SUGERENCIA, type TipoSugerencia } from "@/lib/sugerencias";
@@ -17,11 +18,19 @@ const MAX_MB = 10;
 const EXTENSION: Record<string, string> = { "image/png": "png", "image/jpeg": "jpg", "image/webp": "webp", "image/heic": "heic", "image/heif": "heif", "image/gif": "gif" };
 
 type Captura = { archivo: File; url: string };
+/** Lo que deja listo Hogariano: el usuario la revisa y la envía él. */
+export type SugerenciaLista = { tipo: TipoSugerencia; texto: string; capturas: File[] };
+const esLista = (d: unknown): d is SugerenciaLista =>
+  !!d && typeof d === "object" && typeof (d as SugerenciaLista).texto === "string" && Array.isArray((d as SugerenciaLista).capturas);
 
 /** Botón del encabezado: errores, mejoras y preferencias de diseño, con capturas. Lleva la pantalla y el link desde donde se escribe. */
 export function BotonSugerencia() {
   const [abierta, setAbierta] = useState(false);
-  useAbrirHoja("sugerencia", () => setAbierta(true));
+  const [lista, setLista] = useState<{ datos: SugerenciaLista; n: number } | null>(null);
+  useAbrirHoja("sugerencia", (datos) => {
+    setLista(esLista(datos) ? { datos, n: Date.now() } : null);
+    setAbierta(true);
+  });
   return (
     <>
       <button
@@ -32,15 +41,26 @@ export function BotonSugerencia() {
       >
         <Lightbulb size={22} />
       </button>
-      {abierta && <HojaSugerencia onClose={() => setAbierta(false)} />}
+      {abierta && (
+        <HojaSugerencia
+          key={lista?.n ?? 0}
+          inicial={lista?.datos}
+          onClose={() => {
+            setAbierta(false);
+            setLista(null);
+          }}
+        />
+      )}
     </>
   );
 }
 
-function HojaSugerencia({ onClose }: { onClose: () => void }) {
-  const [tipo, setTipo] = useState<TipoSugerencia>("ERROR");
-  const [texto, setTexto] = useState("");
-  const [capturas, setCapturas] = useState<Captura[]>([]);
+function HojaSugerencia({ onClose, inicial }: { onClose: () => void; inicial?: SugerenciaLista }) {
+  const [tipo, setTipo] = useState<TipoSugerencia>(inicial?.tipo ?? "ERROR");
+  const [texto, setTexto] = useState(inicial?.texto ?? "");
+  const [capturas, setCapturas] = useState<Captura[]>(() =>
+    (inicial?.capturas ?? []).slice(0, MAX_CAPTURAS).map((archivo) => ({ archivo, url: URL.createObjectURL(archivo) })),
+  );
   const [error, setError] = useState<string | null>(null);
   const [enviada, setEnviada] = useState(false);
   const [pending, startTransition] = useTransition();
@@ -93,7 +113,7 @@ function HojaSugerencia({ onClose }: { onClose: () => void }) {
         if (e) return setError(e.message);
         rutas.push(ruta);
       }
-      const e = await enviarSugerencia({ tipo, texto, pantalla: origen.pantalla, ruta: origen.ruta, capturas: rutas });
+      const e = await enviarSugerencia({ tipo, texto, pantalla: origen.pantalla, ruta: origen.ruta, capturas: rutas, origen: inicial ? "HOGARIANO" : "APP" });
       if (e) return setError(e);
       setEnviada(true);
     });
@@ -127,6 +147,12 @@ function HojaSugerencia({ onClose }: { onClose: () => void }) {
       }
     >
       <div className="flex flex-col gap-4 p-4" onPaste={pegar}>
+        {inicial && (
+          <p className="flex items-center gap-1.5 text-[14px] font-medium text-hogariano">
+            <IconoHogariano size={15} />
+            Con Hogariano
+          </p>
+        )}
         <div role="radiogroup" aria-label="Tipo" className="grid grid-cols-3 gap-1 rounded-control bg-sunken p-1">
           {TIPOS_SUGERENCIA.map((t) => (
             <button

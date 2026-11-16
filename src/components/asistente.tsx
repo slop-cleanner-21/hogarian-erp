@@ -73,6 +73,14 @@ const HOJA: Record<string, string> = {
   ajustes_hogariano: "Abrió sus ajustes",
   chats: "Abrió los chats",
 };
+/** Capturas que se le pasan al formulario de sugerencia (las últimas fotos del chat). */
+const MAX_CAPTURAS = 5;
+
+/** Una foto del chat (JPEG en base64) como archivo, para el formulario de sugerencia. */
+async function aArchivo(f: Foto, i: number): Promise<File> {
+  const blob = await (await fetch(f.url)).blob();
+  return new File([blob], `captura-${i + 1}.jpg`, { type: "image/jpeg" });
+}
 
 /** Rutas donde está el asistente (por ahora, Tesorería; la ruta del servidor también exige el rol). */
 const disponible = (path: string) => path === "/tesoreria" || path.startsWith("/tesoreria/");
@@ -201,6 +209,7 @@ function hizoDe(acciones: Accion[]): string {
   const a = acciones[acciones.length - 1];
   if (a.tipo === "tema") return a.valor === "oscuro" ? "Modo oscuro" : a.valor === "claro" ? "Modo claro" : "Tema del sistema";
   if (a.tipo === "navegar") return a.url.startsWith("/tesoreria/pago/") ? "Abrió la orden" : "Filtró la pantalla";
+  if (a.tipo === "sugerencia") return "Preparó la sugerencia";
   if (a.que === "avisos") return "Abrió los avisos";
   return HOJA[a.que] ?? "Abrió";
 }
@@ -232,6 +241,8 @@ export function PanelAsistente({ userId }: { userId: string }) {
   /** Una respuesta recién llegada: se mide si cabe en el panel pequeño. */
   const medir = useRef(false);
   const abiertoRef = useRef(false);
+  /** Las fotos que se mandaron en cada chat (solo en memoria, no se guardan): pueden ir como capturas de una sugerencia. */
+  const fotosChat = useRef(new Map<string, Foto[]>());
   const ajustesRef = useRef(ajustes);
   const actualRef = useRef<string | null>(null);
   const estado: Estado = escuchando ? "escuchando" : pending ? "pensando" : "quieto";
@@ -415,11 +426,20 @@ export function PanelAsistente({ userId }: { userId: string }) {
     });
 
   /** Lo que pidió hacer en la pantalla (validado otra vez aquí). Devuelve si el panel se ocultó. */
-  const ejecutar = (acciones: Accion[], resumen: string): boolean => {
+  const ejecutar = (acciones: Accion[], resumen: string, chatId: string): boolean => {
     let ocultarse = false;
     let destino: string | null = null;
     const hojas: string[] = [];
     for (const a of acciones) {
+      if (a.tipo === "sugerencia") {
+        // El formulario lleno: el usuario la revisa y la envía.
+        const fotosSug = a.con_fotos ? (fotosChat.current.get(chatId) ?? []).slice(-MAX_CAPTURAS) : [];
+        void Promise.all(fotosSug.map(aArchivo))
+          .catch(() => [] as File[])
+          .then((capturas) => abrirHoja("sugerencia", { tipo: a.categoria, texto: a.texto, capturas }));
+        ocultar(null);
+        return true;
+      }
       if (a.tipo === "tema") {
         aplicar(TEMA[a.valor]);
         ocultarse = true;
@@ -439,7 +459,7 @@ export function PanelAsistente({ userId }: { userId: string }) {
     if (destino) router.push(destino);
     // Con una hoja abierta encima, el aviso quedaría detrás: no se muestra.
     if (ocultarse) ocultar(hojas.length ? null : resumen);
-    if (hojas.length) setTimeout(() => hojas.forEach(abrirHoja), destino ? 700 : 80);
+    if (hojas.length) setTimeout(() => hojas.forEach((q) => abrirHoja(q)), destino ? 700 : 80);
     return ocultarse;
   };
 
@@ -450,6 +470,7 @@ export function PanelAsistente({ userId }: { userId: string }) {
     const id = chat?.id ?? nuevoChat().id;
     if (!chat) setGuardado((g) => ({ ...g, actual: id }));
     const historial = historialDe(turnos);
+    if (fotos.length) fotosChat.current.set(id, [...(fotosChat.current.get(id) ?? []), ...fotos].slice(-MAX_CAPTURAS));
     agregarTurnos(id, [{ rol: "usuario", texto: t, ...(fotos.length ? { fotos: fotos.length } : {}) }]);
     setTexto("");
     const imagenes = fotos.map(({ media_type, data }) => ({ media_type, data }));
@@ -474,7 +495,7 @@ export function PanelAsistente({ userId }: { userId: string }) {
       agregarTurnos(id, [{ rol: "asistente", texto: r.texto, ...(acciones.length ? { hizo: hizoDe(acciones) } : {}) }]);
       // Si mientras pensaba se cambió de chat, la respuesta queda en el suyo y no toca la pantalla.
       if (actualRef.current !== id) return;
-      if (acciones.length && ejecutar(acciones, r.texto.replace(/[#*|_`>[\]()]/g, "").replace(/\s+/g, " ").trim())) return;
+      if (acciones.length && ejecutar(acciones, r.texto.replace(/[#*|_`>[\]()]/g, "").replace(/\s+/g, " ").trim(), id)) return;
       if (pideEspacio(r.texto)) setGrande(true);
       else medir.current = true;
     });
