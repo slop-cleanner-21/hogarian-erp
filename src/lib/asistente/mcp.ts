@@ -54,7 +54,7 @@ function leerDocumentos(db: Db, f: FiltrosDocs) {
   return todas((a, b) => {
     let q = db
       .from("v_por_pagar")
-      .select("doc, obra_id, numero, obra, empresa, proveedor_id, proveedor, ruc, fecha, total, pagado, saldo, etapas")
+      .select("doc, obra_id, numero, obra, empresa_id, empresa, proveedor_id, proveedor, ruc, fecha, total, pagado, saldo, etapas")
       .eq("estado", pagado ? "PAGADO" : "PENDIENTE");
     q = f.doc ? q.eq("doc", f.doc) : q.in("doc", ["OC", "OS"]);
     if (f.empresa_id) q = q.eq("empresa_id", f.empresa_id);
@@ -177,8 +177,8 @@ export function crearServidorMcp(db: Db, ctx: { pantalla?: string } = {}): McpSe
       }
       const pagado = f.estado === "pagado";
       const columnaMonto = pagado ? "pagado" : "saldo";
-      // eslint-disable-next-line @typescript-eslint/no-unused-vars -- el id del proveedor no le sirve al modelo
-      const filas = (await leerDocumentos(db, { ...f, estado: f.estado })).map(({ proveedor_id, ...r }) => ({
+      // eslint-disable-next-line @typescript-eslint/no-unused-vars -- los ids no le sirven al modelo
+      const filas = (await leerDocumentos(db, { ...f, estado: f.estado })).map(({ proveedor_id, empresa_id, ...r }) => ({
         ...r,
         enlace: r.obra_id != null && r.numero ? enlaceOrden(r.obra_id, r.numero) : null,
       }));
@@ -264,7 +264,8 @@ export function crearServidorMcp(db: Db, ctx: { pantalla?: string } = {}): McpSe
         "cada grupo: por proveedor, obra, empresa, etapa o mes (de la fecha de la orden). Úsala para «cuánto le debo a cada " +
         "proveedor», «por pagar por obra», «pagado por mes»: nunca sumes a mano filas de consultar_documentos. Sin doc, OC y OS " +
         "juntas. Por etapa, una orden que toca varias etapas reparte su monto entre ellas según lo que pide en cada una (como la " +
-        "pantalla), así que cuenta como orden en cada etapa. Grupos de mayor a menor monto (por pagar: saldo; pagadas: pagado).",
+        "pantalla), así que cuenta como orden en cada etapa. Grupos de mayor a menor monto (por pagar: saldo; pagadas: pagado). " +
+        "Por proveedor, obra o empresa, cada grupo trae el enlace a Pagos con ese filtro (enlace, o enlace_oc y enlace_os).",
       inputSchema: {
         por: z.enum(["proveedor", "obra", "empresa", "etapa", "mes"]),
         estado: z.enum(["pendiente", "pagado"]).default("pendiente"),
@@ -299,10 +300,21 @@ export function crearServidorMcp(db: Db, ctx: { pantalla?: string } = {}): McpSe
           partes.set(k, m);
         }
       }
-      const grupos = new Map<string, { grupo: string; ordenes: Set<string>; total: number; pagado: number; saldo: number }>();
+      type Grupo = { grupo: string; ordenes: Set<string>; docs: Set<"OC" | "OS">; filtro: Partial<FiltrosPagos>; total: number; pagado: number; saldo: number };
+      const grupos = new Map<string, Grupo>();
+      // El filtro de Pagos de cada grupo (proveedor, obra o empresa), para que la respuesta lo enlace.
+      const filtroDe = (d: (typeof docs)[number]): Partial<FiltrosPagos> =>
+        f.por === "proveedor" && d.proveedor_id
+          ? { proveedor_id: d.proveedor_id }
+          : f.por === "obra" && d.obra_id && d.empresa_id
+            ? { obra_id: d.obra_id, empresa_id: d.empresa_id }
+            : f.por === "empresa" && d.empresa_id
+              ? { empresa_id: d.empresa_id }
+              : {};
       const sumar = (g: string, k: string, d: (typeof docs)[number], parte: number) => {
-        const x = grupos.get(g) ?? { grupo: g, ordenes: new Set<string>(), total: 0, pagado: 0, saldo: 0 };
+        const x = grupos.get(g) ?? { grupo: g, ordenes: new Set<string>(), docs: new Set(), filtro: filtroDe(d), total: 0, pagado: 0, saldo: 0 };
         x.ordenes.add(k);
+        if (d.doc === "OC" || d.doc === "OS") x.docs.add(d.doc);
         x.total += Number(d.total ?? 0) * parte;
         x.pagado += Number(d.pagado ?? 0) * parte;
         x.saldo += Number(d.saldo ?? 0) * parte;
@@ -326,8 +338,16 @@ export function crearServidorMcp(db: Db, ctx: { pantalla?: string } = {}): McpSe
                 : (d.fecha ?? "").slice(0, 7) || "Sin fecha";
         sumar(g, k, d, 1);
       }
+      // Enlace a Pagos con el grupo filtrado (y los mismos filtros), uno por tipo de orden que tiene.
+      const enlacesDe = (g: Grupo) => {
+        if (!Object.keys(g.filtro).length) return {};
+        const base = { empresa_id: f.empresa_id ?? "todas", obra_id: f.obra_id, proveedor_id: f.proveedor_id, estado: f.estado, etapas: f.etapas, fecha: f.fecha, monto: f.monto, ...g.filtro } as const;
+        const docsG = [...g.docs];
+        if (docsG.length === 1) return { enlace: urlPagos({ ...base, doc: docsG[0] }) };
+        return Object.fromEntries(docsG.map((doc) => [`enlace_${doc.toLowerCase()}`, urlPagos({ ...base, doc })]));
+      };
       const lista = [...grupos.values()]
-        .map((g) => ({ grupo: g.grupo, ordenes: g.ordenes.size, total: r2(g.total), pagado: r2(g.pagado), saldo: r2(g.saldo) }))
+        .map((g) => ({ grupo: g.grupo, ordenes: g.ordenes.size, total: r2(g.total), pagado: r2(g.pagado), saldo: r2(g.saldo), ...enlacesDe(g) }))
         .sort((a, b) => b[columna] - a[columna] || a.grupo.localeCompare(b.grupo, "es"));
       const resto = lista.slice(f.limite);
       return json({
@@ -620,6 +640,17 @@ export function crearServidorMcp(db: Db, ctx: { pantalla?: string } = {}): McpSe
       if (!data) return fallo(`La orden ${numero} no está en Tesorería`);
       return accion({ tipo: "navegar", url: enlaceOrden(obra_id, numero) });
     },
+  );
+
+  server.registerTool(
+    "ir_a_pantalla",
+    {
+      description:
+        "Lleva a Pagos o al Presupuesto (las pestañas de abajo) como el usuario las dejó, sin cambiar filtros. Para ir con " +
+        "filtros, usa aplicar_filtros_pagos o aplicar_filtros_presupuesto. El panel se oculta.",
+      inputSchema: { pantalla: z.enum(["pagos", "presupuesto"]) },
+    },
+    async ({ pantalla }) => accion({ tipo: "navegar", url: pantalla === "pagos" ? "/tesoreria" : "/tesoreria/consultas" }),
   );
 
   server.registerTool(

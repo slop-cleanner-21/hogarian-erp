@@ -489,6 +489,17 @@ test.describe("@tesoreria @asistente", () => {
       expect((await h.llamar("cambiar_tema", { tema: "oscuro" })).json().accion).toEqual({ tipo: "tema", valor: "oscuro" });
       expect((await h.llamar("abrir_en_la_app", { que: "menu" })).json().accion).toEqual({ tipo: "abrir", que: "menu" });
       expect((await h.llamar("abrir_en_la_app", { que: "admin" })).error).toBe(true);
+      expect((await h.llamar("ir_a_pantalla", { pantalla: "presupuesto" })).json().accion).toEqual({ tipo: "navegar", url: "/tesoreria/consultas" });
+      // Los grupos por proveedor traen su enlace a Pagos filtrado (uno por tipo de orden).
+      const g = (await h.llamar("resumen_por_grupo", { por: "proveedor", limite: 5 })).json();
+      for (const x of g.grupos) {
+        const enlaces = [x.enlace, x.enlace_oc, x.enlace_os].filter(Boolean);
+        expect(enlaces.length, x.grupo).toBeGreaterThan(0);
+        for (const e of enlaces) {
+          expect(enlaceValido(e)).toBe(true);
+          expect(new URL(e, "https://x").searchParams.get("proveedor")).toBeTruthy();
+        }
+      }
     } finally {
       await h.cerrar();
     }

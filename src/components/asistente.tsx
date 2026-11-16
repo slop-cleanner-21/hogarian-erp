@@ -437,7 +437,8 @@ export function PanelAsistente({ userId }: { userId: string }) {
       }
     }
     if (destino) router.push(destino);
-    if (ocultarse) ocultar(resumen);
+    // Con una hoja abierta encima, el aviso quedaría detrás: no se muestra.
+    if (ocultarse) ocultar(hojas.length ? null : resumen);
     if (hojas.length) setTimeout(() => hojas.forEach(abrirHoja), destino ? 700 : 80);
     return ocultarse;
   };
