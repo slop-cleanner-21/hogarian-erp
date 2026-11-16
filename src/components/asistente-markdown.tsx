@@ -33,7 +33,11 @@ export default function RespuestaMarkdown({ texto, onEnlace }: { texto: string; 
             e.preventDefault();
             onEnlace(href);
           }}
-          className="whitespace-nowrap font-semibold text-primary underline decoration-primary/40 underline-offset-2"
+          // Un N° («OC 900002») no se parte; un nombre largo (proveedor, obra) sí baja de línea.
+          className={cn(
+            "font-semibold text-primary underline decoration-primary/40 underline-offset-2",
+            typeof children === "string" && children.length <= 16 && "whitespace-nowrap",
+          )}
         >
           {children}
         </a>
