@@ -36,7 +36,12 @@ export function BarraCarga() {
       if (a.hasAttribute("data-aqui")) return;
       const destino = new URL(a.href, location.href);
       if (destino.origin !== location.origin || destino.pathname.startsWith("/sb/")) return;
-      if (destino.pathname + destino.search === location.pathname + location.search) return;
+      // A la misma URL: no hay a dónde ir. Si había otra navegación en curso (OS y enseguida OC, la pestaña de donde se
+      // partió), Next la cancela y la URL ya no cambia: la barra se apaga aquí, o quedaría encendida hasta el tope.
+      if (destino.pathname + destino.search === location.pathname + location.search) {
+        setCargando(false);
+        return;
+      }
       encender();
     };
     document.addEventListener("click", onClick, true);

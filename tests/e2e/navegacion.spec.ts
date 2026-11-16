@@ -174,4 +174,22 @@ test.describe("@navegacion apertura y pestañas", () => {
       expect(await page.evaluate(() => (window as unknown as { esqueleto: number }).esqueleto)).toBe(0);
     });
   }
+
+  test("tesoreria: OS y enseguida de vuelta a OC no deja la pantalla cargando", async ({ abrir }) => {
+    const page = await abrir("tesoreria", `/tesoreria?empresa=${empresaTes}&area=log&doc=OC`);
+    // La red lenta (como por datos móviles) para que OC se toque antes de que llegue OS.
+    await page.route("**/tesoreria?*", async (r) => {
+      await new Promise((x) => setTimeout(x, 800));
+      await r.continue();
+    });
+    await page.getByRole("tab", { name: /^OS/ }).click({ noWaitAfter: true });
+    await expect(page.getByRole("progressbar", { name: "Cargando" })).toHaveCount(1);
+    await page.getByRole("tab", { name: /^OC/ }).click({ noWaitAfter: true });
+    // Se queda en OC y la barra se apaga (antes seguía encendida, con la pantalla atenuada, hasta su tope de 12 s).
+    await expect(page.getByRole("progressbar", { name: "Cargando" })).toHaveCount(0, { timeout: 3000 });
+    await expect(page.locator("html")).not.toHaveAttribute("data-cargando");
+    await page.waitForTimeout(1500);
+    expect(new URL(page.url()).searchParams.get("doc")).toBe("OC");
+    await expect(page.getByRole("tab", { name: /^OC/ })).toHaveAttribute("aria-selected", "true");
+  });
 });
