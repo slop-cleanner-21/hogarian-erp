@@ -174,7 +174,8 @@ Contabilidad, Residente y RRHH **no entran**. Sus roles siguen en la base
   pedidos como «quiero ver las OC de Adolfo King en la etapa L1A» y abre la pantalla con esos filtros, o responde cuánto y qué.
   - Es Claude (API de Anthropic, `claude-opus-5-5`, esfuerzo bajo) con las herramientas de un **servidor MCP** propio
     (`src/lib/asistente/mcp.ts`): buscar empresas, obras, proveedores y etapas; consultar la lista de Pagos con sus mismos filtros
-    y el detalle de una orden; y armar el filtro de Pagos o del Presupuesto. Se conecta en el mismo proceso (`InMemoryTransport`):
+    (sumas de todo, las primeras filas en el `orden` pedido y cuántas no vinieron: «las más grandes» salen de `monto.desc`, nunca de una
+    lista parcial por fecha) y el detalle de una orden; y armar el filtro de Pagos o del Presupuesto. Se conecta en el mismo proceso (`InMemoryTransport`):
     el conector MCP de la API necesitaría una URL pública y no llevaría la sesión. Un servidor MCP externo (p. ej. para Claude
     Desktop) es otra fase, con su propia autenticación.
   - Las herramientas leen con la **sesión de quien pregunta** (la base le da solo lo que ve en pantalla) y solo hacen `select`: nada

@@ -235,6 +235,27 @@ test.describe("@tesoreria @asistente", () => {
     await expect(panel.getByRole("textbox", { name: "Mensaje" })).toHaveValue("las OS pagadas");
   });
 
+  test("las más grandes por pagar: con orden monto.desc salen de todas las filas, no de las primeras por fecha", async () => {
+    const esperadas = sql(`select numero, saldo from v_por_pagar where estado = 'PENDIENTE' and doc = 'OC' order by saldo desc, obra_id, numero limit 3`);
+    test.skip(esperadas.length < 3, "pocas OC por pagar");
+    const h = await herramientas("tesoreria");
+    try {
+      const r = (await h.llamar("consultar_documentos", { doc: "OC", estado: "pendiente", orden: "monto.desc", limite: 3 })).json();
+      expect(r.orden).toBe("monto.desc");
+      expect(r.sin_mostrar).toBe(r.cantidad - 3);
+      expect(r.filas.map((f: { saldo: number }) => Number(f.saldo))).toEqual(esperadas.map(([, s]) => Number(s)));
+      // Las sumas siguen siendo de todas, no de las que vinieron.
+      expect(r.saldo).toBeCloseTo(Number(sql1(`select sum(saldo) from v_por_pagar where estado = 'PENDIENTE' and doc = 'OC'`)), 2);
+      // Sin orden, como la pantalla: las más antiguas primero.
+      const porFecha = (await h.llamar("consultar_documentos", { doc: "OC", estado: "pendiente", limite: 50 })).json();
+      expect(porFecha.orden).toBe("fecha.asc");
+      const fechas = porFecha.filas.map((f: { fecha: string }) => f.fecha);
+      expect(fechas).toEqual([...fechas].sort());
+    } finally {
+      await h.cerrar();
+    }
+  });
+
   test("las herramientas leen con la sesión de quien pregunta: el Jefe de Operaciones no ve montos", async () => {
     const h = await herramientas("jefe");
     try {

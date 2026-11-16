@@ -92,8 +92,10 @@ export function crearServidorMcp(db: Db): McpServer {
     "consultar_documentos",
     {
       description:
-        "Lee las OC u OS de la lista de Pagos con los mismos filtros que la pantalla y devuelve cuántas son, sus sumas y las " +
-        "primeras filas. estado: pendiente (por pagar), pagado o rechazos. Montos en soles.",
+        "Lee las OC u OS de la lista de Pagos con los mismos filtros que la pantalla y devuelve cuántas son, sus sumas (de todas) y " +
+        "solo las primeras filas según `orden` (sin_mostrar = las que no vinieron). Para «las más grandes» usa orden monto.desc; " +
+        "para «las más antiguas», fecha.asc: no saques un ranking de filas en otro orden. estado: pendiente (por pagar), pagado o " +
+        "rechazos. Montos en soles (por pagar: saldo; pagado: lo pagado).",
       inputSchema: {
         empresa_id: z.number().int().positive().optional(),
         obra_id: z.number().int().positive().optional(),
@@ -103,6 +105,7 @@ export function crearServidorMcp(db: Db): McpServer {
         etapas: ETAPAS.optional(),
         fecha: FECHA.optional(),
         monto: z.enum(["bajo", "medio", "alto"]).optional(),
+        orden: FiltrosPagos.shape.orden,
         limite: LIMITE,
       },
     },
@@ -125,7 +128,7 @@ export function crearServidorMcp(db: Db): McpServer {
           if (desde) q = q.gte("created_at", desde[0]).lt("created_at", desde[1]);
           return q.order("created_at", { ascending: false }).order("id").range(a, b);
         });
-        return json({ cantidad: filas.length, filas: filas.slice(0, f.limite) });
+        return json({ cantidad: filas.length, sin_mostrar: Math.max(0, filas.length - f.limite), filas: filas.slice(0, f.limite) });
       }
       const pagado = f.estado === "pagado";
       const columnaMonto = pagado ? "pagado" : "saldo";
@@ -148,7 +151,28 @@ export function crearServidorMcp(db: Db): McpServer {
         return q.order("fecha", { ascending: !pagado }).order("numero").order("obra_id").range(a, b);
       });
       const suma = (k: "total" | "pagado" | "saldo") => Math.round(filas.reduce((s, r) => s + Number(r[k] ?? 0), 0) * 100) / 100;
-      return json({ cantidad: filas.length, total: suma("total"), pagado: suma("pagado"), saldo: suma("saldo"), filas: filas.slice(0, f.limite) });
+      if (f.orden) {
+        // Sobre todas las filas (ya están en memoria), con desempate por obra y N°: el ranking no depende de cuáles vinieron.
+        const [campo, sentido] = f.orden.split(".") as [string, "asc" | "desc"];
+        const valor = (r: (typeof filas)[number]): number | string =>
+          campo === "monto" ? Number(r[columnaMonto] ?? 0) : campo === "fecha" ? String(r.fecha ?? "") : String(r[campo as "proveedor" | "numero"] ?? "");
+        const signo = sentido === "desc" ? -1 : 1;
+        filas.sort((a, b) => {
+          const va = valor(a);
+          const vb = valor(b);
+          const c = typeof va === "number" && typeof vb === "number" ? va - vb : String(va).localeCompare(String(vb), "es", { numeric: true });
+          return c * signo || (a.obra_id ?? 0) - (b.obra_id ?? 0) || String(a.numero).localeCompare(String(b.numero), "es", { numeric: true });
+        });
+      }
+      return json({
+        cantidad: filas.length,
+        total: suma("total"),
+        pagado: suma("pagado"),
+        saldo: suma("saldo"),
+        orden: f.orden ?? (pagado ? "fecha.desc" : "fecha.asc"),
+        sin_mostrar: Math.max(0, filas.length - f.limite),
+        filas: filas.slice(0, f.limite),
+      });
     },
   );
 
