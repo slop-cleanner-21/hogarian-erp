@@ -1,9 +1,9 @@
 import { osRetenidas } from "@/lib/retenidas";
+import { aLaOrdenRenumerada } from "@/lib/renumeradas";
 import { cookies } from "next/headers";
 import { rechazosDeOrden } from "@/lib/rechazos";
 import { representanteContratos } from "@/lib/representante";
 import type { Metadata } from "next";
-import { notFound } from "next/navigation";
 import { Documentos } from "@/components/documentos";
 import { listarAdjuntos } from "@/lib/adjuntos";
 import { Entregas } from "@/components/entregas";
@@ -78,7 +78,7 @@ export default async function OrdenPage({ params }: PageProps<"/logistica/ordene
     supabase.from("detracciones").select("item_id, porcentaje").eq("obra_id", Number(obraId)),
     supabase.from("parametros").select("detraccion_minimo").maybeSingle(),
   ]);
-  if (!orden) notFound();
+  if (!orden) return aLaOrdenRenumerada("/logistica/ordenes", Number(obraId), numero);
 
   const comprobanteIds = [...new Set((items ?? []).map((i) => i.comprobante_id).filter((c): c is number => c != null))];
   // Las OS de valorización y de retención no tienen entregas: lo ejecutado está en la valorización.

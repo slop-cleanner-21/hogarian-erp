@@ -47,3 +47,24 @@ test.describe("@logistica numeración de órdenes por empresa", () => {
     expect(r[6][0], "queda uno solo con ese N°").toBe("1");
   });
 });
+
+test.describe("@tesoreria links de una orden que cambió de N°", () => {
+  test("el link con el N° viejo lleva a la orden con el N° nuevo; un cambio de N° deja su rastro", async ({ abrir }, info) => {
+    test.skip(info.project.name !== "m390", "escribe en la base");
+    const [obra, numero] = sql(`select obra_id, numero from ordenes_compra where estado = 'EN_TESORERIA' order by obra_id, numero limit 1`)[0];
+    sql(`insert into ordenes_renumeradas (obra_id, anterior, nuevo) values (${obra}, 'E2E-VIEJO', '${numero}') on conflict do nothing`);
+    try {
+      const page = await abrir("tesoreria", `/tesoreria/pago/${obra}/E2E-VIEJO`);
+      await expect(page).toHaveURL(new RegExp(`/tesoreria/pago/${obra}/${numero}$`));
+      const consulta = await abrir("gerencia", `/consulta/orden/${obra}/E2E-VIEJO`);
+      await expect(consulta).toHaveURL(new RegExp(`/consulta/orden/${obra}/${numero}$`));
+    } finally {
+      sql(`delete from ordenes_renumeradas where obra_id = ${obra} and anterior = 'E2E-VIEJO'`);
+    }
+    const r = enTransaccion(`
+      update ordenes_compra set numero = 'E2E-N1' where obra_id = ${obra} and numero = '${numero}';
+      update ordenes_compra set numero = 'E2E-N2' where obra_id = ${obra} and numero = 'E2E-N1';
+      select 'R', anterior || '>' || nuevo from ordenes_renumeradas where obra_id = ${obra} and anterior in ('${numero}', 'E2E-N1') order by anterior`);
+    expect(r.map((x) => x[0]).sort(), "toda la cadena apunta al último N°").toEqual([`${numero}>E2E-N2`, "E2E-N1>E2E-N2"].sort());
+  });
+});

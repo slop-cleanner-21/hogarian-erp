@@ -1,8 +1,8 @@
 import type { Metadata } from "next";
-import { notFound } from "next/navigation";
 import { DetallePago } from "@/app/tesoreria/pago/detalle-pago";
 import { vistaOrden } from "@/app/tesoreria/pago/vista-orden";
 import { fecha } from "@/lib/format";
+import { aLaOrdenRenumerada } from "@/lib/renumeradas";
 import { createClient, requireSesion } from "@/lib/supabase/server";
 import { CerrarEntrega } from "./cerrar-entrega";
 
@@ -39,6 +39,6 @@ export default async function ConsultaOrdenPage({ params }: PageProps<"/consulta
     </>
   );
   const props = await vistaOrden(obraId, numero, { modo: "consulta", volverA: true, extraEntregas: extra || undefined });
-  if (!props) notFound();
+  if (!props) return aLaOrdenRenumerada("/consulta/orden", obraId, numero);
   return <DetallePago {...props} />;
 }

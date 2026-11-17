@@ -54,6 +54,7 @@ const LECTURA = tabla(`
   aviso_preferencias           M   M   M   M   M   M   M   M
   obra_etapas                  T   T   T   T   T   T   T   0
   obras                        T   T   T   P   T   T   T   0
+  ordenes_renumeradas          T   T   T   T   T   T   T   T
   oc_items                     T   T   T   P   T   0   0   0
   ordenes_compra               T   T   T   P   T   0   0   0
   orden_borradores             M   0   0   0   0   0   0   0

@@ -1851,6 +1851,36 @@ export type Database = {
           },
         ];
       };
+      ordenes_renumeradas: {
+        Row: {
+          anterior: string;
+          nuevo: string;
+          obra_id: number;
+          renumerada_at: string;
+        };
+        ComputedFields: never;
+        Insert: {
+          anterior: string;
+          nuevo: string;
+          obra_id: number;
+          renumerada_at?: string;
+        };
+        Update: {
+          anterior?: string;
+          nuevo?: string;
+          obra_id?: number;
+          renumerada_at?: string;
+        };
+        Relationships: [
+          {
+            foreignKeyName: "ordenes_renumeradas_obra_id_fkey";
+            columns: ["obra_id"];
+            isOneToOne: false;
+            referencedRelation: "obras";
+            referencedColumns: ["id"];
+          },
+        ];
+      };
       pago_aplicaciones: {
         Row: {
           comprobante_id: number | null;
@@ -4277,6 +4307,16 @@ export type Database = {
         Args: { p_clave: string; p_user: string };
         Returns: boolean;
       };
+      corregir_numeros_repetidos: {
+        Args: Record<PropertyKey, never>;
+        Returns: {
+          anterior: string;
+          empresa_id: number;
+          nuevo: string;
+          obra_id: number;
+          tipo: string;
+        }[];
+      };
       crear_orden: {
         Args: {
           p_items: Json;
@@ -4426,6 +4466,10 @@ export type Database = {
         Returns: number;
       };
       fn_pu_max: { Args: { p_pu: number; p_tol: number }; Returns: number };
+      fn_recalcular_retencion_4ta: {
+        Args: { p_comprobante_ids?: number[]; p_proveedor_id: number };
+        Returns: number;
+      };
       fn_requerido_partida: { Args: { p_partida_id: number }; Returns: number };
       fn_retencion: {
         Args: { p_item_id: number; p_obra_id: number };
@@ -4597,6 +4641,14 @@ export type Database = {
       ordenar_etapas_obra: {
         Args: { p_etapas: string[]; p_obra_id: number };
         Returns: undefined;
+      };
+      os_contrato_valido: {
+        Args: { p_numero: string; p_obra_id: number };
+        Returns: boolean;
+      };
+      os_lleva_contrato: {
+        Args: { p_numero: string; p_obra_id: number };
+        Returns: boolean;
       };
       pagar_documento: {
         Args: {
