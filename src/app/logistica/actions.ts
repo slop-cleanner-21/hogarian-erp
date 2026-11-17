@@ -26,7 +26,7 @@ const FECHA = z.string().regex(/^\d{4}-\d{2}-\d{2}$/, "Fecha inválida");
 const CrearOrden = z
   .object({
     obraId: z.number().int().positive(),
-    /** Solo se muestra: el N° lo pone la base (el siguiente de la obra). */
+    /** Solo se muestra: el N° lo pone la base (el siguiente de la serie de la empresa). */
     numero: z.string().optional(),
     proveedorId: z.number().int().positive("Selecciona el proveedor"),
     tipo: z.enum(["OC", "OS"]),
@@ -58,7 +58,7 @@ export async function crearOrden(input: z.input<typeof CrearOrden>): Promise<Res
   }
   const { data, error } = await supabase.rpc("crear_orden", {
     p_obra_id: p.data.obraId,
-    // Sin N°: la base pone el siguiente de la obra (nunca repite el de una anulada).
+    // Sin N°: la base pone el siguiente de la serie de la empresa (nunca repite el de otra orden de la empresa, anuladas incluidas).
     p_numero: null as unknown as string,
     p_proveedor_id: p.data.proveedorId,
     p_tipo: p.data.tipo,

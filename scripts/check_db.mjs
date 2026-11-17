@@ -264,7 +264,7 @@ const asAnon = async () => {
 };
 await asUser();
 
-check('siguiente_numero_oc de obra nueva = 100001',
+check('siguiente_numero_oc de una obra de empresa sin órdenes = 100001',
   (await one(`select siguiente_numero_oc($1) n`, [ids.obra])).n === '100001');
 
 // FK compuesta: partida de otra obra (como superusuario: por la API nadie escribe órdenes directo)

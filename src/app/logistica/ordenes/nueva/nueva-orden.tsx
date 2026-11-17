@@ -125,7 +125,7 @@ export function NuevaOrden({
   const [sel, setSel] = useState<Map<number, string>>(
     () => new Map(Object.entries(atender?.lineas ?? {}).map(([id, c]) => [Number(id), String(Number(c.toFixed(4)))])),
   );
-  // El N° lo pone el sistema (el siguiente de la obra, contando las anuladas): no se escribe a mano.
+  // El N° lo pone el sistema (el siguiente de la serie de la empresa, contando las anuladas): no se escribe a mano.
   const numero = siguienteNumero;
   const [proveedorId, setProveedorIdS] = useState<string | null>(null);
   // OS: el comprobante que emitirá el proveedor (define el contrato) y la fecha de inicio de los trabajos;

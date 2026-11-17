@@ -50,8 +50,14 @@ Contabilidad, Residente y RRHH **no entran**. Sus roles siguen en la base
   con la factura conservada). Ya no quedan órdenes «Por enviar»; el botón «Enviar a
   Tesorería» solo aparece en datos viejos. Las del Excel que ya están completas pasan a Tesorería con el último
   seed (`supabase/seed/prod1_envio.sql`), salvo las rechazadas.
-- **N° de orden:** lo pone la base (el siguiente de la obra, contando las anuladas); en Nueva OC / OS no se
-  escribe. Una OS u OC anulada nunca repite su número.
+- **N° de orden:** lo pone la base: **una sola serie por empresa** para OC y OS (como la lleva Logística en Soluflex LO), contando
+  las anuladas; en Nueva OC / OS no se escribe. Una OS u OC anulada nunca repite su número y ninguna orden nueva repite el de otra
+  de su empresa, aunque sea de otra obra (`siguiente_numero_oc`, `fn_numero_unico_empresa`; migración `prod1_numeracion_empresa`).
+  La serie es la primera tirada de números de 6 dígitos de la empresa: lo que está a más de 100 de distancia son errores de tipeo
+  del Excel (1000139, 100669) y no la mueven. Hasta el 17/11/2026 la serie era por obra y dio números repetidos en la empresa y
+  fuera de serie (Virgen del Mar desde 1000140, San Pedro 1 desde 100670). Las órdenes que ya habían salido (contrato firmado,
+  PDF, pago) conservan su número porque sus documentos lo citan; las repetidas que aún no habían salido tomaron uno nuevo
+  (`corregir_numeros_repetidos`). El cruce con LO está en `Soluflex Analisis/migracion-app-a-soluflex.md` § 9 (fuera del repo).
 - **OS: comprobante y contrato.** Al crear la OS, Logística elige el comprobante (recibo por honorarios o
   factura; parte del habitual del proveedor) y la **fecha de inicio** de los trabajos (obligatoria). La de fin
   es la fecha de la OS, que se emite cuando ya se sabe cuándo trabajaron: el inicio no puede ser posterior.
@@ -463,8 +469,8 @@ Contabilidad, Residente y RRHH **no entran**. Sus roles siguen en la base
 - **Contabilidad:** dos roles iguales, como Operaciones: Jefe de Contabilidad y Asistente de Contabilidad (Ángeles y Jerson), cuando
   ese módulo entre a prod 1.
 - **Observaciones de datos:**
-  - Virgen del Mar numera sus órdenes desde 1000140 porque el Excel trae una OC 1000139 (parece un error de tipeo); se deja como
-    en el Excel.
+  - El Excel trae una OC 1000139 de Virgen del Mar que en Soluflex LO es la OC 100139 (error de tipeo); se deja como en el Excel.
+    Desde el 17/11/2026 ya no mueve la numeración (ver «N° de orden»).
   - Suspensiones de 4ta cruzadas por nombre, por confirmar: dos proveedores con código interno (`ZAMANTACRED`, `ASEVENT`) y un RUC que
     está en el proveedor «PROVISIONAL DE LOGISTICA CONTOGURIZ».
   - Las OS 100494 (Mercedes A) y 100496 (Mercedes B) del Excel son ítems «RETENCION 5%» sin pagar, del 15/05/2026: por decidir si se
