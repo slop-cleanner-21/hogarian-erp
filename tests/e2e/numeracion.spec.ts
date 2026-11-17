@@ -25,6 +25,9 @@ test.describe("@logistica numeración de órdenes por empresa", () => {
       select set_config('e2e.n', siguiente_numero_oc(${a}), true);
       insert into ordenes_compra (obra_id, numero, proveedor_id, tipo) values (${a}, current_setting('e2e.n'), ${prov}, 'OC');
       select 'R', siguiente_numero_oc(${b})::bigint - current_setting('e2e.n')::bigint;
+      -- Un N° a más de 100 de la serie (como el 100669 o el 1000139 del Excel) no la mueve.
+      insert into ordenes_compra (obra_id, numero, proveedor_id, tipo) values (${a}, (current_setting('e2e.n')::bigint + 500)::text, ${prov}, 'OC');
+      select 'R', siguiente_numero_oc(${b})::bigint - current_setting('e2e.n')::bigint;
       ${intento(`insert into ordenes_compra (obra_id, numero, proveedor_id, tipo) values (${b}, current_setting('e2e.n'), ${prov}, 'OS')`)};
       ${intento(`insert into ordenes_compra (obra_id, numero, proveedor_id, tipo) values (${otra}, current_setting('e2e.n'), ${prov}, 'OS')`)};
       -- Un repetido que llegó sin pasar la regla (como los de antes del arreglo): la corrección le da el siguiente de la serie.
@@ -37,9 +40,10 @@ test.describe("@logistica numeración de órdenes por empresa", () => {
        where x.empresa_id = ${empresa} and o.numero = current_setting('e2e.n')`);
     expect(r[0][0], "las dos obras proponen el mismo siguiente").toBe("t");
     expect(r[1][0], "tomado en una obra, la otra sigue con el siguiente").toBe("1");
-    expect(r[2][0]).toMatch(/Ya existe una orden N° \d+ en la empresa/);
-    expect(r[3][0], "otra empresa sí puede usar el mismo N°").toBe("ok");
-    expect(r[4][0], "el repetido sin salir cambia de N°").toBe("1");
-    expect(r[5][0], "queda uno solo con ese N°").toBe("1");
+    expect(r[2][0], "un N° fuera de la serie no la mueve").toBe("1");
+    expect(r[3][0]).toMatch(/Ya existe una orden N° \d+ en la empresa/);
+    expect(r[4][0], "otra empresa sí puede usar el mismo N°").toBe("ok");
+    expect(r[5][0], "el repetido sin salir cambia de N°").toBe("1");
+    expect(r[6][0], "queda uno solo con ese N°").toBe("1");
   });
 });

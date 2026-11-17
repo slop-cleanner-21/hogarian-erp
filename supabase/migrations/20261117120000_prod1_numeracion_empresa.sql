@@ -115,8 +115,11 @@ begin
     end if;
     v_nuevo := siguiente_numero_oc(r.obra_id);
     update ordenes_compra set numero = v_nuevo where obra_id = r.obra_id and numero = r.numero;
+    -- Los avisos de esa orden (su enlace es /…/<obra>/<N°>): enlace, título y texto con el N° nuevo.
     update notificaciones
-       set href = regexp_replace(href, '/' || r.obra_id || '/' || r.numero || '(?=$|[/?#])', '/' || r.obra_id || '/' || v_nuevo)
+       set href = regexp_replace(href, '/' || r.obra_id || '/' || r.numero || '(?=$|[/?#])', '/' || r.obra_id || '/' || v_nuevo),
+           titulo = regexp_replace(titulo, '\m' || r.numero || '\M', v_nuevo, 'g'),
+           cuerpo = regexp_replace(cuerpo, '\m' || r.numero || '\M', v_nuevo, 'g')
      where href ~ ('/' || r.obra_id || '/' || r.numero || '($|[/?#])');
     empresa_id := r.empresa_id; obra_id := r.obra_id; tipo := r.tipo::text; anterior := r.numero; nuevo := v_nuevo;
     return next;
