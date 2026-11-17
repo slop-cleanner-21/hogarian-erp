@@ -25,6 +25,10 @@ test.describe("@logistica numeración de órdenes por empresa", () => {
       select set_config('e2e.n', siguiente_numero_oc(${a}), true);
       insert into ordenes_compra (obra_id, numero, proveedor_id, tipo) values (${a}, current_setting('e2e.n'), ${prov}, 'OC');
       select 'R', siguiente_numero_oc(${b})::bigint - current_setting('e2e.n')::bigint;
+      -- Un N° que una orden dejó al cambiar de número no se vuelve a dar (sus links viejos llevan a esa orden).
+      insert into ordenes_renumeradas (obra_id, anterior, nuevo) values (${a}, (current_setting('e2e.n')::bigint + 1)::text, current_setting('e2e.n'));
+      select 'R', siguiente_numero_oc(${b})::bigint - current_setting('e2e.n')::bigint;
+      delete from ordenes_renumeradas where obra_id = ${a} and anterior = (current_setting('e2e.n')::bigint + 1)::text;
       -- Un N° a más de 100 de la serie (como el 100669 o el 1000139 del Excel) no la mueve.
       insert into ordenes_compra (obra_id, numero, proveedor_id, tipo) values (${a}, (current_setting('e2e.n')::bigint + 500)::text, ${prov}, 'OC');
       select 'R', siguiente_numero_oc(${b})::bigint - current_setting('e2e.n')::bigint;
@@ -40,6 +44,7 @@ test.describe("@logistica numeración de órdenes por empresa", () => {
        where x.empresa_id = ${empresa} and o.numero = current_setting('e2e.n')`);
     expect(r[0][0], "las dos obras proponen el mismo siguiente").toBe("t");
     expect(r[1][0], "tomado en una obra, la otra sigue con el siguiente").toBe("1");
+    expect(r.splice(2, 1)[0][0], "salta el N° que dejó una orden renumerada").toBe("2");
     expect(r[2][0], "un N° fuera de la serie no la mueve").toBe("1");
     expect(r[3][0]).toMatch(/Ya existe una orden N° \d+ en la empresa/);
     expect(r[4][0], "otra empresa sí puede usar el mismo N°").toBe("ok");
