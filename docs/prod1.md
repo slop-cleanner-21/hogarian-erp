@@ -118,7 +118,9 @@ Contabilidad, Residente y RRHH **no entran**. Sus roles siguen en la base
   por la cuadrilla: sus OS quedan devueltas en esa orden y no se vuelven a pagar. Las líneas a otros porcentajes (0.855, 0.8938…)
   no se marcan: no se sabe cuánto de esa rebaja es retención.
 - **Retención de 4ta categoría** (LIR art. 71): solo en recibos por honorarios de **más de S/ 1,500**, por el %
-  del proveedor (8 % por defecto; Logística lo cambia en su ficha). Tesorería paga el neto y la retención
+  del proveedor (8 % por defecto; Logística lo cambia en su ficha). La ficha dice cuándo no se cobra: en recibos de hasta
+  S/ 1,500 y en los que se paguen mientras rige la suspensión (del día siguiente a la constancia al 31/12). Así no se pone 0 %
+  por tener suspensión: con 0 % la retención no vuelve cuando la suspensión vence (pasó en 6 proveedores). Tesorería paga el neto y la retención
   queda registrada. No se retiene si el proveedor tiene **suspensión de 4ta** vigente: Logística la marca en
   su ficha con su fecha y la constancia (Formulario 1609) o su N° de operación, que se valida en SUNAT. Rige desde el **día
   siguiente** al de su emisión y vale hasta el 31 de diciembre de ese año (`src/lib/retencion.ts`). Las conocidas están en

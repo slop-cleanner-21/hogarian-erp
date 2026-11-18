@@ -11,8 +11,8 @@ import { Field, Input, NumberInput, inputClass } from "@/components/ui/field";
 import { SearchSelect } from "@/components/ui/search-select";
 import { Sheet } from "@/components/ui/sheet";
 import { createClient } from "@/lib/supabase/client";
-import { cn, hoyISO } from "@/lib/format";
-import { suspensionDelAnio } from "@/lib/retencion";
+import { cn, fecha, hoyISO, soles } from "@/lib/format";
+import { RETENCION_4TA_MINIMO, suspensionDelAnio } from "@/lib/retencion";
 import { TIPO_COMPROBANTE_LABEL, type Proveedor, type TipoComprobante } from "@/lib/types";
 import { guardarProveedor } from "../actions";
 import { NuevoTipoSheet } from "../nuevo-tipo";
@@ -95,6 +95,19 @@ export function ProveedoresList({ proveedores, tiposMaterial }: { proveedores: P
       {editando && <ProveedorSheet proveedor={editando} tiposMaterial={tiposMaterial} onClose={() => setEditando(null)} />}
     </>
   );
+}
+
+/** Cuándo no se cobra la retención de 4ta: en recibos de hasta S/ 1,500 y en los que se pagan mientras rige la suspensión
+ *  (desde el día siguiente al de la constancia hasta el 31/12). Logística ponía 0 % al proveedor con suspensión, y así la
+ *  retención no volvía cuando la suspensión vencía. */
+function cuandoNoSeRetiene(suspension: string | null) {
+  const minimo = `No se retiene en recibos de hasta ${soles(RETENCION_4TA_MINIMO)}`;
+  if (!suspension || !suspensionDelAnio(suspension, hoyISO())) return `${minimo}.`;
+  const desde = new Date(`${suspension}T12:00:00Z`);
+  desde.setUTCDate(desde.getUTCDate() + 1);
+  const anio = suspension.slice(0, 4);
+  if (desde.toISOString().slice(0, 4) !== anio) return `${minimo}.`;
+  return `${minimo} ni en los que se paguen del ${fecha(desde.toISOString())} al ${fecha(`${anio}-12-31`)}, por la suspensión.`;
 }
 
 /** Ficha del proveedor (crear o editar). `onGuardado` recibe el proveedor guardado (p. ej. para elegirlo en una orden). */
@@ -306,6 +319,7 @@ export function ProveedorSheet({
                 }}
               />
             </Field>
+            <p className="text-[15px] text-ink-2">{cuandoNoSeRetiene(suspension ? p.suspension_4ta_fecha : null)}</p>
             <label className="flex min-h-11 cursor-pointer items-center justify-between gap-3">
               <span>Suspensión de 4ta categoría</span>
               <input

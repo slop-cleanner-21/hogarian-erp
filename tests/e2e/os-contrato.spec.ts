@@ -275,11 +275,19 @@ test.describe("@prod1 @logistica facturar: guía y retención", () => {
       const hoja = page.getByRole("dialog", { name: "Proveedor" });
       const seccion = hoja.getByRole("region", { name: "Retención de 4ta" });
       await expect(seccion.getByLabel("Retención 4ta (%)")).toHaveValue("8");
+      await expect(seccion).toContainText("No se retiene en recibos de hasta S/ 1,500.00.");
       await seccion.getByLabel("Suspensión de 4ta categoría").check();
       await hoja.getByRole("button", { name: "Guardar" }).click();
       await expect(hoja.getByRole("alert")).toHaveText(/constancia/);
       await seccion.getByLabel("Fecha de la constancia").fill(hoyLima());
       await expect(seccion).toContainText(`Vigente hasta el 31/12/${hoyLima().slice(0, 4)}`);
+      // La de hoy rige desde mañana: el % se queda en 8 y la ficha dice desde cuándo no se retiene.
+      if (!hoyLima().endsWith("-12-31")) {
+        const manana = new Date(`${hoyLima()}T12:00:00Z`);
+        manana.setUTCDate(manana.getUTCDate() + 1);
+        const [y, m, d] = manana.toISOString().slice(0, 10).split("-");
+        await expect(seccion).toContainText(`ni en los que se paguen del ${d}/${m}/${y.slice(2)} al 31/12/${y.slice(2)}, por la suspensión.`);
+      }
       await seccion.locator('input[type="file"]').setInputFiles(path.resolve("tests/e2e/archivos/ariant.png"));
       await hoja.getByRole("button", { name: "Guardar" }).click();
       await expect(hoja).toBeHidden();
