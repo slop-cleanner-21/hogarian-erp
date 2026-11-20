@@ -107,6 +107,8 @@ export async function PaginaSeguimiento({ sp, sesion, clave, titulo }: { sp: Par
             requeridoPendiente: Math.max(Number(f.requerido) - comprometido, 0),
           };
         })
+        // Una partida dada de baja (en 0 y sin nada en curso ni recibido) no se muestra.
+        .filter((f) => f.presupuestado > 0.0001 || f.enLogistica + f.enTesoreria + f.porRecibir + f.recibido > 0.0001)
         .filter((f) => (!etapa || f.etapa === etapa) && (!q || f.descripcion.includes(q)))
         .filter((f) =>
           estado === "requerido" ? f.requeridoPendiente > 0.0001

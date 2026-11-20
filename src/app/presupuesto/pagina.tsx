@@ -126,6 +126,8 @@ export async function PaginaPresupuesto({
       montoComprado: Number(f.monto_comprado),
       llegado: Number(f.llegado),
     }))
+    // Una partida dada de baja (en 0 y sin nada comprado) no se muestra; queda en el editor de Gerencia.
+    .filter((p) => p.presupuestado > 0.0001 || p.comprado > 0.0001)
     .filter((p) => !q || matches(p.descripcion, q))
     .filter((p) => !pago || cumplePago(pago, p.presupuestado, pagos.get(p.id)))
     .filter((p) =>

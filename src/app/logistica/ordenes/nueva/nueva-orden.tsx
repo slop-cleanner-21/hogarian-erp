@@ -208,7 +208,11 @@ export function NuevaOrden({
     [partidas, etapa, tipoMat, q, soloRequeridas, requeridos],
   );
   const pendientes = useMemo(() => filtradas.filter((p) => Number(p.saldo_cant) > 0), [filtradas]);
-  const completas = useMemo(() => filtradas.filter((p) => Number(p.saldo_cant) <= 0), [filtradas]);
+  // Sin las dadas de baja (en 0 y sin nada pedido).
+  const completas = useMemo(
+    () => filtradas.filter((p) => Number(p.saldo_cant) <= 0 && (Number(p.cantidad_efectiva ?? p.cantidad) > 0 || Number(p.cant_comprometida) > 0)),
+    [filtradas],
+  );
   const visibles = vista === "pend" ? pendientes : completas;
 
   const todosVisiblesSel = pendientes.length > 0 && pendientes.every((p) => sel.has(p.id));
