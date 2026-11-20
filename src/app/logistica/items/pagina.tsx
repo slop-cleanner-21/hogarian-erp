@@ -25,17 +25,13 @@ export async function PaginaItems({ sp, sesion, modo }: { sp: Record<string, str
   const limite = limiteDe(sp);
   const orden = ordenDe(sp, ["descripcion", "unidad", "numero", "rubro"] as const, "descripcion.asc");
   const supabase = await createClient();
-  // Plan de cuentas y catálogo completo (para avisar de nombres parecidos) del ítem nuevo: solo Gerencia lo crea.
-  const cuentas =
-    modo === "gerencia"
-      ? supabase
-          .from("cuentas_contables")
-          .select("codigo, denominacion")
-          .order("codigo")
-          .then((r) => r.data)
-      : null;
-  const catalogo =
-    modo === "gerencia" ? todas((a, b) => supabase.from("items").select("id, descripcion, unidad, rubro").order("id").range(a, b)) : null;
+  // Plan de cuentas y catálogo completo (para avisar de nombres parecidos) del ítem nuevo: lo crean Gerencia y Logística.
+  const cuentas = supabase
+    .from("cuentas_contables")
+    .select("codigo, denominacion")
+    .order("codigo")
+    .then((r) => r.data);
+  const catalogo = todas((a, b) => supabase.from("items").select("id, descripcion, unidad, rubro").order("id").range(a, b));
 
   let query = supabase
     .from("items")
@@ -106,7 +102,7 @@ export async function PaginaItems({ sp, sesion, modo }: { sp: Record<string, str
           rubroDefault={clase === "mat" ? "MATERIAL" : (rubro ?? "MANO OBRA")}
           tipoDefault={tipo === SIN_TIPO ? null : tipo}
           clasificar={modo === "logistica"}
-          crear={modo === "gerencia" ? { cuentas: (await cuentas) ?? [], catalogo: (await catalogo) ?? [] } : null}
+          crear={{ cuentas: (await cuentas) ?? [], catalogo: await catalogo, tolerancia: modo === "gerencia" }}
         />
         <VerMas visibles={data?.length ?? 0} limite={limite} />
       </main>

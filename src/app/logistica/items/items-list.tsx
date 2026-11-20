@@ -47,7 +47,7 @@ export function ItemsList({
   rubroDefault: Rubro;
   tipoDefault: string | null;
   /** Gerencia: crea ítems (con la cuenta contable, opcional, de entre estas). */
-  crear?: { cuentas: { codigo: string; denominacion: string }[]; catalogo: ItemCatalogo[] } | null;
+  crear?: { cuentas: { codigo: string; denominacion: string }[]; catalogo: ItemCatalogo[]; /** Solo Gerencia pone la tolerancia (Logística: 0). */ tolerancia: boolean } | null;
   /** Logística: cambia el tipo de material (o la especialidad) de un ítem. */
   clasificar?: boolean;
 }) {
@@ -168,6 +168,7 @@ export function ItemsList({
         <NuevoItemSheet
           cuentas={crear.cuentas}
           catalogo={crear.catalogo}
+          conTolerancia={crear.tolerancia}
           unidades={unidades}
           tipos={tipos}
           clase={clase}
@@ -183,6 +184,7 @@ export function ItemsList({
 function NuevoItemSheet({
   cuentas,
   catalogo,
+  conTolerancia,
   unidades,
   tipos,
   clase,
@@ -192,6 +194,7 @@ function NuevoItemSheet({
 }: {
   cuentas: { codigo: string; denominacion: string }[];
   catalogo: ItemCatalogo[];
+  conTolerancia: boolean;
   unidades: string[];
   tipos: string[];
   clase: Clase;
@@ -218,7 +221,7 @@ function NuevoItemSheet({
         descripcion,
         unidad: unidad ?? "",
         rubro,
-        tolerancia_pct: Number(tolerancia) / 100,
+        tolerancia_pct: conTolerancia ? Number(tolerancia) / 100 : 0,
         tipo_material: tipo === SIN_TIPO ? null : tipo,
         cuenta_contable: cuenta,
       });
@@ -263,13 +266,15 @@ function NuevoItemSheet({
             </ul>
           </section>
         )}
-        <div className="grid grid-cols-2 gap-3">
+        <div className={cn("grid gap-3", conTolerancia && "grid-cols-2")}>
           <Field label="Unidad">
             <SearchSelect label="Unidad" value={unidad} onChange={setUnidad} options={unidades.map((u) => ({ value: u, label: u }))} />
           </Field>
-          <Field label="Tolerancia %">
-            <NumberInput value={tolerancia} onChange={(e) => setTolerancia(e.target.value)} />
-          </Field>
+          {conTolerancia && (
+            <Field label="Tolerancia %">
+              <NumberInput value={tolerancia} onChange={(e) => setTolerancia(e.target.value)} />
+            </Field>
+          )}
         </div>
         {clase === "serv" && (
           <Field label="Rubro">

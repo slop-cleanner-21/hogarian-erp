@@ -15,8 +15,8 @@ código del MVP se toca lo mínimo, para que los cherry-picks entren sin conflic
 | Rol | Qué tiene |
 |---|---|
 | **Tesorería** | Aprobación y pago de OC y OS (sin órdenes de pago de Contabilidad). Presupuesto de la obra enfocado en lo pagado y lo pendiente de pago. |
-| **Logística** | OC, OS, proveedores, transportistas e ítems (los consulta y clasifica; no los crea). Sin la pestaña Requerimientos ni nada de residentes. Registra la guía de remisión y crea las OS de mano de obra. |
-| **Gerencia** | Obras: carga y publica presupuestos, con sus detracciones, el mínimo del SPOT y los adicionales. Seguimiento (la misma vista que el del Jefe de Operaciones), órdenes e **ítems**: los crea Gerencia. |
+| **Logística** | OC, OS, proveedores, transportistas e ítems (los crea, sin tolerancia, y los clasifica). Sin la pestaña Requerimientos ni nada de residentes. Registra la guía de remisión y crea las OS de mano de obra. |
+| **Gerencia** | Obras: carga y publica presupuestos, con sus detracciones, el mínimo del SPOT y los adicionales. Seguimiento (la misma vista que el del Jefe de Operaciones, con subtotales y total en S/), órdenes e **ítems** (también los crea, con su tolerancia). |
 | **Jefe de Operaciones** | Solo el seguimiento de compras de Logística, sin nada de dinero ni contable: ni montos ni P.U. en pantalla, y la base no le da las tablas con precios, montos o datos contables (órdenes, partidas, ítems, proveedores, parámetros, adjuntos, valorizaciones). Su seguimiento sale de vistas sin montos (`v_seguimiento_partida`, `v_entregas_partida`; migración `prod1_operaciones_sin_dinero`). |
 | **Ingeniero de Operaciones** | Exactamente lo mismo que el Jefe: solo ver el seguimiento. Para la base es un Jefe (`rol_actual()` / `rol_en()` lo tratan como `JEFE_OPERACIONES`, migración `prod1_ing_operaciones`), así hereda todas sus restricciones; en `perfiles` queda su rol (`OPERACIONES`), para migrar al MVP. |
 | Admin | Todo lo anterior y **Usuarios** (`/admin`, desde su menú). |
@@ -230,9 +230,10 @@ Contabilidad, Residente y RRHH **no entran**. Sus roles siguen en la base
   de PROVEED e ITEMS) no los encuentran y dan #N/D. Revisado abriéndolo en Excel (`tests/audit/excel-recalc.ps1`, local): sin errores salvo 30
   `#REF!` que ya trae la hoja FILTRO del original. Pesa más de lo que una respuesta del servidor permite: se guarda y se baja con un enlace
   de 2 minutos. Queda en la auditoría. El Jefe y el Ingeniero de Operaciones no lo tienen (lleva lo financiero).
-- **Ítems:** los crea Gerencia (Gerencia › Ítems, la misma lista que la de Logística). Al crearlo puede elegir
-  la **cuenta contable** del ítem (la del asiento de compra), opcional; por eso Gerencia lee el plan de cuentas.
-  Logística ve el catálogo sin «Nuevo» y sigue clasificando el tipo de material o la especialidad.
+- **Ítems:** los crean Gerencia y Logística (Gerencia › Ítems y Logística › Ítems, la misma lista). Al crearlo se puede
+  elegir la **cuenta contable** del ítem (la del asiento de compra), opcional; por eso las dos leen el plan de cuentas.
+  La tolerancia de sobreprecio la pone solo Gerencia: el ítem de Logística nace con 0, también en la base (`items_insert`,
+  migración `prod1_logistica_items`). Logística sigue clasificando el tipo de material o la especialidad.
   Al escribir la descripción, la hoja muestra los ítems ya existentes con nombre parecido (sin importar
   mayúsculas, tildes ni el orden de las palabras; `src/lib/parecidos.ts`); con uno igual no deja guardar.
 - **Requerimientos:** no existen. En el seguimiento, «Por requerir» pasa a «Por comprar» (o «Por

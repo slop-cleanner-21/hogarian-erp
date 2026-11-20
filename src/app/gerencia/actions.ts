@@ -17,13 +17,21 @@ const Item = z.object({
   cuenta_contable: z.string().trim().min(1).nullable().default(null),
 });
 
-/** Gerencia crea un ítem del catálogo (material o servicio); Logística lo clasifica después si hace falta. */
+/**
+ * Gerencia o Logística crean un ítem del catálogo (material o servicio). La tolerancia de sobreprecio la pone solo
+ * Gerencia: el de Logística nace con 0 (la base tampoco acepta otra).
+ */
 export async function crearItem(input: z.input<typeof Item>): Promise<Result<number>> {
   const p = Item.safeParse(input);
   if (!p.success) return { ok: false, error: p.error.issues[0].message };
-  await requireSesion(["GERENCIA"]);
+  const sesion = await requireSesion(["GERENCIA", "LOGISTICA"]);
   const supabase = await createClient();
-  const row = { ...p.data, descripcion: p.data.descripcion.toUpperCase(), unidad: p.data.unidad.toUpperCase() };
+  const row = {
+    ...p.data,
+    descripcion: p.data.descripcion.toUpperCase(),
+    unidad: p.data.unidad.toUpperCase(),
+    ...(sesion.rol === "LOGISTICA" ? { tolerancia_pct: 0 } : {}),
+  };
   const { data, error } = await supabase.from("items").insert(row).select("id").single();
   if (error) return { ok: false, error: error.code === "23505" ? "Ya existe un ítem con esa descripción" : error.message };
   revalidatePath("/gerencia/items");
