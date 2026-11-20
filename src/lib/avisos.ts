@@ -9,11 +9,13 @@ export type EventoAviso = { tipo: string; label: string; area: string; roles: Ro
 export const EVENTOS_AVISO: EventoAviso[] = [
   { tipo: "COTIZACION_RECIBIDA", label: "Un proveedor envió su cotización", area: "Logística", roles: ["LOGISTICA"] },
   { tipo: "RECHAZO", label: "Tesorería rechazó una orden", area: "Logística", roles: ["LOGISTICA"] },
-  { tipo: "ADICIONAL", label: "Gerencia agregó un adicional", area: "Logística", roles: ["LOGISTICA"] },
+  { tipo: "ADICIONAL", label: "Gerencia agregó o aprobó un adicional", area: "Logística", roles: ["LOGISTICA"] },
+  { tipo: "ADICIONAL_RECHAZADO", label: "Gerencia rechazó un adicional pedido", area: "Logística", roles: ["LOGISTICA"] },
   { tipo: "PRECIO_PRESUPUESTO", label: "Gerencia cambió un precio del presupuesto", area: "Logística", roles: ["LOGISTICA"] },
   { tipo: "POR_PAGAR", label: "Llegó una orden por pagar", area: "Tesorería", roles: ["TESORERIA"] },
   { tipo: "REENVIO", label: "Logística reenvió una orden corregida", area: "Tesorería", roles: ["TESORERIA"] },
   { tipo: "OS_PRECIO", label: "Una OS llegó con precios distintos al presupuesto", area: "Tesorería", roles: ["TESORERIA"] },
+  { tipo: "SOLICITUD_ADICIONAL", label: "Logística pidió un adicional", area: "Gerencia", roles: ["GERENCIA"] },
   { tipo: "PRESUPUESTO", label: "Gerencia publicó un presupuesto", area: "Operaciones", roles: ["JEFE_OPERACIONES", "OPERACIONES"] },
   // Las sugerencias solo se leen en Admin › Sugerencias: Gerencia no puede sumarse.
   { tipo: "SUGERENCIA", label: "Llegó una sugerencia", area: "Administración", roles: ["ADMIN"], soloSuRol: true },

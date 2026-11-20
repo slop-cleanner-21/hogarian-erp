@@ -241,6 +241,8 @@ test.describe("@logistica pantallas de garantía y borradores", () => {
       `select o.obra_id, o.numero from ordenes_compra o
         where o.tipo = 'OS' and o.estado = 'PRECIOS_CONFIRMADOS' and not o.historico and not o.es_retencion and o.contrato_enviado_at is null
           and not exists (select 1 from adjuntos a where a.tipo = 'CONTRATO' and a.obra_id = o.obra_id and a.numero_oc = o.numero)
+          -- Una OS de servicios sin contrato (un alquiler por horas) no tiene contrato que enviar.
+          and os_lleva_contrato(o.obra_id, o.numero)
         order by o.obra_id, o.numero limit 1`,
     )[0];
     test.skip(!fila, "sin OS con el contrato por enviar");

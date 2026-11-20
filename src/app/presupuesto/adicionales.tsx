@@ -112,6 +112,52 @@ function NuevoAdicional({
   onClose: () => void;
   onGuardado: () => void;
 }) {
+  return (
+    <HojaAdicional
+      titulo="Nuevo adicional"
+      boton="Guardar adicional"
+      partidas={partidas}
+      items={items}
+      etapas={etapas}
+      onClose={onClose}
+      onGuardar={async (lineas) => {
+        const r = await agregarAdicional(obraId, lineas);
+        if (r.ok) onGuardado();
+        return r.ok ? null : r.error;
+      }}
+    />
+  );
+}
+
+export type LineaAdicional = { etapa: string; item_id: number; cantidad: number; pu: number };
+
+/**
+ * Hoja con las partidas de un adicional (ítem, etapa, cantidad y P.U.): la usan el adicional directo de Gerencia y la
+ * solicitud de Logística (`cabecera` lleva la obra y el motivo; `faltanExtra`, lo que falta de ellos).
+ */
+export function HojaAdicional({
+  titulo,
+  boton,
+  partidas,
+  items,
+  etapas,
+  cabecera,
+  faltanExtra = [],
+  onClose,
+  onGuardar,
+}: {
+  titulo: string;
+  boton: string;
+  /** Partidas de la obra, para proponer el P.U. del mismo ítem. */
+  partidas: PartidaAdicional[];
+  items: { id: number; descripcion: string; unidad: string }[];
+  etapas: string[];
+  cabecera?: React.ReactNode;
+  faltanExtra?: (string | false)[];
+  onClose: () => void;
+  /** Guarda; devuelve el error o null. */
+  onGuardar: (lineas: LineaAdicional[]) => Promise<string | null>;
+}) {
   const [lineas, setLineas] = useState<Linea[]>([{ key: 1, etapa: etapas[0] ?? "", itemId: "", cantidad: "", pu: "" }]);
   const [error, setError] = useState<string | null>(null);
   const [pending, startTransition] = useTransition();
@@ -135,15 +181,12 @@ function NuevoAdicional({
   const validas = lineas.every((l) => l.etapa && l.itemId && Number(l.cantidad) > 0 && l.pu !== "" && Number(l.pu) >= 0);
   const total = lineas.reduce((a, l) => a + (Number(l.cantidad) || 0) * (Number(l.pu) || 0), 0);
 
+  const listo = validas && faltanExtra.every((f) => !f);
   const guardar = () =>
     startTransition(async () => {
       setError(null);
-      const r = await agregarAdicional(
-        obraId,
-        lineas.map((l) => ({ etapa: l.etapa, item_id: Number(l.itemId), cantidad: Number(l.cantidad), pu: Number(l.pu) })),
-      );
-      if (!r.ok) return setError(r.error);
-      onGuardado();
+      const e = await onGuardar(lineas.map((l) => ({ etapa: l.etapa, item_id: Number(l.itemId), cantidad: Number(l.cantidad), pu: Number(l.pu) })));
+      if (e) setError(e);
     });
 
   return (
@@ -151,7 +194,7 @@ function NuevoAdicional({
       open
       full
       onClose={onClose}
-      title="Nuevo adicional"
+      title={titulo}
       footer={
         <div className="flex flex-col gap-2">
           {error && (
@@ -159,14 +202,15 @@ function NuevoAdicional({
               {error}
             </p>
           )}
-          <Faltan items={[!validas && "etapa, ítem, cantidad y P.U. en cada línea"]} />
-          <Button onClick={guardar} disabled={!validas || pending}>
-            Guardar adicional · {soles(total)}
+          <Faltan items={[...faltanExtra, !validas && "etapa, ítem, cantidad y P.U. en cada línea"]} />
+          <Button onClick={guardar} disabled={!listo || pending}>
+            {boton} · {soles(total)}
           </Button>
         </div>
       }
     >
       <div className="flex flex-col gap-3 p-4">
+        {cabecera}
         {lineas.map((l, i) => (
           <section key={l.key} aria-label={`Partida ${i + 1}`} className="flex flex-col gap-3 rounded-panel border border-line p-3">
             <div className="flex items-center justify-between">

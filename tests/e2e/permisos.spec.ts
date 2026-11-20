@@ -33,6 +33,8 @@ const lista = (s: string) => CORTOS.filter((k) => s.split(/\s+/).includes(k));
 const LECTURA = tabla(`
   tabla                       LOG CON TES RES GER OPS JEF RRHH
   adelantos                    T   T   T   0   T   0   0   0
+  adicional_solicitudes        T   0   0   0   T   0   0   0
+  adicional_solicitud_partidas T   0   0   0   T   0   0   0
   adjuntos                     T   T   T   P   T   0   0   0
   asiento_lineas               0   T   0   0   0   0   0   0
   asientos                     T   T   T   0   0   0   0   0
@@ -42,7 +44,7 @@ const LECTURA = tabla(`
   comprobantes                 T   T   T   0   T   T   0   0
   comprobantes_historial       T   T   T   0   0   0   0   0
   cotizacion_accesos           T   0   0   0   0   0   0   0
-  cuentas_contables            0   T   0   0   T   0   0   0
+  cuentas_contables            T   T   0   0   T   0   0   0
   datos_demo                   0   0   0   0   0   0   0   0
   empresas                     T   T   T   T   T   T   T   0
   entrega_fotos                T   T   T   P   T   T   T   0
@@ -147,6 +149,8 @@ const RPC: Record<string, string> = {
   guardar_obra: "GER",
   guardar_partidas: "GER",
   agregar_adicional: "GER",
+  pedir_adicional: "LOG",
+  resolver_adicionales: "GER",
   guardar_precios: "LOG",
   guardar_retenciones: "GER",
   guardar_detracciones: "GER",

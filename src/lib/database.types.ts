@@ -170,6 +170,111 @@ export type Database = {
           },
         ];
       };
+      adicional_solicitud_partidas: {
+        Row: {
+          cantidad: number;
+          etapa: string;
+          id: number;
+          item_id: number;
+          pu: number;
+          solicitud_id: number;
+        };
+        ComputedFields: never;
+        Insert: {
+          cantidad: number;
+          etapa: string;
+          id?: number;
+          item_id: number;
+          pu: number;
+          solicitud_id: number;
+        };
+        Update: {
+          cantidad?: number;
+          etapa?: string;
+          id?: number;
+          item_id?: number;
+          pu?: number;
+          solicitud_id?: number;
+        };
+        Relationships: [
+          {
+            foreignKeyName: "adicional_solicitud_partidas_etapa_fkey";
+            columns: ["etapa"];
+            isOneToOne: false;
+            referencedRelation: "etapas";
+            referencedColumns: ["codigo"];
+          },
+          {
+            foreignKeyName: "adicional_solicitud_partidas_item_id_fkey";
+            columns: ["item_id"];
+            isOneToOne: false;
+            referencedRelation: "items";
+            referencedColumns: ["id"];
+          },
+          {
+            foreignKeyName: "adicional_solicitud_partidas_item_id_fkey";
+            columns: ["item_id"];
+            isOneToOne: false;
+            referencedRelation: "v_items_sin_cuenta";
+            referencedColumns: ["item_id"];
+          },
+          {
+            foreignKeyName: "adicional_solicitud_partidas_solicitud_id_fkey";
+            columns: ["solicitud_id"];
+            isOneToOne: false;
+            referencedRelation: "adicional_solicitudes";
+            referencedColumns: ["id"];
+          },
+        ];
+      };
+      adicional_solicitudes: {
+        Row: {
+          estado: string;
+          id: number;
+          motivo: string;
+          obra_id: number;
+          requerimiento: string | null;
+          respuesta: string | null;
+          resuelto_at: string | null;
+          resuelto_by: string | null;
+          solicitado_at: string;
+          solicitado_by: string;
+        };
+        ComputedFields: never;
+        Insert: {
+          estado?: string;
+          id?: number;
+          motivo: string;
+          obra_id: number;
+          requerimiento?: string | null;
+          respuesta?: string | null;
+          resuelto_at?: string | null;
+          resuelto_by?: string | null;
+          solicitado_at?: string;
+          solicitado_by?: string;
+        };
+        Update: {
+          estado?: string;
+          id?: number;
+          motivo?: string;
+          obra_id?: number;
+          requerimiento?: string | null;
+          respuesta?: string | null;
+          resuelto_at?: string | null;
+          resuelto_by?: string | null;
+          solicitado_at?: string;
+          solicitado_by?: string;
+        };
+        Relationships: [
+          {
+            foreignKeyName: "adicional_solicitudes_obra_id_fkey";
+            columns: ["obra_id"];
+            isOneToOne: false;
+            referencedRelation: "obras";
+            referencedColumns: ["id"];
+          },
+        ];
+      };
       adjuntos: {
         Row: {
           created_at: string;
@@ -1667,8 +1772,7 @@ export type Database = {
       ordenes_compra: {
         Row: {
           comprobante_tipo:
-            | Database["public"]["Enums"]["tipo_comprobante"]
-            | null;
+            Database["public"]["Enums"]["tipo_comprobante"] | null;
           contrato_enviado_at: string | null;
           cotizacion_enviada_at: string | null;
           cotizacion_estado: Database["public"]["Enums"]["cotizacion_estado"];
@@ -1699,8 +1803,7 @@ export type Database = {
         ComputedFields: never;
         Insert: {
           comprobante_tipo?:
-            | Database["public"]["Enums"]["tipo_comprobante"]
-            | null;
+            Database["public"]["Enums"]["tipo_comprobante"] | null;
           contrato_enviado_at?: string | null;
           cotizacion_enviada_at?: string | null;
           cotizacion_estado?: Database["public"]["Enums"]["cotizacion_estado"];
@@ -1730,8 +1833,7 @@ export type Database = {
         };
         Update: {
           comprobante_tipo?:
-            | Database["public"]["Enums"]["tipo_comprobante"]
-            | null;
+            Database["public"]["Enums"]["tipo_comprobante"] | null;
           contrato_enviado_at?: string | null;
           cotizacion_enviada_at?: string | null;
           cotizacion_estado?: Database["public"]["Enums"]["cotizacion_estado"];
@@ -2354,8 +2456,7 @@ export type Database = {
         Row: {
           comprobante_excel: string | null;
           comprobante_habitual:
-            | Database["public"]["Enums"]["tipo_comprobante"]
-            | null;
+            Database["public"]["Enums"]["tipo_comprobante"] | null;
           id: number;
           razon_social: string;
           retencion_4ta_pct: number;
@@ -2368,8 +2469,7 @@ export type Database = {
         Insert: {
           comprobante_excel?: string | null;
           comprobante_habitual?:
-            | Database["public"]["Enums"]["tipo_comprobante"]
-            | null;
+            Database["public"]["Enums"]["tipo_comprobante"] | null;
           id?: number;
           razon_social: string;
           retencion_4ta_pct?: number;
@@ -2381,8 +2481,7 @@ export type Database = {
         Update: {
           comprobante_excel?: string | null;
           comprobante_habitual?:
-            | Database["public"]["Enums"]["tipo_comprobante"]
-            | null;
+            Database["public"]["Enums"]["tipo_comprobante"] | null;
           id?: number;
           razon_social?: string;
           retencion_4ta_pct?: number;
@@ -4546,8 +4645,7 @@ export type Database = {
         Args: { p_token: string };
         Returns: {
           comprobante_tipo:
-            | Database["public"]["Enums"]["tipo_comprobante"]
-            | null;
+            Database["public"]["Enums"]["tipo_comprobante"] | null;
           contrato_enviado_at: string | null;
           cotizacion_enviada_at: string | null;
           cotizacion_estado: Database["public"]["Enums"]["cotizacion_estado"];
@@ -4665,6 +4763,10 @@ export type Database = {
         };
         Returns: number;
       };
+      pedir_adicional: {
+        Args: { p_motivo: string; p_obra_id: number; p_partidas: Json };
+        Returns: number;
+      };
       publicar_presupuesto: { Args: { p_obra_id: number }; Returns: undefined };
       rechazar_documento: {
         Args: {
@@ -4755,6 +4857,10 @@ export type Database = {
           p_numero_operacion: string;
         };
         Returns: number;
+      };
+      resolver_adicionales: {
+        Args: { p_aprobar: boolean; p_ids: number[]; p_respuesta: string };
+        Returns: Json;
       };
       resolver_solicitud: {
         Args: { p_aprobar: boolean; p_id: number; p_respuesta: string };
@@ -4862,12 +4968,12 @@ export type Tables<
   DefaultSchemaTableNameOrOptions extends
     | keyof (DefaultSchema["Tables"] & DefaultSchema["Views"])
     | { schema: keyof DatabaseWithoutInternals },
-  TableName extends DefaultSchemaTableNameOrOptions extends {
+  TableName extends (DefaultSchemaTableNameOrOptions extends {
     schema: keyof DatabaseWithoutInternals;
   }
     ? keyof (DatabaseWithoutInternals[DefaultSchemaTableNameOrOptions["schema"]]["Tables"] &
         DatabaseWithoutInternals[DefaultSchemaTableNameOrOptions["schema"]]["Views"])
-    : never = never,
+    : never) = never,
 > = DefaultSchemaTableNameOrOptions extends {
   schema: keyof DatabaseWithoutInternals;
 }
@@ -4889,13 +4995,12 @@ export type Tables<
 
 export type TablesInsert<
   DefaultSchemaTableNameOrOptions extends
-    | keyof DefaultSchema["Tables"]
-    | { schema: keyof DatabaseWithoutInternals },
-  TableName extends DefaultSchemaTableNameOrOptions extends {
+    keyof DefaultSchema["Tables"] | { schema: keyof DatabaseWithoutInternals },
+  TableName extends (DefaultSchemaTableNameOrOptions extends {
     schema: keyof DatabaseWithoutInternals;
   }
     ? keyof DatabaseWithoutInternals[DefaultSchemaTableNameOrOptions["schema"]]["Tables"]
-    : never = never,
+    : never) = never,
 > = DefaultSchemaTableNameOrOptions extends {
   schema: keyof DatabaseWithoutInternals;
 }
@@ -4914,13 +5019,12 @@ export type TablesInsert<
 
 export type TablesUpdate<
   DefaultSchemaTableNameOrOptions extends
-    | keyof DefaultSchema["Tables"]
-    | { schema: keyof DatabaseWithoutInternals },
-  TableName extends DefaultSchemaTableNameOrOptions extends {
+    keyof DefaultSchema["Tables"] | { schema: keyof DatabaseWithoutInternals },
+  TableName extends (DefaultSchemaTableNameOrOptions extends {
     schema: keyof DatabaseWithoutInternals;
   }
     ? keyof DatabaseWithoutInternals[DefaultSchemaTableNameOrOptions["schema"]]["Tables"]
-    : never = never,
+    : never) = never,
 > = DefaultSchemaTableNameOrOptions extends {
   schema: keyof DatabaseWithoutInternals;
 }
@@ -4939,13 +5043,12 @@ export type TablesUpdate<
 
 export type Enums<
   DefaultSchemaEnumNameOrOptions extends
-    | keyof DefaultSchema["Enums"]
-    | { schema: keyof DatabaseWithoutInternals },
-  EnumName extends DefaultSchemaEnumNameOrOptions extends {
+    keyof DefaultSchema["Enums"] | { schema: keyof DatabaseWithoutInternals },
+  EnumName extends (DefaultSchemaEnumNameOrOptions extends {
     schema: keyof DatabaseWithoutInternals;
   }
     ? keyof DatabaseWithoutInternals[DefaultSchemaEnumNameOrOptions["schema"]]["Enums"]
-    : never = never,
+    : never) = never,
 > = DefaultSchemaEnumNameOrOptions extends {
   schema: keyof DatabaseWithoutInternals;
 }
@@ -4958,11 +5061,11 @@ export type CompositeTypes<
   PublicCompositeTypeNameOrOptions extends
     | keyof DefaultSchema["CompositeTypes"]
     | { schema: keyof DatabaseWithoutInternals },
-  CompositeTypeName extends PublicCompositeTypeNameOrOptions extends {
+  CompositeTypeName extends (PublicCompositeTypeNameOrOptions extends {
     schema: keyof DatabaseWithoutInternals;
   }
     ? keyof DatabaseWithoutInternals[PublicCompositeTypeNameOrOptions["schema"]]["CompositeTypes"]
-    : never = never,
+    : never) = never,
 > = PublicCompositeTypeNameOrOptions extends {
   schema: keyof DatabaseWithoutInternals;
 }

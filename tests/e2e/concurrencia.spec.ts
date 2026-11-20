@@ -332,15 +332,15 @@ test.describe("@avisos cada uno elige sus avisos", () => {
       const log = await abrir("logistica", "/avisos");
       await log.getByRole("button", { name: "Elegir avisos" }).click();
       const hojaLog = log.getByRole("dialog", { name: "Elegir avisos" });
-      await expect(hojaLog.getByRole("listitem")).toHaveText([/proveedor envió su cotización/, /Tesorería rechazó/, /adicional/, /precio del presupuesto/]);
+      await expect(hojaLog.getByRole("listitem")).toHaveText([/proveedor envió su cotización/, /Tesorería rechazó/, /agregó o aprobó un adicional/, /rechazó un adicional/, /precio del presupuesto/]);
       for (const s of await hojaLog.getByRole("switch", { name: "Avisar" }).all()) await expect(s).toHaveAttribute("aria-checked", "true");
 
       const page = await abrir("admin", "/avisos");
       await page.getByRole("button", { name: "Elegir avisos" }).click();
       const hoja = page.getByRole("dialog", { name: "Elegir avisos" });
-      await expect(hoja.getByRole("heading", { level: 3 })).toHaveText(["Logística", "Tesorería", "Operaciones", "Administración"]);
+      await expect(hoja.getByRole("heading", { level: 3 })).toHaveText(["Logística", "Tesorería", "Gerencia", "Operaciones", "Administración"]);
       // Los de los demás, apagados; el suyo (las sugerencias), encendido.
-      for (const area of ["Logística", "Tesorería", "Operaciones"]) {
+      for (const area of ["Logística", "Tesorería", "Gerencia", "Operaciones"]) {
         for (const s of await hoja.getByRole("region", { name: area }).getByRole("switch", { name: "Avisar" }).all()) await expect(s).toHaveAttribute("aria-checked", "false");
       }
       await expect(hoja.getByRole("listitem", { name: "Llegó una sugerencia" }).getByRole("switch", { name: "Avisar" })).toHaveAttribute("aria-checked", "true");

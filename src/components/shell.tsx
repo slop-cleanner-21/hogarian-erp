@@ -5,6 +5,7 @@ import {
   Banknote,
   Building2,
   ClipboardList,
+  FilePlus2,
   Hammer,
   Lightbulb,
   Package,
@@ -53,6 +54,7 @@ const MODULOS: Record<ClaveModulo, { label: string; roles: Rol[]; nav: NavItem[]
         match: (p) => p.startsWith("/logistica/proveedores") || p.startsWith("/logistica/transportistas") || p.startsWith("/logistica/retenciones"),
       },
       { href: "/logistica/items", label: "Ítems", icon: Package },
+      { href: "/logistica/adicionales", label: "Adicionales", icon: FilePlus2 },
     ],
   },
   tesoreria: {
@@ -71,6 +73,7 @@ const MODULOS: Record<ClaveModulo, { label: string; roles: Rol[]; nav: NavItem[]
       { href: "/gerencia/presupuesto", label: "Seguimiento", icon: TrendingUp },
       { href: "/gerencia/ordenes", label: "Órdenes", icon: ClipboardList },
       { href: "/gerencia/items", label: "Ítems", icon: Package },
+      { href: "/gerencia/adicionales", label: "Adicionales", icon: FilePlus2 },
     ],
   },
   operaciones: {

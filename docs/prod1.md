@@ -15,8 +15,8 @@ código del MVP se toca lo mínimo, para que los cherry-picks entren sin conflic
 | Rol | Qué tiene |
 |---|---|
 | **Tesorería** | Aprobación y pago de OC y OS (sin órdenes de pago de Contabilidad). Presupuesto de la obra enfocado en lo pagado y lo pendiente de pago. |
-| **Logística** | OC, OS, proveedores, transportistas e ítems (los crea, sin tolerancia, y los clasifica). Sin la pestaña Requerimientos ni nada de residentes. Registra la guía de remisión y crea las OS de mano de obra. |
-| **Gerencia** | Obras: carga y publica presupuestos, con sus detracciones, el mínimo del SPOT y los adicionales. Seguimiento (la misma vista que el del Jefe de Operaciones, con subtotales y total en S/), órdenes e **ítems** (también los crea, con su tolerancia). |
+| **Logística** | OC, OS, proveedores, transportistas e ítems (los crea, sin tolerancia, y los clasifica). Sin la pestaña Requerimientos ni nada de residentes. Registra la guía de remisión y crea las OS de mano de obra. Pide adicionales, que aprueba Gerencia. |
+| **Gerencia** | Obras: carga y publica presupuestos, con sus detracciones, el mínimo del SPOT y los adicionales (los agrega directo o aprueba los que pide Logística). Seguimiento (la misma vista que el del Jefe de Operaciones, con subtotales y total en S/), órdenes e **ítems** (también los crea, con su tolerancia). |
 | **Jefe de Operaciones** | Solo el seguimiento de compras de Logística, sin nada de dinero ni contable: ni montos ni P.U. en pantalla, y la base no le da las tablas con precios, montos o datos contables (órdenes, partidas, ítems, proveedores, parámetros, adjuntos, valorizaciones). Su seguimiento sale de vistas sin montos (`v_seguimiento_partida`, `v_entregas_partida`; migración `prod1_operaciones_sin_dinero`). |
 | **Ingeniero de Operaciones** | Exactamente lo mismo que el Jefe: solo ver el seguimiento. Para la base es un Jefe (`rol_actual()` / `rol_en()` lo tratan como `JEFE_OPERACIONES`, migración `prod1_ing_operaciones`), así hereda todas sus restricciones; en `perfiles` queda su rol (`OPERACIONES`), para migrar al MVP. |
 | Admin | Todo lo anterior y **Usuarios** (`/admin`, desde su menú). |
@@ -166,6 +166,16 @@ Contabilidad, Residente y RRHH **no entran**. Sus roles siguen en la base
   partidas con el siguiente N° de la obra («ADIC n»); puede repetir el ítem y la etapa de una regular. Logística
   recibe un aviso que abre Nueva OC u OS. Toda partida adicional lleva la marca «Adicional N»
   (`MarcaAdicional`): editor y avance de Gerencia, presupuesto de Tesorería, Nueva OC y los ítems de una orden.
+- **Solicitudes de adicionales** (migración `prod1_solicitudes_adicional`, `/logistica/adicionales` y `/gerencia/adicionales`):
+  Logística pide un adicional («Pedir adicional»: obra con el presupuesto publicado y sin cerrar, partidas con etapa, ítem,
+  cantidad y P.U., y el motivo; `pedir_adicional`, las mismas reglas que `agregar_adicional`). A Gerencia le llega el aviso
+  y lo aprueba o lo rechaza con su motivo, uno por uno o «Aprobar todas» las por aprobar de lo filtrado (estado, obra, quién
+  lo pidió, orden y buscador por ítem, obra o motivo). Al aprobarse, cada solicitud es el siguiente «Adicional N» de su obra
+  (`resolver_adicionales` llama a `agregar_adicional`, con su aviso a Logística), en el orden en que se pidieron; cada una por
+  separado: si una ya no se puede (otra persona la resolvió, la obra se cerró), las demás siguen y la pantalla dice cuál y
+  por qué. Tablas propias (`adicional_solicitudes`, `adicional_solicitud_partidas`): las leen Logística y Gerencia, no
+  Operaciones (llevan precios); la `solicitudes` del MVP (una partida por solicitud) no se usa. Gerencia también sigue
+  agregando adicionales directo en la obra.
 - **Consulta de una orden** (`/consulta/orden/…`, la que abre Gerencia): la misma pantalla que el pago de
   Tesorería (`vistaOrden` en `src/app/tesoreria/pago/vista-orden.tsx`, común a las dos), sin el formulario de
   pago ni las acciones: datos y estado, ítems con sus diseños, total con detracción y retención, presupuesto,
@@ -282,8 +292,9 @@ Contabilidad, Residente y RRHH **no entran**. Sus roles siguen en la base
 - **Nueva OC / OS:** sin desplegables de «Ordenar por» ni de «Regular o adicional» (siempre por etapa);
   las partidas adicionales llevan la etiqueta «Adicional N».
 - **Avisos** (campana; `notificar`, solo a las cuentas activas del rol):
-  - Logística: cotización recibida (a la orden), rechazo de Tesorería (a la orden), adicional (a Nueva OC / OS), precio del
-    presupuesto cambiado (a cada orden con esa partida);
+  - Logística: cotización recibida (a la orden), rechazo de Tesorería (a la orden), adicional agregado o aprobado (a Nueva
+    OC / OS), adicional pedido y rechazado (a sus solicitudes), precio del presupuesto cambiado (a cada orden con esa partida);
+  - Gerencia: adicional pedido por Logística (a Adicionales, para aprobarlo);
   - Tesorería: **orden nueva por pagar** («Nueva OC N por pagar · obra», con el proveedor) y orden reenviada corregida
     (al pago); OS con precios distintos al presupuesto;
   - Jefe e Ingeniero de Operaciones: presupuesto publicado (a su seguimiento).
