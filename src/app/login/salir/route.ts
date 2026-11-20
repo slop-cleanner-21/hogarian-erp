@@ -4,7 +4,7 @@ import { createClient } from "@/lib/supabase/server";
 
 // Cerrar sesión: una ruta (formulario POST), no una server action, para que funcione también con la pantalla
 // bloqueada (el proxy no deja pasar server actions sin «desbloqueado») y sin JavaScript.
-export async function POST(req: Request) {
+export async function POST() {
   const supabase = await createClient();
   const { data } = await supabase.auth.getClaims();
   const id = data?.claims?.sub ?? null;
@@ -14,5 +14,6 @@ export async function POST(req: Request) {
   await quitarDesbloqueo();
   if (id) await registrarEvento({ tabla: "sesion", accion: "LOGOUT", registro: id, actor: id, detalle: { email: data?.claims?.email ?? null } });
   // (Una respuesta propia: la de Response.redirect tiene las cabeceras inmutables y Next le agrega las cookies.)
-  return new Response(null, { status: 303, headers: { Location: new URL("/login", req.url).toString() } });
+  // Relativa: con `next start`, req.url dice localhost aunque se entre por la IP de la red (y form-action 'self' la bloquea).
+  return new Response(null, { status: 303, headers: { Location: "/login" } });
 }

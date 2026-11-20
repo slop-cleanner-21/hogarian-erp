@@ -14,17 +14,18 @@ export async function POST(req: Request) {
   if (!accesoActivo()) return new Response(null, { status: 404 });
   const clave = String((await req.formData().catch(() => null))?.get("clave") ?? "");
   const esperada = process.env.DEMO_ACCESO ?? "";
-  const destino = (ruta: string) => new URL(ruta, req.url);
-  if (!esperada || !igual(clave, esperada)) return Response.redirect(destino("/acceso?error=1"), 303);
-  const res = Response.redirect(destino("/login"), 303);
+  // Redirecciones relativas: con `next start`, req.url dice localhost aunque se entre por la IP de la red, y
+  // form-action 'self' bloquea el salto a otro origen.
+  if (!esperada || !igual(clave, esperada)) return new Response(null, { status: 303, headers: { Location: "/acceso?error=1" } });
+  // Secure solo por HTTPS: por http://<IP de la red> el navegador no guardaría la cookie (solo exceptúa localhost).
+  const https = req.headers.get("x-forwarded-proto") === "https" || new URL(req.url).protocol === "https:";
   const cookie = [
     `${COOKIE_ACCESO}=${await firmaAcceso()}`,
     "Path=/",
     "HttpOnly",
     "SameSite=Lax",
     `Max-Age=${60 * 60 * 24 * 7}`,
-    ...(process.env.NODE_ENV === "production" ? ["Secure"] : []),
+    ...(https ? ["Secure"] : []),
   ].join("; ");
-  // Response.redirect deja los headers inmutables: se arma una respuesta nueva con la cookie.
-  return new Response(null, { status: 303, headers: { Location: res.headers.get("Location")!, "Set-Cookie": cookie } });
+  return new Response(null, { status: 303, headers: { Location: "/login", "Set-Cookie": cookie } });
 }
