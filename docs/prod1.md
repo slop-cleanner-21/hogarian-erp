@@ -199,6 +199,10 @@ Contabilidad, Residente y RRHH **no entran**. Sus roles siguen en la base
     apellidos son opcionales al crear la cuenta: con el link los completa el usuario.
   - El celular (como el DNI) va en `perfil_privado`: solo lo lee el servidor. Se guarda con el código del país (un
     número de 9 dígitos que empieza con 9 lleva el 51).
+- **Rehacer un presupuesto como adicionales** (San Pedro 1 y Adolfo King, mano de obra, 20/11/2026): lo pendiente se baja con
+  `guardar_partidas`: la partida sin ninguna orden se quita y la que tiene compras queda en lo comprado (no puede quedar debajo).
+  El saldo se sube como un adicional por obra (`agregar_adicional`). Presupuesto, Seguimiento y Nueva OC / OS no muestran una
+  partida en 0 sin nada comprado; el editor de Gerencia sí.
 - **Presupuesto de la obra (Gerencia):** buscador por ítem y «Filtros» (requerimiento: regular o cada adicional,
   varias etapas, rubro y con o sin P.U.), en la pantalla, sin recargar (`FiltrosHoja` con `local`); las
   partidas nuevas o cambiadas siempre se ven. Las adicionales llevan una franja a la izquierda y dicen
@@ -219,7 +223,8 @@ Contabilidad, Residente y RRHH **no entran**. Sus roles siguen en la base
   toma el original (la plantilla, bucket privado `excel`; tiene RUCs y cuentas reales, no va en el repo) y se escriben solo las
   celdas de datos: es lo inverso de `scripts/extract_excel.py`. Entran las órdenes con precios confirmados en adelante (no las
   anuladas), los ítems, proveedores, obras y partidas nuevos y, en las del Excel, lo que cambió (precios, comprobante y pago
-  registrados en la app). La línea N de la carga es la N-ésima fila válida de GASTOEJEC: **la plantilla debe ser el mismo archivo
+  registrados en la app). Una partida quitada en la app deja su fila de GASTOPROG vacía, como las preparadas sin usar (no se
+  borra la fila; los códigos salen de la auditoría, que guarda la fila borrada). La línea N de la carga es la N-ésima fila válida de GASTOEJEC: **la plantilla debe ser el mismo archivo
   con el que se generó `excel.sql`** (`npm run excel:plantilla -- <ruta>`). Si una hoja se llena (partidas 10,000, compras 15,951,
   proveedores 500, obras 50), lo dice. Los RUC van como número y el texto de un ítem como lo tiene ITEMS (con sus espacios): si no, las búsquedas del libro (BUSCARV
   de PROVEED e ITEMS) no los encuentran y dan #N/D. Revisado abriéndolo en Excel (`tests/audit/excel-recalc.ps1`, local): sin errores salvo 30

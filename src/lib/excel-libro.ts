@@ -13,6 +13,8 @@ export type DatosExcel = {
   items: { descripcion: string; unidad: string | null; rubro: string; tolerancia: number }[];
   proveedores: { cod: string; razon: string; comprobante: string | null; banco: string | null; cuenta: string | null }[];
   partidas: { codigo: string; obra: string; etapa: string; requerimiento: string; item: string; cantidad: number; pu: number | null }[];
+  /** Códigos de las partidas que se quitaron en la app (de la auditoría): su fila de GASTOPROG queda vacía. */
+  borradas: string[];
   lineas: {
     id: number;
     codigo: string;
@@ -255,6 +257,16 @@ export function armarLibro(plantilla: Uint8Array, datos: DatosExcel) {
     if (!igual(numero(f.M) ?? 0, p.cantidad)) poner(cProg, n, "M", p.cantidad);
     if (!igual(numero(f.N), p.pu)) poner(cProg, n, "N", p.pu);
   }
+  // Las quitadas en la app: su fila queda como las preparadas sin usar (sin descripción). No se borra la fila, que
+  // tiene sus fórmulas; y una partida solo se quita sin órdenes, así que ninguna compra de GASTOEJEC la cita.
+  const vigentes = new Set(datos.partidas.map((p) => p.codigo));
+  let partidasQuitadas = 0;
+  for (const codigo of new Set(datos.borradas)) {
+    const n = filaCodigo.get(codigo);
+    if (n === undefined || vigentes.has(codigo) || !norm(progHoja.get(n)!.J)) continue;
+    partidasQuitadas++;
+    for (const col of ["C", "E", "G", "J", "M", "N"]) poner(cProg, n, col, null);
+  }
 
   // ---- GASTOEJEC: la línea N de la carga es la N-ésima fila válida (como las cuenta extract_excel.py)
   const xmlEjec = xml("GASTOEJEC");
@@ -330,7 +342,7 @@ export function armarLibro(plantilla: Uint8Array, datos: DatosExcel) {
   salida["[Content_Types].xml"] = strToU8(strFromU8(archivos["[Content_Types].xml"]).replace(/<Override\b[^>]*calcChain[^>]*\/>/, ""));
   salida["xl/_rels/workbook.xml.rels"] = strToU8(strFromU8(archivos["xl/_rels/workbook.xml.rels"]).replace(/<Relationship\b[^>]*calcChain[^>]*\/>/, ""));
 
-  return { archivo: zipSync(salida, { level: 6 }), resumen: { itemsNuevos, proveedoresNuevos, partidasNuevas, lineasNuevas } };
+  return { archivo: zipSync(salida, { level: 6 }), resumen: { itemsNuevos, proveedoresNuevos, partidasNuevas, partidasQuitadas, lineasNuevas } };
 }
 
 /** Los códigos con partida: los que tienen descripción (los demás están preparados, sin usar). */

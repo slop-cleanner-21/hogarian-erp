@@ -22,9 +22,13 @@ export async function leerDatosExcel(db: SupabaseClient<Database>): Promise<Dato
     todas((a, b) => db.from("oc_items").select("id, obra_id, numero_oc, partida_id, cantidad, pu_cotizado, pu_aprobado, comprobante_id, precio_fijado_at, ret_garantia_pct, pu_bruto").order("id").range(a, b)),
     todas((a, b) => db.from("pago_aplicaciones").select("id, comprobante_id, obra_id, numero_oc, pago_id").order("id").range(a, b)),
   ]);
-  const [comprobantes, pagos] = await Promise.all([
+  const [comprobantes, pagos, borradas] = await Promise.all([
     todas((a, b) => db.from("comprobantes").select("id, tipo, serie, numero, historico").order("id").range(a, b)),
     todas((a, b) => db.from("pagos").select("id, numero_operacion, historico").order("id").range(a, b)),
+    // Las partidas quitadas en la app (el registro guarda la fila entera, con su código).
+    todas((a, b) =>
+      db.from("audit_log").select("id, codigo:detalle->>codigo").eq("tabla", "partidas").eq("accion", "DELETE").order("id").range(a, b),
+    ),
   ]);
 
   const empresa = new Map(empresas.map((e) => [e.id, e]));
@@ -67,6 +71,7 @@ export async function leerDatosExcel(db: SupabaseClient<Database>): Promise<Dato
       cantidad: Number(p.cantidad),
       pu: num(p.pu),
     })),
+    borradas: borradas.map((b) => b.codigo).filter((c): c is string => !!c),
     lineas: lineas.flatMap((l) => {
       const o = orden.get(`${l.obra_id}/${l.numero_oc}`);
       const p = partida.get(l.partida_id);
