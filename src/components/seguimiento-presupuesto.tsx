@@ -24,6 +24,9 @@ export type FilaSeguimiento = {
   entregas: EntregaPartida[];
   /** Mano de obra: retención acumulada (S/), se paga al cerrar la obra. */
   retencion?: number;
+  /** Solo Gerencia: presupuestado (cantidad × P.U.) y comprado al precio real, en S/. */
+  parcial?: number;
+  montoComprado?: number;
 };
 
 type Clave = "porRequerir" | "requeridoPendiente" | "enLogistica" | "enTesoreria" | "porRecibir" | "recibido";

@@ -24,8 +24,23 @@ const FILTRO: Record<string, string> = {
   recibido: "recibido",
 };
 
-/** Seguimiento de los 3 presupuestos de una obra (Operaciones). */
-export async function PaginaSeguimiento({ sp, sesion, clave, titulo }: { sp: Params; sesion: Sesion; clave: string; titulo: string }) {
+/**
+ * Seguimiento de los 3 presupuestos de una obra (Operaciones y Gerencia). `montos`: subtotales por etapa y el total de lo
+ * filtrado en S/, como en el presupuesto de Tesorería; solo Gerencia (Operaciones no ve dinero: ni se consulta).
+ */
+export async function PaginaSeguimiento({
+  sp,
+  sesion,
+  clave,
+  titulo,
+  montos = false,
+}: {
+  sp: Params;
+  sesion: Sesion;
+  clave: string;
+  titulo: string;
+  montos?: boolean;
+}) {
   const supabase = await createClient();
   const grupo = grupoDe(sp.grupo);
   const etapa = filtro(sp, "etapa");
@@ -43,7 +58,7 @@ export async function PaginaSeguimiento({ sp, sesion, clave, titulo }: { sp: Par
   const obraId = lista.find((o) => String(o.id) === sp.obra)?.id ?? lista[0]?.id ?? null;
   // Orden de etapas de la obra (lo define el Jefe de Operaciones), adelantos vigentes, entregas y las partidas:
   // todo en una sola ola (solo necesitan la obra).
-  const [{ data: ordenObra }, { marcas }, entregas, partidas] = obraId
+  const [{ data: ordenObra }, { marcas }, entregas, partidas, dinero] = obraId
     ? await Promise.all([
         supabase.from("obra_etapas").select("etapa").eq("obra_id", obraId).order("orden"),
         adelantosDeObra(obraId),
@@ -61,8 +76,15 @@ export async function PaginaSeguimiento({ sp, sesion, clave, titulo }: { sp: Par
             .order("partida_id")
             .range(a, b),
         ),
+        // Los montos, de la misma vista que el presupuesto de Tesorería (comprado al precio real y presupuestado).
+        montos
+          ? todas((a, b) =>
+              supabase.from("v_avance_partida").select("partida_id, parcial, monto_comprado").eq("obra_id", obraId).order("partida_id").range(a, b),
+            )
+          : Promise.resolve([]),
       ])
-    : [{ data: [] }, { marcas: new Map<number, string[]>() }, {} as Record<number, EntregaPartida[]>, []];
+    : [{ data: [] }, { marcas: new Map<number, string[]>() }, {} as Record<number, EntregaPartida[]>, [], []];
+  const monto = new Map(dinero.map((d) => [d.partida_id, { parcial: Number(d.parcial ?? 0), comprado: Number(d.monto_comprado ?? 0) }]));
 
   const filas: FilaSeguimiento[] = obraId
     ? partidas
@@ -78,6 +100,7 @@ export async function PaginaSeguimiento({ sp, sesion, clave, titulo }: { sp: Par
             pu: f.pu == null ? null : Number(f.pu),
             adelantos: marcas.get(f.partida_id) ?? [],
             entregas: entregas[f.partida_id] ?? [],
+            ...(montos ? { parcial: monto.get(f.partida_id)?.parcial ?? 0, montoComprado: monto.get(f.partida_id)?.comprado ?? 0 } : {}),
           };
           const comprometido = Number(f.en_logistica) + Number(f.en_tesoreria) + Number(f.por_recibir) + Number(f.recibido);
           // Prod 1: la mano de obra sigue el recorrido de las OS (sin avances ni valorizaciones).
@@ -171,6 +194,7 @@ export async function PaginaSeguimiento({ sp, sesion, clave, titulo }: { sp: Par
           <SeguimientoPresupuesto
             filas={filas}
             grupo={grupo}
+            montos={montos}
             ordenEtapas={[...(ordenObra ?? []).map((e) => e.etapa), ...(etapas ?? []).map((e) => e.codigo)]}
           />
         ) : (

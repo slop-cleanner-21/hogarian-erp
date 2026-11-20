@@ -1,7 +1,7 @@
 "use client";
 
 import { MarcaAdicional } from "@/components/marca-adicional";
-import { cn, money, qty } from "@/lib/format";
+import { cn, money, qty, soles } from "@/lib/format";
 import type { Grupo } from "@/lib/presupuesto";
 import { EntregasPartida } from "./entregas-partida";
 import { tramosDe, type FilaSeguimiento } from "./seguimiento-presupuesto";
@@ -19,10 +19,13 @@ export function SeguimientoPresupuesto({
   filas,
   grupo,
   ordenEtapas,
+  montos = false,
 }: {
   filas: FilaSeguimiento[];
   grupo: Grupo;
   ordenEtapas: string[];
+  /** Gerencia: subtotal por etapa y total de lo filtrado en S/ (comprado sobre presupuestado), como en Tesorería. */
+  montos?: boolean;
 }) {
   const verPu = grupo !== "MATERIALES";
   const tramos = tramosDe(grupo);
@@ -58,14 +61,46 @@ export function SeguimientoPresupuesto({
             <h2 className="flex items-baseline justify-between gap-3 px-1 pb-1.5 pt-2">
               <span className="rotulo text-[21px] font-semibold">{etapa}</span>
             </h2>
-            <ul className="overflow-hidden rounded-panel bg-surface">
-              {lista.map((f) => (
-                <Partida key={f.id} f={f} verPu={verPu} tramos={tramos} />
-              ))}
-            </ul>
+            <div className="overflow-hidden rounded-panel bg-surface">
+              <ul>
+                {lista.map((f) => (
+                  <Partida key={f.id} f={f} verPu={verPu} tramos={tramos} />
+                ))}
+              </ul>
+              {montos && <Total titulo={`Subtotal ${etapa}`} filas={lista} className="border-t-2 border-line bg-sunken/60" />}
+            </div>
           </section>
         );
       })}
+      {/* Total de lo filtrado, fijo abajo sobre la barra de navegación (h-16 + borde), como en Tesorería. */}
+      {montos && (
+        <Total
+          titulo={`Total (${filas.length} ítems)`}
+          filas={filas}
+          className="sticky bottom-[calc(4rem+1px+env(safe-area-inset-bottom))] z-10 -mx-4 rounded-none border-t border-line bg-surface px-[1.625rem] shadow-[0_-6px_12px_-8px_rgb(0_0_0/0.25)]"
+        />
+      )}
+    </div>
+  );
+}
+
+/** Subtotal de una etapa o total de lo filtrado: comprado sobre presupuestado, en S/. */
+function Total({ titulo, filas, className }: { titulo: string; filas: FilaSeguimiento[]; className?: string }) {
+  const comprado = filas.reduce((a, f) => a + (f.montoComprado ?? 0), 0);
+  const total = filas.reduce((a, f) => a + (f.parcial ?? 0), 0);
+  return (
+    <div className={cn("flex items-center justify-between gap-3 px-4 py-2", className)}>
+      <span className="font-semibold">{titulo}</span>
+      <span className="num text-right text-[14px] leading-tight">
+        <span className={cn("block font-semibold", comprado > total + 0.005 && "text-danger")}>
+          <span className="sr-only">Comprado </span>
+          {soles(comprado)}
+        </span>
+        <span className="block text-ink-3">
+          <span className="sr-only">de </span>
+          {soles(total)}
+        </span>
+      </span>
     </div>
   );
 }
